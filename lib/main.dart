@@ -53,7 +53,6 @@ class MyApp extends StatelessWidget {
               );
             },
             routes: {
-              '/splash': (context) => const SplashScreen(),
               '/main': (context) => const MainScreen(),
               '/delivery-location': (context) => const DeliveryLocationScreen(),
               '/payment-tracking': (context) {
