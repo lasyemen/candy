@@ -1,0 +1,46 @@
+# Exclude everything by default
+*
+
+# Only include lib and assets folders
+!lib/
+!assets/
+!.gitignore
+
+# Still exclude build files even in lib and assets
+**/build/
+**/ios/
+**/android/
+**/macos/
+**/windows/
+**/linux/
+**/web/
+**/test/
+**/coverage/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub/
+**/.pub-cache/
+**/pubspec.lock
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
