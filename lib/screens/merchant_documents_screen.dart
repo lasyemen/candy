@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:file_selector/file_selector.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 
@@ -23,16 +24,16 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
     'national_id': false,
   };
 
-  final Map<String, String> _documentNames = {
+  final Map<String, String?> _documentNames = {
     'commercial_register': '',
     'national_address': '',
     'tax_number': '',
     'national_id': '',
   };
 
-  late final AnimationController _animationController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<Offset> _slideAnimation;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
@@ -49,15 +50,13 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
       ),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+          ),
+        );
 
     _animationController.forward();
   }
@@ -70,30 +69,85 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
 
   Future<void> _pickDocument(String documentType) async {
     try {
-      final typeGroup = XTypeGroup(
-        label: 'documents',
-        extensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      // Show options dialog
+      final String? choice = await showDialog<String>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'اختر طريقة الرفع',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(Icons.image, color: Colors.blue),
+                  title: Text(
+                    'معرض الصور',
+                    style: TextStyle(fontFamily: 'Rubik'),
+                  ),
+                  onTap: () => Navigator.pop(context, 'gallery'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.camera_alt, color: Colors.green),
+                  title: Text(
+                    'الكاميرا',
+                    style: TextStyle(fontFamily: 'Rubik'),
+                  ),
+                  onTap: () => Navigator.pop(context, 'camera'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.folder, color: Colors.orange),
+                  title: Text('الملفات', style: TextStyle(fontFamily: 'Rubik')),
+                  onTap: () => Navigator.pop(context, 'files'),
+                ),
+              ],
+            ),
+          );
+        },
       );
 
-      final XFile? file = await openFile(acceptedTypeGroups: [typeGroup]);
+      if (choice == null) return;
 
-      if (file != null) {
+      String? fileName;
+      if (choice == 'gallery') {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.gallery,
+        );
+        if (image != null) {
+          fileName = image.name;
+        }
+      } else if (choice == 'camera') {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(source: ImageSource.camera);
+        if (image != null) {
+          fileName = image.name;
+        }
+      } else if (choice == 'files') {
+        FilePickerResult? result = await FilePicker.platform.pickFiles();
+        if (result != null) {
+          fileName = result.files.first.name;
+        }
+      }
+
+      if (fileName != null) {
         setState(() {
           _uploadedDocuments[documentType] = true;
-          _documentNames[documentType] = file.name;
+          _documentNames[documentType] = fileName;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم رفع ${file.name} بنجاح'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('حدث خطأ أثناء رفع الملف'),
           backgroundColor: Colors.red,
         ),
@@ -106,21 +160,16 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
       _uploadedDocuments[documentType] = false;
       _documentNames[documentType] = '';
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم حذف الملف'),
-        backgroundColor: Colors.orange,
-      ),
-    );
   }
 
   void _submitDocuments() async {
-    if (_uploadedDocuments.values.contains(false)) {
+    // Check if all documents are uploaded
+    bool allUploaded = _uploadedDocuments.values.every((uploaded) => uploaded);
+    if (!allUploaded) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('يرجى رفع جميع المستندات المطلوبة'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.orange,
         ),
       );
       return;
@@ -132,13 +181,22 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
 
     if (!mounted) return;
     setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, AppRoutes.main);
+
+    // Navigate to merchant approval screen
+    Navigator.pushNamed(
+      context,
+      AppRoutes.merchantApproval,
+      arguments: {...widget.merchantData, 'documents': _documentNames},
+    );
   }
 
   Widget _buildDocumentCard(
-      String title, String subtitle, String documentType) {
+    String title,
+    String subtitle,
+    String documentType,
+  ) {
     final isUploaded = _uploadedDocuments[documentType]!;
-    final fileName = _documentNames[documentType]!;
+    final fileName = _documentNames[documentType] ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -168,36 +226,43 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                      fontFamily: 'Rubik',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    )),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Rubik',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(isUploaded ? 'تم الرفع بنجاح' : subtitle,
-                    style: TextStyle(
-                      fontFamily: 'Rubik',
-                      fontSize: 12,
-                      color: isUploaded ? Colors.green[600] : Colors.grey[600],
-                    )),
+                Text(
+                  isUploaded ? 'تم الرفع بنجاح' : subtitle,
+                  style: TextStyle(
+                    fontFamily: 'Rubik',
+                    fontSize: 12,
+                    color: isUploaded ? Colors.green[600] : Colors.grey[600],
+                  ),
+                ),
                 if (isUploaded && fileName.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(fileName,
-                      style: const TextStyle(
-                        fontFamily: 'Rubik',
-                        fontSize: 11,
-                        color: Colors.grey,
-                        fontStyle: FontStyle.italic,
-                      )),
+                  Text(
+                    fileName,
+                    style: const TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 11,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
                 ],
               ],
             ),
           ),
           GestureDetector(
-            onTap: () =>
-                isUploaded ? _deleteDocument(documentType) : _pickDocument(documentType),
+            onTap: () => isUploaded
+                ? _deleteDocument(documentType)
+                : _pickDocument(documentType),
             child: Container(
               width: 32,
               height: 32,
@@ -205,7 +270,8 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                 color: isUploaded ? Colors.red[50] : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: isUploaded ? Colors.red[200]! : Colors.transparent),
+                  color: isUploaded ? Colors.red[200]! : Colors.transparent,
+                ),
               ),
               child: Icon(
                 isUploaded ? Icons.delete_outline : Icons.add,
@@ -234,7 +300,7 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
           shaderCallback: (bounds) =>
               DesignSystem.primaryGradient.createShader(bounds),
           child: const Text(
-            'تسجيل تاجر جديد',
+            'رفع المستندات',
             style: TextStyle(
               fontFamily: 'Rubik',
               fontSize: 18,
@@ -265,7 +331,7 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                           height: 4,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(2),
-                            gradient: DesignSystem.primaryGradient,
+                            color: Colors.grey[300],
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -289,15 +355,17 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'الملفات المطلوبة',
+                    Text(
+                      'رفع المستندات',
                       style: TextStyle(
                         fontFamily: 'Rubik',
                         fontSize: 14,
-                        color: Colors.grey,
+                        color: Colors.grey[600],
                       ),
                     ),
                     const SizedBox(height: 32),
+
+                    // Documents Icon with Gradient Container
                     Container(
                       width: 100,
                       height: 100,
@@ -318,9 +386,12 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                         size: 50,
                       ),
                     ),
+
                     const SizedBox(height: 24),
-                    const Text(
-                      'الملفات المطلوبة\nيرجى رفع جميع المستندات المطلوبة',
+
+                    // Subtitle
+                    Text(
+                      'رفع المستندات المطلوبة\nلإكمال التسجيل',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Rubik',
@@ -329,28 +400,34 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                         height: 1.8,
                       ),
                     ),
+
                     const SizedBox(height: 40),
+
+                    // Document Cards
                     _buildDocumentCard(
                       'السجل التجاري',
-                      'اضغط لرفع السجل التجاري',
+                      'رفع صورة من السجل التجاري',
                       'commercial_register',
                     ),
                     _buildDocumentCard(
                       'العنوان الوطني',
-                      'اضغط لرفع العنوان الوطني',
+                      'رفع صورة من العنوان الوطني',
                       'national_address',
                     ),
                     _buildDocumentCard(
                       'الرقم الضريبي',
-                      'اضغط لرفع الرقم الضريبي',
+                      'رفع صورة من الرقم الضريبي',
                       'tax_number',
                     ),
                     _buildDocumentCard(
                       'الهوية الوطنية',
-                      'اضغط لرفع الهوية الوطنية',
+                      'رفع صورة من الهوية الوطنية',
                       'national_id',
                     ),
+
                     const SizedBox(height: 32),
+
+                    // Submit Button
                     Container(
                       width: double.infinity,
                       height: 56,
@@ -380,29 +457,19 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.arrow_back_ios,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'التالي',
-                                    style: TextStyle(
-                                      fontFamily: 'Rubik',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                            : const Text(
+                                'التالي',
+                                style: TextStyle(
+                                  fontFamily: 'Rubik',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
                               ),
                       ),
                     ),

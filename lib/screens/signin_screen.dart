@@ -13,9 +13,6 @@ class _SignInScreenState extends State<SignInScreen>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-
-  bool _obscurePassword = true;
   bool _isLoading = false;
 
   late AnimationController _animationController;
@@ -51,7 +48,6 @@ class _SignInScreenState extends State<SignInScreen>
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -71,8 +67,15 @@ class _SignInScreenState extends State<SignInScreen>
         _isLoading = false;
       });
 
-      // Navigate to main screen
-      Navigator.pushReplacementNamed(context, AppRoutes.main);
+      // Navigate to OTP screen
+      Navigator.pushNamed(
+        context,
+        AppRoutes.otp,
+        arguments: {
+          'userName': 'User', // Generic name for signin
+          'userPhone': _phoneController.text,
+        },
+      );
     }
   }
 
@@ -207,89 +210,6 @@ class _SignInScreenState extends State<SignInScreen>
                                     Icons.phone_outlined,
                                     color: Colors.grey[600],
                                     size: 20,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Password Field
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Label above the input field
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16, bottom: 8),
-                            child: Text(
-                              'كلمة المرور',
-                              style: TextStyle(
-                                fontFamily: 'Rubik',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                          // Input field
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: DesignSystem.primaryGradient,
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال كلمة المرور';
-                                  }
-                                  return null;
-                                },
-                                style: const TextStyle(
-                                  fontFamily: 'Rubik',
-                                  fontSize: 12,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'أدخل كلمة المرور',
-                                  hintStyle: TextStyle(
-                                    fontFamily: 'Rubik',
-                                    fontSize: 12,
-                                    color: Colors.grey[500],
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.lock_outline,
-                                    color: Colors.grey[600],
-                                    size: 20,
-                                  ),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                      color: Colors.grey[600],
-                                      size: 20,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePassword = !_obscurePassword;
-                                      });
-                                    },
                                   ),
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(

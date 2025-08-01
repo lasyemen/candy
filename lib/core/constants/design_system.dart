@@ -401,6 +401,127 @@ class DesignSystem {
     contentPadding: PlatformUIStandards.paddingM,
   );
 
+  /// Gradient Input Decoration with White Background - نمط الحقل المتدرج مع خلفية بيضاء
+  static InputDecoration get gradientInputDecorationWhite => InputDecoration(
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.transparent, width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: error, width: 2),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  );
+
+  /// Gradient TextFormField Widget - حقل النص المتدرج
+  static Widget gradientTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    required String hintText,
+    required IconData prefixIcon,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+    Widget? suffixIcon,
+    VoidCallback? onTap,
+    bool readOnly = false,
+    int? maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Custom label above the input field
+        Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: 8),
+          child: Text(
+            labelText,
+            style: const TextStyle(
+              fontFamily: 'Rubik',
+              fontSize: 14,
+              color: Color(0xFF6B46C1),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        // Gradient input field
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: primaryGradient,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6B46C1).withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: TextFormField(
+              controller: controller,
+              obscureText: obscureText,
+              keyboardType: keyboardType,
+              validator: validator,
+              onTap: onTap,
+              readOnly: readOnly,
+              maxLines: maxLines,
+              style: const TextStyle(fontFamily: 'Rubik', fontSize: 14),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                labelText: '', // Empty label to prevent border crossing
+                hintText: hintText,
+                hintStyle: const TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+                prefixIcon: Icon(
+                  prefixIcon,
+                  color: const Color(0xFF6B46C1),
+                  size: 20,
+                ),
+                suffixIcon: suffixIcon,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: error, width: 1),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // Dialog Styles - أنماط الحوارات
 
   /// Primary Dialog Style - نمط الحوار الأساسي

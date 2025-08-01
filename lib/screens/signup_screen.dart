@@ -70,10 +70,10 @@ class _SignUpScreenState extends State<SignUpScreen>
         _isLoading = false;
       });
 
-      // Navigate to password creation screen
+      // Navigate directly to OTP screen
       Navigator.pushNamed(
         context,
-        AppRoutes.createPassword,
+        AppRoutes.otp,
         arguments: {
           'userName': _nameController.text,
           'userPhone': _phoneController.text,
@@ -225,7 +225,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                         ],
                       ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
                       // Phone Field
                       Column(

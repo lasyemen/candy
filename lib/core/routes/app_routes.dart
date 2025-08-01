@@ -10,10 +10,11 @@ class AppRoutes {
   static const String auth = '/auth';
   static const String signin = '/signin';
   static const String signup = '/signup';
-  static const String createPassword = '/create-password';
+
   static const String otp = '/otp';
   static const String merchantSignup = '/merchant-signup';
   static const String merchantDocuments = '/merchant-documents';
+  static const String merchantApproval = '/merchant-approval';
   static const String main = '/main';
   static const String home = '/home';
   static const String cart = '/cart';
@@ -36,14 +37,12 @@ class AppRoutes {
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         return MerchantDocumentsScreen(merchantData: args ?? {});
       },
-      createPassword: (context) {
+      merchantApproval: (context) {
         final args =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-        return CreatePasswordScreen(
-          userName: args?['userName'] ?? '',
-          userPhone: args?['userPhone'] ?? '',
-        );
+        return MerchantApprovalScreen(merchantData: args ?? {});
       },
+
       otp: (context) {
         final args =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
