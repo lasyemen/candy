@@ -8,9 +8,12 @@ class AppRoutes {
   // Route names as constants for easy reference
   static const String splash = '/';
   static const String auth = '/auth';
+  static const String signin = '/signin';
   static const String signup = '/signup';
   static const String createPassword = '/create-password';
   static const String otp = '/otp';
+  static const String merchantSignup = '/merchant-signup';
+  static const String merchantDocuments = '/merchant-documents';
   static const String main = '/main';
   static const String home = '/home';
   static const String cart = '/cart';
@@ -25,7 +28,14 @@ class AppRoutes {
     return {
       // Authentication Routes
       auth: (context) => const AuthScreen(),
+      signin: (context) => const SignInScreen(),
       signup: (context) => const SignUpScreen(),
+      merchantSignup: (context) => const MerchantSignupScreen(),
+      merchantDocuments: (context) {
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        return MerchantDocumentsScreen(merchantData: args ?? {});
+      },
       createPassword: (context) {
         final args =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;

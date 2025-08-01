@@ -142,10 +142,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           // Navigate to sign in screen
-                          Navigator.pushReplacementNamed(
-                            context,
-                            AppRoutes.main,
-                          );
+                          Navigator.pushNamed(context, AppRoutes.signin);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -189,10 +186,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          // Navigate to merchant sign in screen
-                          Navigator.pushReplacementNamed(
+                          // Navigate to merchant signup screen
+                          Navigator.pushNamed(
                             context,
-                            AppRoutes.main,
+                            AppRoutes.merchantSignup,
                           );
                         },
                         style: ElevatedButton.styleFrom(
