@@ -68,7 +68,7 @@ class BannerWidget extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             gradient: banner['gradient'],
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(35),
             boxShadow: [
               BoxShadow(
                 color: banner['color']!.withOpacity(0.15),
@@ -85,7 +85,7 @@ class BannerWidget extends StatelessWidget {
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(35),
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -97,7 +97,7 @@ class BannerWidget extends StatelessWidget {
                     Colors.white.withOpacity(0.05),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(35),
               ),
               child: Row(
                 children: [
