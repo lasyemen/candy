@@ -74,43 +74,177 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
+            backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
             ),
-            title: Text(
-              'اختر طريقة الرفع',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 80,
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    gradient: DesignSystem.primaryGradient,
+                  ),
+                  child: Icon(Icons.upload_file, color: Colors.white, size: 16),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'اختر طريقة الرفع',
+                  style: TextStyle(
+                    fontFamily: 'Rubik',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(
-                  leading: Icon(Icons.image, color: Colors.blue),
-                  title: Text(
-                    'معرض الصور',
-                    style: TextStyle(fontFamily: 'Rubik'),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  onTap: () => Navigator.pop(context, 'gallery'),
-                ),
-                ListTile(
-                  leading: Icon(Icons.camera_alt, color: Colors.green),
-                  title: Text(
-                    'الكاميرا',
-                    style: TextStyle(fontFamily: 'Rubik'),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            gradient: DesignSystem.primaryGradient,
+                          ),
+                          child: Icon(
+                            Icons.image,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        title: Text(
+                          'معرض الصور',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'اختر صورة من المعرض',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        onTap: () => Navigator.pop(context, 'gallery'),
+                      ),
+                      Divider(height: 1, color: Colors.grey[200]),
+                      ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            gradient: DesignSystem.primaryGradient,
+                          ),
+                          child: Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        title: Text(
+                          'الكاميرا',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'التقاط صورة جديدة',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        onTap: () => Navigator.pop(context, 'camera'),
+                      ),
+                      Divider(height: 1, color: Colors.grey[200]),
+                      ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            gradient: DesignSystem.primaryGradient,
+                          ),
+                          child: Icon(
+                            Icons.folder,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        title: Text(
+                          'الملفات',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'اختر ملف من الجهاز',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        onTap: () => Navigator.pop(context, 'files'),
+                      ),
+                    ],
                   ),
-                  onTap: () => Navigator.pop(context, 'camera'),
-                ),
-                ListTile(
-                  leading: Icon(Icons.folder, color: Colors.orange),
-                  title: Text('الملفات', style: TextStyle(fontFamily: 'Rubik')),
-                  onTap: () => Navigator.pop(context, 'files'),
                 ),
               ],
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    fontFamily: 'Rubik',
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           );
         },
       );
@@ -144,22 +278,137 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
           _uploadedDocuments[documentType] = true;
           _documentNames[documentType] = fileName;
         });
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'تم رفع الملف بنجاح',
+                  style: TextStyle(fontFamily: 'Rubik'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ أثناء رفع الملف'),
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'حدث خطأ أثناء رفع الملف',
+                style: TextStyle(fontFamily: 'Rubik'),
+              ),
+            ],
+          ),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
   }
 
-  void _deleteDocument(String documentType) {
-    setState(() {
-      _uploadedDocuments[documentType] = false;
-      _documentNames[documentType] = '';
-    });
+  void _deleteDocument(String documentType) async {
+    // Show confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Colors.red[600],
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'حذف الملف',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'هل أنت متأكد من حذف هذا الملف؟',
+            style: TextStyle(fontFamily: 'Rubik', fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'إلغاء',
+                style: TextStyle(fontFamily: 'Rubik', color: Colors.grey[600]),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'حذف',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  color: Colors.red[600],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _uploadedDocuments[documentType] = false;
+        _documentNames[documentType] = '';
+      });
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.delete_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text('تم حذف الملف بنجاح', style: TextStyle(fontFamily: 'Rubik')),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
   }
 
   void _submitDocuments() async {
@@ -198,89 +447,88 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
     final isUploaded = _uploadedDocuments[documentType]!;
     final fileName = _documentNames[documentType] ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green[200]!),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: isUploaded ? Colors.green : Colors.grey[300],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isUploaded ? Icons.check : Icons.upload_file,
-              color: isUploaded ? Colors.white : Colors.grey[600],
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Rubik',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isUploaded ? 'تم الرفع بنجاح' : subtitle,
-                  style: TextStyle(
-                    fontFamily: 'Rubik',
-                    fontSize: 12,
-                    color: isUploaded ? Colors.green[600] : Colors.grey[600],
-                  ),
-                ),
-                if (isUploaded && fileName.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    fileName,
-                    style: const TextStyle(
-                      fontFamily: 'Rubik',
-                      fontSize: 11,
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => isUploaded
-                ? _deleteDocument(documentType)
-                : _pickDocument(documentType),
-            child: Container(
-              width: 32,
-              height: 32,
+    return GestureDetector(
+      onTap: () => isUploaded
+          ? _deleteDocument(documentType)
+          : _pickDocument(documentType),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.green[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green[200]!),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
-                color: isUploaded ? Colors.red[50] : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isUploaded ? Colors.red[200]! : Colors.transparent,
-                ),
+                borderRadius: BorderRadius.circular(6),
+                gradient: isUploaded
+                    ? LinearGradient(
+                        colors: [Colors.green[400]!, Colors.green[600]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : LinearGradient(
+                        colors: [Colors.grey[400]!, Colors.grey[600]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
               ),
               child: Icon(
-                isUploaded ? Icons.delete_outline : Icons.add,
-                color: isUploaded ? Colors.red[600] : Colors.grey[600],
-                size: 18,
+                isUploaded ? Icons.check : Icons.upload_file,
+                color: Colors.white,
+                size: 16,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isUploaded ? 'تم الرفع بنجاح' : subtitle,
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 11,
+                      color: isUploaded ? Colors.green[600] : Colors.grey[600],
+                    ),
+                  ),
+                  if (isUploaded && fileName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      fileName,
+                      style: const TextStyle(
+                        fontFamily: 'Rubik',
+                        fontSize: 10,
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(
+              isUploaded ? Icons.delete_outline : Icons.add,
+              color: isUploaded ? Colors.red[600] : Colors.grey[600],
+              size: 16,
+            ),
+          ],
+        ),
       ),
     );
   }
