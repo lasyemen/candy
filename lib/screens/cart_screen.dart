@@ -21,6 +21,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late List<Animation<Offset>> _itemAnimations = [];
+  bool _showSummaryCard = false;
 
   @override
   void initState() {
@@ -87,6 +88,132 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     } else {
       appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
     }
+  }
+
+  void _showCartDetails(List<CartItem> cartItems, double cartTotal) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: DesignSystem.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: DesignSystem.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'تفاصيل السلة',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Items breakdown
+              ...cartItems
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.product.name,
+                              style: TextStyle(
+                                fontFamily: 'Rubik',
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                '${item.quantity} × ${item.product.price.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontFamily: 'Rubik',
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const RiyalIcon(size: 12, color: Colors.grey),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              const Divider(height: 20),
+              // Total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المجموع الكلي',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        cartTotal.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: DesignSystem.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'إغلاق',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _removeItem(String productId) {
@@ -265,20 +392,6 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          gradient: DesignSystem.getBrandGradient('primary'),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: DesignSystem.getBrandShadow('light'),
-                        ),
-                        child: Icon(
-                          FontAwesomeIcons.cartShopping,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,17 +417,17 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                         ),
                       ),
                       if (cartItems.isNotEmpty)
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: IconButton(
-                            onPressed: _clearCart,
-                            icon: Icon(
-                              FontAwesomeIcons.trash,
-                              color: Colors.red,
-                              size: 18,
+                        IconButton(
+                          onPressed: () =>
+                              _showCartSummary(cartItems, cartTotal),
+                          icon: ShaderMask(
+                            shaderCallback: (bounds) => DesignSystem
+                                .primaryGradient
+                                .createShader(bounds),
+                            child: Icon(
+                              Icons.receipt_long,
+                              color: Colors.white,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -339,142 +452,212 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildCartContent(List<CartItem> cartItems, double cartTotal) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      itemCount: cartItems.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final cartItem = cartItems[index];
+        return SlideTransition(
+          position: _itemAnimations.isNotEmpty && index < _itemAnimations.length
+              ? _itemAnimations[index]
+              : AlwaysStoppedAnimation(Offset.zero),
+          child: _buildCartItem(cartItem, index),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryCardContent(List<CartItem> cartItems, double cartTotal) {
     return Column(
       children: [
-        // Cart Items List
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(20),
-            physics: const BouncingScrollPhysics(),
-            itemCount: cartItems.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final cartItem = cartItems[index];
-              return SlideTransition(
-                position:
-                    _itemAnimations.isNotEmpty && index < _itemAnimations.length
-                    ? _itemAnimations[index]
-                    : AlwaysStoppedAnimation(Offset.zero),
-                child: _buildCartItem(cartItem, index),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: Text(
+                'المجموع الكلي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${cartItems.length} منتج',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              cartTotal.toStringAsFixed(2),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Rubik',
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const RiyalIcon(size: 24, color: Colors.white),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DeliveryLocationScreen(),
+                ),
               );
             },
+            icon: Icon(FontAwesomeIcons.creditCard, size: 18),
+            label: ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: Text(
+                'المتابعة للدفع',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Rubik',
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: DesignSystem.primary,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+              shadowColor: DesignSystem.secondary.withOpacity(0.3),
+            ),
           ),
         ),
+      ],
+    );
+  }
 
-        // Total Summary Card at Bottom
-        Container(
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            120,
-          ), // رفع عن الناف بار أكثر
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: DesignSystem.getBrandGradient('primary'),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: DesignSystem.primary.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, -4), // ظل للأعلى
-              ),
-              BoxShadow(
-                color: DesignSystem.secondary.withOpacity(0.2),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: Column(
+  void _showCartSummary(List<CartItem> cartItems, double cartTotal) {
+    if (_showSummaryCard) {
+      setState(() {
+        _showSummaryCard = false;
+      });
+    } else {
+      _showSummaryOverlay(cartItems, cartTotal);
+    }
+  }
+
+  void _showSummaryOverlay(List<CartItem> cartItems, double cartTotal) {
+    final overlay = Overlay.of(context);
+    late final OverlayEntry overlayEntry;
+    bool isVisible = false;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => GestureDetector(
+        onTap: () {
+          // Dismiss when tapping anywhere
+          isVisible = false;
+          overlayEntry.markNeedsBuild();
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (overlayEntry.mounted) {
+              overlayEntry.remove();
+            }
+          });
+        },
+        child: Container(
+          color: Colors.transparent,
+          child: Stack(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'المجموع الكلي',
-                    style: DesignSystem.titleLarge.copyWith(
-                      color: Colors.white.withOpacity(0.9),
-                      fontFamily: 'Rubik',
-                      fontWeight: FontWeight.w500,
+              Positioned(
+                bottom: 120, // Position above the navigation bar
+                left: 20,
+                right: 20,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 0,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    transform: Matrix4.translationValues(
+                      0,
+                      isVisible ? 0 : 200, // Slide up from bottom
+                      0,
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${cartItems.length} منتج',
-                      style: DesignSystem.bodySmall.copyWith(
-                        color: Colors.white,
-                        fontFamily: 'Rubik',
-                        fontWeight: FontWeight.w500,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 250),
+                      opacity: isVisible ? 1.0 : 0.0,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        decoration: BoxDecoration(
+                          gradient: DesignSystem.getBrandGradient('primary'),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: const EdgeInsets.all(24),
+                        child: _buildSummaryCardContent(cartItems, cartTotal),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${cartTotal.toStringAsFixed(2)}',
-                    style: DesignSystem.displaySmall.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const RiyalIcon(size: 24, color: Colors.white),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const DeliveryLocationScreen(),
-                      ),
-                    );
-                  },
-                  icon: Icon(FontAwesomeIcons.creditCard, size: 18),
-                  label: Text(
-                    'المتابعة للدفع',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: DesignSystem.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                    shadowColor: DesignSystem.secondary.withOpacity(0.3),
                   ),
                 ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
+
+    overlay.insert(overlayEntry);
+
+    // Start appearing animation
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (overlayEntry.mounted) {
+        isVisible = true;
+        overlayEntry.markNeedsBuild();
+      }
+    });
+
+    // Auto remove after 5 seconds with disappearing animation
+    Future.delayed(const Duration(seconds: 5), () {
+      if (overlayEntry.mounted) {
+        isVisible = false;
+        overlayEntry.markNeedsBuild();
+
+        // Remove after animation completes
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        });
+      }
+    });
   }
 
   Widget _buildEmptyCart() {
@@ -708,20 +891,20 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // Total Price & Remove
+          // Total Price & Info
           Column(
             children: [
               IconButton(
-                onPressed: () => _removeItem(cartItem.product.id),
+                onPressed: () => _showProductInfo(cartItem),
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: DesignSystem.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    FontAwesomeIcons.trash,
-                    color: Colors.red,
+                    Icons.info_outline,
+                    color: DesignSystem.primary,
                     size: 16,
                   ),
                 ),
@@ -797,6 +980,188 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
           color: isDecrease ? DesignSystem.textSecondary : Colors.white,
         ),
       ),
+    );
+  }
+
+  void _showProductInfo(CartItem cartItem) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: DesignSystem.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: DesignSystem.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'تفاصيل المنتج',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Product Image
+              Center(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: DesignSystem.getBrandGradient('primary'),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DesignSystem.primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      FontAwesomeIcons.droplet,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Product Name
+              Text(
+                cartItem.product.name,
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Price
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'السعر:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        cartItem.product.price.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: DesignSystem.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Quantity
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'الكمية المطلوبة:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Text(
+                    '${cartItem.quantity}',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: DesignSystem.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Total for this item
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المجموع:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        cartItem.totalPrice.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: DesignSystem.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                'إغلاق',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
