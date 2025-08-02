@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../../core/models/water_product.dart';
+import '../../models/product.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/design_system.dart';
 import '../riyal_icon.dart';
 
 class HomeProductCard extends StatefulWidget {
-  final WaterProduct product;
+  final Product product;
   final VoidCallback onAddToCart;
   final bool isGridView;
 
@@ -100,36 +100,23 @@ class _HomeProductCardState extends State<HomeProductCard>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(16),
                         ),
-                        child: Image.asset(
-                          product.image,
-                          width: double.infinity,
-                          height: isGridView ? 120 : 100,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      if (product.discount > 0)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red[500],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '-${product.discount.toInt()}%',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                        child: product.imageUrl != null
+                            ? Image.network(
+                                product.imageUrl!,
+                                width: double.infinity,
+                                height: isGridView ? 120 : 100,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: double.infinity,
+                                height: isGridView ? 120 : 100,
+                                color: Colors.grey[300],
+                                child: const Icon(
+                                  Icons.image,
+                                  color: Colors.grey,
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
+                      ),
                     ],
                   ),
                   // Product Info
@@ -165,7 +152,7 @@ class _HomeProductCardState extends State<HomeProductCard>
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '(${product.reviewCount})',
+                              '(${product.totalSold})',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[500],

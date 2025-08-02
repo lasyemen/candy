@@ -4,14 +4,14 @@ import 'dart:ui';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../core/models/water_product.dart';
+import '../../models/product.dart';
 import '../../core/constants/design_system.dart';
 import '../riyal_icon.dart';
 
 class HomeProductCardWidget extends StatelessWidget {
-  final WaterProduct product;
+  final Product product;
   final VoidCallback onAddToCart;
-  final String Function(WaterProduct) getProductDescription;
+  final String Function(Product) getProductDescription;
 
   const HomeProductCardWidget({
     super.key,
@@ -147,12 +147,18 @@ class HomeProductCardWidget extends StatelessWidget {
                                       ),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: Image.asset(
-                                      product.image,
-                                      fit: BoxFit.contain,
-                                      width: 60,
-                                      height: 60,
-                                    ),
+                                    child: product.imageUrl != null
+                                        ? Image.network(
+                                            product.imageUrl!,
+                                            fit: BoxFit.contain,
+                                            width: 60,
+                                            height: 60,
+                                          )
+                                        : const Icon(
+                                            Icons.image,
+                                            size: 60,
+                                            color: Colors.grey,
+                                          ),
                                   ),
                                 ),
                               ),

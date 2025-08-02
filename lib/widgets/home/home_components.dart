@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../core/constants/design_system.dart';
-import '../../core/models/water_product.dart';
+import '../../models/index.dart';
 
 class HomeBannerWidget extends StatelessWidget {
   final List<Map<String, dynamic>> banners;
@@ -190,8 +190,8 @@ class HomeCategoryWidget extends StatelessWidget {
 }
 
 class HomeSearchWidget extends StatelessWidget {
-  final List<WaterProduct> allProducts;
-  final ValueChanged<WaterProduct> onProductTap;
+  final List<Product> allProducts;
+  final ValueChanged<Product> onProductTap;
 
   const HomeSearchWidget({
     Key? key,
@@ -205,7 +205,7 @@ class HomeSearchWidget extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: GestureDetector(
         onTap: () {
-          showSearch<WaterProduct?>(
+          showSearch<Product?>(
             context: context,
             delegate: _ProductSearchDelegate(
               allProducts: allProducts,
@@ -321,9 +321,9 @@ class HomeViewToggleWidget extends StatelessWidget {
   }
 }
 
-class _ProductSearchDelegate extends SearchDelegate<WaterProduct?> {
-  final List<WaterProduct> allProducts;
-  final ValueChanged<WaterProduct> onProductTap;
+class _ProductSearchDelegate extends SearchDelegate<Product?> {
+  final List<Product> allProducts;
+  final ValueChanged<Product> onProductTap;
 
   _ProductSearchDelegate({
     required this.allProducts,
@@ -347,7 +347,9 @@ class _ProductSearchDelegate extends SearchDelegate<WaterProduct?> {
             (p) => ListTile(
               title: Text(p.name),
               subtitle: Text('${p.price} ر.س'),
-              leading: Image.asset(p.image, width: 40),
+              leading: p.imageUrl != null
+                  ? Image.network(p.imageUrl!, width: 40)
+                  : const Icon(Icons.image),
               onTap: () {
                 onProductTap(p);
                 close(context, p);

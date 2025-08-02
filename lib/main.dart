@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'blocs/app_bloc.dart';
 import 'core/services/app_settings.dart';
+import 'core/services/supabase_service.dart';
 import 'screens/index.dart';
 import 'core/constants/design_system.dart';
 import 'core/routes/index.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -18,6 +20,10 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+
+  // Initialize Supabase
+  await SupabaseService.instance.initialize();
+
   runApp(const MyApp());
 }
 

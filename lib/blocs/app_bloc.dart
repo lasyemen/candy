@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../core/models/cart_item.dart';
-import '../core/models/water_product.dart';
+import '../models/cart.dart';
+import '../models/product.dart';
+import '../core/services/cart_service.dart';
 
 // Events
 abstract class AppEvent {}
@@ -16,7 +17,7 @@ class SetCartItemCountEvent extends AppEvent {
 }
 
 class AddToCartEvent extends AppEvent {
-  final WaterProduct product;
+  final Product product;
   AddToCartEvent(this.product);
 }
 
@@ -65,7 +66,7 @@ class AppInitialState extends AppState {}
 class AppLoadedState extends AppState {
   final int currentIndex;
   final int cartItemCount;
-  final List<CartItem> cartItems;
+  final Cart? cart;
   final bool isLoading;
   final String? errorMessage;
   final bool isInitialized;
@@ -74,7 +75,7 @@ class AppLoadedState extends AppState {
   AppLoadedState({
     required this.currentIndex,
     required this.cartItemCount,
-    required this.cartItems,
+    this.cart,
     required this.isLoading,
     this.errorMessage,
     required this.isInitialized,
@@ -84,7 +85,7 @@ class AppLoadedState extends AppState {
   AppLoadedState copyWith({
     int? currentIndex,
     int? cartItemCount,
-    List<CartItem>? cartItems,
+    Cart? cart,
     bool? isLoading,
     String? errorMessage,
     bool? isInitialized,
@@ -93,7 +94,7 @@ class AppLoadedState extends AppState {
     return AppLoadedState(
       currentIndex: currentIndex ?? this.currentIndex,
       cartItemCount: cartItemCount ?? this.cartItemCount,
-      cartItems: cartItems ?? this.cartItems,
+      cart: cart ?? this.cart,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
       isInitialized: isInitialized ?? this.isInitialized,
@@ -107,7 +108,7 @@ class AppBloc extends ChangeNotifier {
   AppState _state = AppLoadedState(
     currentIndex: 2, // Home is default
     cartItemCount: 0,
-    cartItems: [],
+    cart: null,
     isLoading: false,
     errorMessage: null,
     isInitialized: false,
@@ -200,96 +201,125 @@ class AppBloc extends ChangeNotifier {
     }
   }
 
-  void _addToCart(WaterProduct product) {
+  void _addToCart(Product product) async {
     if (_state is AppLoadedState) {
       final currentState = _state as AppLoadedState;
-      final cartItems = List<CartItem>.from(currentState.cartItems);
 
-      // Check if product already exists in cart
-      final existingItemIndex = cartItems.indexWhere(
-        (item) => item.product.id == product.id,
-      );
+      try {
+        // For now, we'll use a simple approach
+        // In a real app, you'd get the customer ID from user session
+        const customerId = 'temp-customer-id';
 
-      if (existingItemIndex >= 0) {
-        // Update quantity of existing item
-        final existingItem = cartItems[existingItemIndex];
-        cartItems[existingItemIndex] = existingItem.copyWith(
-          quantity: existingItem.quantity + 1,
-          totalPrice: (existingItem.quantity + 1) * product.price,
-        );
-      } else {
-        // Add new item to cart
-        cartItems.add(
-          CartItem(product: product, quantity: 1, totalPrice: product.price),
-        );
-      }
-
-      _state = currentState.copyWith(
-        cartItems: cartItems,
-        cartItemCount: cartItems.fold<int>(
-          0,
-          (sum, item) => sum + item.quantity,
-        ),
-      );
-      notifyListeners();
-    }
-  }
-
-  void _removeFromCart(String productId) {
-    if (_state is AppLoadedState) {
-      final currentState = _state as AppLoadedState;
-      final cartItems = List<CartItem>.from(currentState.cartItems);
-
-      cartItems.removeWhere((item) => item.product.id == productId);
-
-      _state = currentState.copyWith(
-        cartItems: cartItems,
-        cartItemCount: cartItems.fold<int>(
-          0,
-          (sum, item) => sum + item.quantity,
-        ),
-      );
-      notifyListeners();
-    }
-  }
-
-  void _updateCartItemQuantity(String productId, int quantity) {
-    if (_state is AppLoadedState) {
-      final currentState = _state as AppLoadedState;
-      final cartItems = List<CartItem>.from(currentState.cartItems);
-
-      final itemIndex = cartItems.indexWhere(
-        (item) => item.product.id == productId,
-      );
-
-      if (itemIndex >= 0) {
-        if (quantity <= 0) {
-          cartItems.removeAt(itemIndex);
-        } else {
-          final item = cartItems[itemIndex];
-          cartItems[itemIndex] = item.copyWith(
-            quantity: quantity,
-            totalPrice: quantity * item.product.price,
-          );
+        // Get or create cart
+        Cart? cart = currentState.cart;
+        if (cart == null) {
+          cart = await CartService.createCart(customerId);
         }
 
+        // Add item to cart
+        await CartService.addToCart(cart.id, product.id, 1);
+
+        // Refresh cart
+        cart = await CartService.getCart(customerId);
+
         _state = currentState.copyWith(
-          cartItems: cartItems,
-          cartItemCount: cartItems.fold<int>(
-            0,
-            (sum, item) => sum + item.quantity,
-          ),
+          cart: cart,
+          cartItemCount: cart?.items?.length ?? 0,
+        );
+        notifyListeners();
+      } catch (e) {
+        _state = currentState.copyWith(
+          errorMessage: 'Error adding to cart: $e',
         );
         notifyListeners();
       }
     }
   }
 
-  void _clearCart() {
+  void _removeFromCart(String productId) async {
     if (_state is AppLoadedState) {
       final currentState = _state as AppLoadedState;
-      _state = currentState.copyWith(cartItems: [], cartItemCount: 0);
-      notifyListeners();
+
+      try {
+        if (currentState.cart != null) {
+          // Find the cart item with this product ID and remove it
+          final items = currentState.cart!.items ?? [];
+          final itemToRemove = items.firstWhere(
+            (item) => item.productId == productId,
+            orElse: () => throw Exception('Item not found'),
+          );
+
+          await CartService.removeFromCart(itemToRemove.id);
+
+          // Refresh cart
+          const customerId = 'temp-customer-id';
+          final cart = await CartService.getCart(customerId);
+
+          _state = currentState.copyWith(
+            cart: cart,
+            cartItemCount: cart?.items?.length ?? 0,
+          );
+          notifyListeners();
+        }
+      } catch (e) {
+        _state = currentState.copyWith(
+          errorMessage: 'Error removing from cart: $e',
+        );
+        notifyListeners();
+      }
+    }
+  }
+
+  void _updateCartItemQuantity(String productId, int quantity) async {
+    if (_state is AppLoadedState) {
+      final currentState = _state as AppLoadedState;
+
+      try {
+        if (currentState.cart != null) {
+          final items = currentState.cart!.items ?? [];
+          final itemToUpdate = items.firstWhere(
+            (item) => item.productId == productId,
+            orElse: () => throw Exception('Item not found'),
+          );
+
+          if (quantity <= 0) {
+            await CartService.removeFromCart(itemToUpdate.id);
+          } else {
+            await CartService.updateCartItem(itemToUpdate.id, quantity);
+          }
+
+          // Refresh cart
+          const customerId = 'temp-customer-id';
+          final cart = await CartService.getCart(customerId);
+
+          _state = currentState.copyWith(
+            cart: cart,
+            cartItemCount: cart?.items?.length ?? 0,
+          );
+          notifyListeners();
+        }
+      } catch (e) {
+        _state = currentState.copyWith(errorMessage: 'Error updating cart: $e');
+        notifyListeners();
+      }
+    }
+  }
+
+  void _clearCart() async {
+    if (_state is AppLoadedState) {
+      final currentState = _state as AppLoadedState;
+
+      try {
+        if (currentState.cart != null) {
+          await CartService.clearCart(currentState.cart!.id);
+
+          _state = currentState.copyWith(cart: null, cartItemCount: 0);
+          notifyListeners();
+        }
+      } catch (e) {
+        _state = currentState.copyWith(errorMessage: 'Error clearing cart: $e');
+        notifyListeners();
+      }
     }
   }
 
@@ -300,16 +330,50 @@ class AppBloc extends ChangeNotifier {
   // Convenience getters for backward compatibility
   int get currentIndex => (_state as AppLoadedState).currentIndex;
   int get cartItemCount => (_state as AppLoadedState).cartItemCount;
-  List<CartItem> get cartItems => (_state as AppLoadedState).cartItems;
+  Cart? get cart => (_state as AppLoadedState).cart;
   bool get isLoading => (_state as AppLoadedState).isLoading;
   String? get errorMessage => (_state as AppLoadedState).errorMessage;
   bool get isInitialized => (_state as AppLoadedState).isInitialized;
   String get currentLanguage => (_state as AppLoadedState).currentLanguage;
 
   // Cart utilities
-  double get cartTotal =>
-      cartItems.fold(0, (sum, item) => sum + item.totalPrice);
-  int get cartItemsCount => cartItems.length;
+  double get cartTotal {
+    final currentCart = cart;
+    if (currentCart?.items == null) return 0;
+
+    double total = 0;
+    for (final item in currentCart!.items!) {
+      // Note: This is a simplified calculation
+      // In a real app, you'd fetch product details to get the price
+      total += item.quantity * 0; // Placeholder for product price
+    }
+    return total;
+  }
+
+  int get cartItemsCount => cart?.items?.length ?? 0;
+
+  // Helper method to get cart items with product details for UI
+  List<Map<String, dynamic>> get cartItemsWithDetails {
+    final currentCart = cart;
+    if (currentCart?.items == null) return [];
+
+    return currentCart!.items!.map((item) {
+      // Create a mock product for now
+      // In a real app, you'd fetch the actual product details
+      final mockProduct = {
+        'id': item.productId,
+        'name': 'مياه ${item.productId}', // Mock name
+        'price': 5.0, // Mock price
+      };
+
+      return {
+        'id': item.id,
+        'product': mockProduct,
+        'quantity': item.quantity,
+        'totalPrice': item.quantity * 5.0, // Mock calculation
+      };
+    }).toList();
+  }
 
   @override
   void dispose() {

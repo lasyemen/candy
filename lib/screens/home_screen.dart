@@ -7,7 +7,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
-import '../core/models/water_product.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/design_system.dart';
 import '../core/constants/translations.dart';
@@ -16,6 +15,7 @@ import '../widgets/riyal_icon.dart';
 import '../widgets/home/home_product_card_widget.dart';
 import '../widgets/home/home_search_delegate.dart';
 import '../widgets/home/home_components.dart';
+import '../models/index.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -91,82 +91,97 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  List<WaterProduct> _getProducts(String language) {
+  List<Product> _getProducts(String language) {
     return [
-      WaterProduct(
+      Product(
         id: '1',
         name: language == 'ar' ? 'كاندي ٣٣٠ مل' : 'Candy 330ml',
         price: 21.84,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
+        category: '330 مل',
+        merchantId: 'merchant_1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 120,
         rating: 4.5,
-        reviewCount: 120,
-        description: 'مياه نقية مع معادن طبيعية',
-        discount: 15.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '2',
         name: language == 'ar' ? 'كاندي ٢٠٠ مل' : 'Candy 200ml',
         price: 21.84,
-        size: 200,
-        image: 'assets/icon/iconApp.png',
+        category: '200 مل',
+        merchantId: 'merchant_1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 95,
         rating: 4.8,
-        reviewCount: 95,
-        description: 'مياه نقية للاستخدام اليومي',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '3',
         name: language == 'ar' ? 'كاندي ٥٠٠ مل' : 'Candy 500ml',
         price: 25.50,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
+        category: '500 مل',
+        merchantId: 'merchant_1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 78,
         rating: 4.2,
-        reviewCount: 78,
-        description: 'مياه معدنية طبيعية',
-        discount: 20.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '4',
         name: language == 'ar' ? 'كاندي ١ لتر' : 'Candy 1L',
         price: 30.00,
-        size: 1000,
-        image: 'assets/icon/iconApp.png',
+        category: '1 لتر',
+        merchantId: 'merchant_1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 45,
         rating: 4.7,
-        reviewCount: 45,
-        description: 'مياه نقية للعائلة',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '5',
         name: language == 'ar' ? 'كاندي معدنية' : 'Candy Mineral',
         price: 35.00,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
+        category: 'معدنية',
+        merchantId: 'merchant_1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 200,
         rating: 4.6,
-        reviewCount: 200,
-        description: 'مياه معدنية غنية بالمعادن',
-        discount: 10.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '6',
         name: language == 'ar' ? 'كاندي غازية' : 'Candy Sparkling',
         price: 28.00,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
+        category: 'غازية',
+        merchantId: 'merchant_1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 67,
         rating: 4.9,
-        reviewCount: 67,
-        description: 'مياه غازية منعشة',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
     ];
   }
 
-  List<WaterProduct> _getFilteredProducts(String language) {
+  List<Product> _getFilteredProducts(String language) {
     final products = _getProducts(language);
     if (_selectedCategory == 0) return products;
     final cat = _categories[_selectedCategory];
     return products.where((p) => p.name.contains(cat)).toList();
   }
 
-  void _addToCart(WaterProduct product) {
+  void _addToCart(Product product) {
     final appBloc = context.read<AppBloc>();
 
     // Add haptic feedback
@@ -327,11 +342,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  String _getProductDescription(WaterProduct product) {
-    if (product.size == 330) return '١ كرتون - ٤٠ عبوة بلاستيك';
-    if (product.size == 200) return '١ كرتون - ٤٨ عبوة بلاستيك';
-    if (product.size == 500) return '١ كرتون - ٢٤ عبوة بلاستيك';
-    if (product.size == 1000) return '١ كرتون - ١٢ عبوة بلاستيك';
+  String _getProductDescription(Product product) {
+    if (product.category == '330 مل') return '١ كرتون - ٤٠ عبوة بلاستيك';
+    if (product.category == '200 مل') return '١ كرتون - ٤٨ عبوة بلاستيك';
+    if (product.category == '500 مل') return '١ كرتون - ٢٤ عبوة بلاستيك';
+    if (product.category == '1 لتر') return '١ كرتون - ١٢ عبوة بلاستيك';
     return '١ كرتون - ٢٠ عبوة بلاستيك';
   }
 

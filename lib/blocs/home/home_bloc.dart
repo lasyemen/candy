@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/models/water_product.dart';
+import '../../models/product.dart';
 import '../../core/constants/design_system.dart';
+import '../../core/services/product_service.dart';
 
 // Events
 abstract class HomeEvent {}
@@ -25,7 +26,7 @@ class BannerPageChanged extends HomeEvent {
 }
 
 class ProductAddedToCart extends HomeEvent {
-  final WaterProduct product;
+  final Product product;
   ProductAddedToCart(this.product);
 }
 
@@ -40,11 +41,12 @@ class HomeLoaded extends HomeState {
   final int selectedCategory;
   final bool isGridView;
   final int currentBanner;
-  final List<WaterProduct> products;
+  final List<Product> products;
   final List<Map<String, dynamic>> banners;
   final List<String> categories;
   final PageController bannerController;
   final Timer? bannerTimer;
+  final bool isLoading;
 
   HomeLoaded({
     required this.selectedCategory,
@@ -55,17 +57,19 @@ class HomeLoaded extends HomeState {
     required this.categories,
     required this.bannerController,
     this.bannerTimer,
+    this.isLoading = false,
   });
 
   HomeLoaded copyWith({
     int? selectedCategory,
     bool? isGridView,
     int? currentBanner,
-    List<WaterProduct>? products,
+    List<Product>? products,
     List<Map<String, dynamic>>? banners,
     List<String>? categories,
     PageController? bannerController,
     Timer? bannerTimer,
+    bool? isLoading,
   }) {
     return HomeLoaded(
       selectedCategory: selectedCategory ?? this.selectedCategory,
@@ -76,6 +80,7 @@ class HomeLoaded extends HomeState {
       categories: categories ?? this.categories,
       bannerController: bannerController ?? this.bannerController,
       bannerTimer: bannerTimer ?? this.bannerTimer,
+      isLoading: isLoading ?? this.isLoading,
     );
   }
 }
@@ -95,7 +100,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<ProductAddedToCart>(_onProductAddedToCart);
   }
 
-  void _onHomeInitialized(HomeInitialized event, Emitter<HomeState> emit) {
+  void _onHomeInitialized(
+    HomeInitialized event,
+    Emitter<HomeState> emit,
+  ) async {
     emit(HomeLoading());
 
     final bannerController = PageController();
@@ -136,49 +144,73 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       },
     ];
 
-    final products = _getProducts();
+    try {
+      // Fetch products from API
+      final products = await ProductService.fetchProducts();
 
-    // Start banner timer
-    final bannerTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (bannerController.hasClients) {
-        int next = (0 + 1) % banners.length;
-        bannerController.animateToPage(
-          next,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-
-    emit(
-      HomeLoaded(
-        selectedCategory: 0,
-        isGridView: true,
-        currentBanner: 0,
-        products: products,
-        banners: banners,
-        categories: categories,
-        bannerController: bannerController,
-        bannerTimer: bannerTimer,
-      ),
-    );
-  }
-
-  void _onCategoryChanged(CategoryChanged event, Emitter<HomeState> emit) {
-    if (state is HomeLoaded) {
-      final currentState = state as HomeLoaded;
-      final filteredProducts = _getFilteredProducts(
-        currentState.products,
-        event.categoryIndex,
-        currentState.categories,
-      );
+      // Start banner timer
+      final bannerTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+        if (bannerController.hasClients) {
+          int next = (0 + 1) % banners.length;
+          bannerController.animateToPage(
+            next,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
 
       emit(
-        currentState.copyWith(
-          selectedCategory: event.categoryIndex,
-          products: filteredProducts,
+        HomeLoaded(
+          selectedCategory: 0,
+          isGridView: true,
+          currentBanner: 0,
+          products: products,
+          banners: banners,
+          categories: categories,
+          bannerController: bannerController,
+          bannerTimer: bannerTimer,
         ),
       );
+    } catch (e) {
+      emit(HomeError('Failed to load products: $e'));
+    }
+  }
+
+  void _onCategoryChanged(
+    CategoryChanged event,
+    Emitter<HomeState> emit,
+  ) async {
+    if (state is HomeLoaded) {
+      final currentState = state as HomeLoaded;
+
+      // Show loading state
+      emit(currentState.copyWith(isLoading: true));
+
+      try {
+        List<Product> filteredProducts;
+
+        if (event.categoryIndex == 0) {
+          // Fetch all products
+          filteredProducts = await ProductService.fetchProducts();
+        } else {
+          // Fetch products by category
+          final category = currentState.categories[event.categoryIndex];
+          filteredProducts = await ProductService.fetchProductsByCategory(
+            category,
+          );
+        }
+
+        emit(
+          currentState.copyWith(
+            selectedCategory: event.categoryIndex,
+            products: filteredProducts,
+            isLoading: false,
+          ),
+        );
+      } catch (e) {
+        emit(HomeError('Failed to load products: $e'));
+      }
     }
   }
 
@@ -202,84 +234,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   ) {
     // Handle adding product to cart
     // This would typically interact with a cart bloc or service
-  }
-
-  List<WaterProduct> _getProducts() {
-    return [
-      WaterProduct(
-        id: '1',
-        name: 'كاندي ٣٣٠ مل',
-        price: 21.84,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.5,
-        reviewCount: 120,
-        description: 'مياه نقية مع معادن طبيعية',
-        discount: 15.0,
-      ),
-      WaterProduct(
-        id: '2',
-        name: 'كاندي ٢٠٠ مل',
-        price: 21.84,
-        size: 200,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.8,
-        reviewCount: 95,
-        description: 'مياه نقية للاستخدام اليومي',
-      ),
-      WaterProduct(
-        id: '3',
-        name: 'كاندي ٥٠٠ مل',
-        price: 25.50,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.2,
-        reviewCount: 78,
-        description: 'مياه معدنية طبيعية',
-        discount: 20.0,
-      ),
-      WaterProduct(
-        id: '4',
-        name: 'كاندي ١ لتر',
-        price: 30.00,
-        size: 1000,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.7,
-        reviewCount: 45,
-        description: 'مياه نقية للعائلة',
-      ),
-      WaterProduct(
-        id: '5',
-        name: 'كاندي معدنية',
-        price: 35.00,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.6,
-        reviewCount: 200,
-        description: 'مياه معدنية غنية بالمعادن',
-        discount: 10.0,
-      ),
-      WaterProduct(
-        id: '6',
-        name: 'كاندي غازية',
-        price: 28.00,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.9,
-        reviewCount: 67,
-        description: 'مياه غازية منعشة',
-      ),
-    ];
-  }
-
-  List<WaterProduct> _getFilteredProducts(
-    List<WaterProduct> products,
-    int selectedCategory,
-    List<String> categories,
-  ) {
-    if (selectedCategory == 0) return products;
-    final cat = categories[selectedCategory];
-    return products.where((p) => p.name.contains(cat)).toList();
   }
 
   @override

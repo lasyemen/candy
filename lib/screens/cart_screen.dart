@@ -4,7 +4,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
-import '../core/models/cart_item.dart';
+import '../models/cart.dart';
+
 import '../widgets/riyal_icon.dart';
 import 'delivery_location_screen.dart';
 
@@ -138,7 +139,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                         children: [
                           Expanded(
                             child: Text(
-                              item.product.name,
+                              'مياه ${item.productId}',
                               style: TextStyle(
                                 fontFamily: 'Rubik',
                                 fontSize: 14,
@@ -149,7 +150,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                           Row(
                             children: [
                               Text(
-                                '${item.quantity} × ${item.product.price.toStringAsFixed(2)}',
+                                '${item.quantity} × 5.00',
                                 style: TextStyle(
                                   fontFamily: 'Rubik',
                                   fontSize: 14,
@@ -368,7 +369,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Consumer<AppBloc>(
       builder: (context, appBloc, child) {
-        final cartItems = appBloc.cartItems;
+        final cartItems = appBloc.cart?.items ?? [];
         final cartTotal = appBloc.cartTotal;
 
         if (cartItems.isNotEmpty &&
@@ -810,7 +811,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  cartItem.product.name,
+                  'مياه ${cartItem.productId}', // Using productId since we don't have product details
                   style: DesignSystem.titleMedium.copyWith(
                     color: DesignSystem.textPrimary,
                     fontWeight: FontWeight.bold,
@@ -821,7 +822,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                 Row(
                   children: [
                     Text(
-                      '${cartItem.product.price.toStringAsFixed(2)}',
+                      '5.00', // Mock price since we don't have product details
                       style: DesignSystem.bodyLarge.copyWith(
                         color: DesignSystem.primary,
                         fontWeight: FontWeight.w600,
@@ -848,7 +849,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     _buildQuantityButton(
                       icon: Icons.remove,
                       onPressed: () => _updateQuantity(
-                        cartItem.product.id,
+                        cartItem.productId,
                         cartItem.quantity - 1,
                       ),
                       isDecrease: true,
@@ -880,7 +881,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     _buildQuantityButton(
                       icon: Icons.add,
                       onPressed: () => _updateQuantity(
-                        cartItem.product.id,
+                        cartItem.productId,
                         cartItem.quantity + 1,
                       ),
                       isDecrease: false,
@@ -928,7 +929,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${cartItem.totalPrice.toStringAsFixed(2)}',
+                      '${(cartItem.quantity * 5.0).toStringAsFixed(2)}', // Calculate total price
                       style: DesignSystem.labelLarge.copyWith(
                         color: DesignSystem.primary,
                         fontWeight: FontWeight.bold,
@@ -1050,7 +1051,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
               const SizedBox(height: 16),
               // Product Name
               Text(
-                cartItem.product.name,
+                'مياه ${cartItem.productId}', // Using productId since we don't have product details
                 style: TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 16,
@@ -1075,7 +1076,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   Row(
                     children: [
                       Text(
-                        cartItem.product.price.toStringAsFixed(2),
+                        '5.00', // Mock price since we don't have product details
                         style: TextStyle(
                           fontFamily: 'Rubik',
                           fontSize: 16,
@@ -1131,7 +1132,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   Row(
                     children: [
                       Text(
-                        cartItem.totalPrice.toStringAsFixed(2),
+                        '${(cartItem.quantity * 5.0).toStringAsFixed(2)}', // Calculate total price
                         style: TextStyle(
                           fontFamily: 'Rubik',
                           fontSize: 16,

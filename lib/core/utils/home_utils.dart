@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/models/water_product.dart';
+import '../../models/product.dart';
 
 class HomeUtils {
   // Banner data
@@ -36,80 +36,92 @@ class HomeUtils {
   }
 
   // Product data
-  static List<WaterProduct> getProducts(String language) {
+  static List<Product> getProducts(String language) {
     return [
-      WaterProduct(
+      Product(
         id: '1',
         name: language == 'ar' ? 'كاندي ٣٣٠ مل' : 'Candy 330ml',
         price: 21.84,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
+        category: 'water',
+        merchantId: 'merchant1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 120,
         rating: 4.5,
-        reviewCount: 120,
-        description: 'مياه نقية مع معادن طبيعية',
-        discount: 15.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '2',
         name: language == 'ar' ? 'كاندي ٢٠٠ مل' : 'Candy 200ml',
         price: 15.50,
-        size: 200,
-        image: 'assets/icon/iconApp.png',
+        category: 'water',
+        merchantId: 'merchant1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 85,
         rating: 4.3,
-        reviewCount: 85,
-        description: 'مياه معدنية طبيعية',
-        discount: 0.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '3',
         name: language == 'ar' ? 'كاندي ٥٠٠ مل' : 'Candy 500ml',
         price: 28.90,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
+        category: 'water',
+        merchantId: 'merchant1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 200,
         rating: 4.7,
-        reviewCount: 200,
-        description: 'مياه نقية للعائلة',
-        discount: 10.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '4',
         name: language == 'ar' ? 'كاندي ١ لتر' : 'Candy 1L',
         price: 45.00,
-        size: 1000,
-        image: 'assets/icon/iconApp.png',
+        category: 'water',
+        merchantId: 'merchant1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 150,
         rating: 4.6,
-        reviewCount: 150,
-        description: 'مياه معدنية للاستخدام اليومي',
-        discount: 20.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '5',
         name: language == 'ar' ? 'كاندي معدنية' : 'Candy Mineral',
         price: 32.50,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
+        category: 'water',
+        merchantId: 'merchant1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 95,
         rating: 4.4,
-        reviewCount: 95,
-        description: 'مياه معدنية غنية بالمعادن',
-        discount: 5.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
-      WaterProduct(
+      Product(
         id: '6',
         name: language == 'ar' ? 'كاندي غازية' : 'Candy Sparkling',
         price: 18.75,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
+        category: 'water',
+        merchantId: 'merchant1',
+        imageUrl: 'assets/icon/iconApp.png',
+        status: 'active',
+        totalSold: 75,
         rating: 4.2,
-        reviewCount: 75,
-        description: 'مياه غازية منعشة',
-        discount: 0.0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
     ];
   }
 
   // Filter products by category
-  static List<WaterProduct> filterProducts(
-    List<WaterProduct> products,
+  static List<Product> filterProducts(
+    List<Product> products,
     int selectedCategory,
     String language,
   ) {
@@ -118,24 +130,23 @@ class HomeUtils {
     }
 
     final categories = getCategories();
-    final category = categories[selectedCategory];
 
     return products.where((product) {
       switch (selectedCategory) {
         case 1: // 330 مل
-          return product.size == 330;
+          return product.name.contains('330') || product.name.contains('٣٣٠');
         case 2: // 200 مل
-          return product.size == 200;
+          return product.name.contains('200') || product.name.contains('٢٠٠');
         case 3: // 500 مل
-          return product.size == 500;
+          return product.name.contains('500') || product.name.contains('٥٠٠');
         case 4: // 1 لتر
-          return product.size == 1000;
+          return product.name.contains('1 لتر') || product.name.contains('1L');
         case 5: // معدنية
-          return product.description.contains('معدنية') ||
-              product.description.contains('Mineral');
+          return product.name.contains('معدنية') ||
+              product.name.contains('Mineral');
         case 6: // غازية
-          return product.description.contains('غازية') ||
-              product.description.contains('Sparkling');
+          return product.name.contains('غازية') ||
+              product.name.contains('Sparkling');
         default:
           return true;
       }
@@ -143,9 +154,24 @@ class HomeUtils {
   }
 
   // Get product description based on language
-  static String getProductDescription(WaterProduct product, String language) {
+  static String getProductDescription(Product product, String language) {
     if (language == 'ar') {
-      return product.description;
+      switch (product.id) {
+        case '1':
+          return 'مياه نقية مع معادن طبيعية';
+        case '2':
+          return 'مياه معدنية طبيعية';
+        case '3':
+          return 'مياه نقية للعائلة';
+        case '4':
+          return 'مياه معدنية للاستخدام اليومي';
+        case '5':
+          return 'مياه معدنية غنية بالمعادن';
+        case '6':
+          return 'مياه غازية منعشة';
+        default:
+          return 'مياه نقية';
+      }
     } else {
       // English descriptions
       switch (product.id) {
@@ -162,7 +188,7 @@ class HomeUtils {
         case '6':
           return 'Refreshing sparkling water';
         default:
-          return product.description;
+          return 'Pure water';
       }
     }
   }
