@@ -4,14 +4,14 @@ import 'dart:ui';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../models/product.dart';
+import '../../models/products.dart';
 import '../../core/constants/design_system.dart';
 import '../riyal_icon.dart';
 
 class HomeProductCardWidget extends StatelessWidget {
-  final Product product;
+  final Products product;
   final VoidCallback onAddToCart;
-  final String Function(Product) getProductDescription;
+  final String Function(Products) getProductDescription;
 
   const HomeProductCardWidget({
     super.key,
@@ -120,48 +120,34 @@ class HomeProductCardWidget extends StatelessWidget {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      Colors.white.withOpacity(0.8),
-                                      Colors.white.withOpacity(0.4),
-                                    ],
-                                    center: Alignment.topCenter,
-                                    radius: 0.8,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          const Color(
-                                            0xFF6B46C1,
-                                          ).withOpacity(0.1),
-                                          const Color(
-                                            0xFF3B82F6,
-                                          ).withOpacity(0.1),
-                                        ],
+                              child: product.imageUrl != null
+                                  ? Image.network(
+                                      product.imageUrl!,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              color: Colors.grey[300],
+                                              child: const Icon(
+                                                Icons.image,
+                                                color: Colors.grey,
+                                              ),
+                                            );
+                                          },
+                                    )
+                                  : Container(
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      color: Colors.grey[300],
+                                      child: const Icon(
+                                        Icons.image,
+                                        color: Colors.grey,
                                       ),
-                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: product.imageUrl != null
-                                        ? Image.network(
-                                            product.imageUrl!,
-                                            fit: BoxFit.contain,
-                                            width: 60,
-                                            height: 60,
-                                          )
-                                        : const Icon(
-                                            Icons.image,
-                                            size: 60,
-                                            color: Colors.grey,
-                                          ),
-                                  ),
-                                ),
-                              ),
                             ),
                           ),
                         ),

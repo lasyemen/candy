@@ -190,8 +190,8 @@ class HomeCategoryWidget extends StatelessWidget {
 }
 
 class HomeSearchWidget extends StatelessWidget {
-  final List<Product> allProducts;
-  final ValueChanged<Product> onProductTap;
+  final List<Products> allProducts;
+  final ValueChanged<Products> onProductTap;
 
   const HomeSearchWidget({
     Key? key,
@@ -205,7 +205,7 @@ class HomeSearchWidget extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: GestureDetector(
         onTap: () {
-          showSearch<Product?>(
+          showSearch<Products?>(
             context: context,
             delegate: _ProductSearchDelegate(
               allProducts: allProducts,
@@ -321,9 +321,9 @@ class HomeViewToggleWidget extends StatelessWidget {
   }
 }
 
-class _ProductSearchDelegate extends SearchDelegate<Product?> {
-  final List<Product> allProducts;
-  final ValueChanged<Product> onProductTap;
+class _ProductSearchDelegate extends SearchDelegate<Products?> {
+  final List<Products> allProducts;
+  final ValueChanged<Products> onProductTap;
 
   _ProductSearchDelegate({
     required this.allProducts,

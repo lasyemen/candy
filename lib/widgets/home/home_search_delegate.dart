@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../models/index.dart';
 
-class HomeSearchDelegate extends SearchDelegate<Product?> {
-  final List<Product> allProducts;
-  final Function(Product) onProductTap;
+class HomeSearchDelegate extends SearchDelegate<Products?> {
+  final List<Products> allProducts;
+  final Function(Products) onProductTap;
 
   HomeSearchDelegate({required this.allProducts, required this.onProductTap})
     : super(

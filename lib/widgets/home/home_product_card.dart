@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../../models/product.dart';
+import '../../models/products.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/design_system.dart';
 import '../riyal_icon.dart';
 
 class HomeProductCard extends StatefulWidget {
-  final Product product;
+  final Products product;
   final VoidCallback onAddToCart;
   final bool isGridView;
 
@@ -101,15 +101,41 @@ class _HomeProductCardState extends State<HomeProductCard>
                           top: Radius.circular(16),
                         ),
                         child: product.imageUrl != null
-                            ? Image.network(
-                                product.imageUrl!,
+                            ? Container(
                                 width: double.infinity,
-                                height: isGridView ? 120 : 100,
-                                fit: BoxFit.cover,
+                                height: isGridView ? 160 : 140,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16),
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16),
+                                  ),
+                                  child: Image.network(
+                                    product.imageUrl!,
+                                    width: double.infinity,
+                                    height: isGridView ? 160 : 140,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: double.infinity,
+                                        height: isGridView ? 160 : 140,
+                                        color: Colors.grey[300],
+                                        child: const Icon(
+                                          Icons.image,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               )
                             : Container(
                                 width: double.infinity,
-                                height: isGridView ? 120 : 100,
+                                height: isGridView ? 160 : 140,
                                 color: Colors.grey[300],
                                 child: const Icon(
                                   Icons.image,

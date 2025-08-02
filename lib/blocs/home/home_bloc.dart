@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../models/product.dart';
+import '../../models/products.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/services/product_service.dart';
 
@@ -26,7 +26,7 @@ class BannerPageChanged extends HomeEvent {
 }
 
 class ProductAddedToCart extends HomeEvent {
-  final Product product;
+  final Products product;
   ProductAddedToCart(this.product);
 }
 
@@ -41,7 +41,7 @@ class HomeLoaded extends HomeState {
   final int selectedCategory;
   final bool isGridView;
   final int currentBanner;
-  final List<Product> products;
+  final List<Products> products;
   final List<Map<String, dynamic>> banners;
   final List<String> categories;
   final PageController bannerController;
@@ -64,7 +64,7 @@ class HomeLoaded extends HomeState {
     int? selectedCategory,
     bool? isGridView,
     int? currentBanner,
-    List<Product>? products,
+    List<Products>? products,
     List<Map<String, dynamic>>? banners,
     List<String>? categories,
     PageController? bannerController,
@@ -188,7 +188,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       emit(currentState.copyWith(isLoading: true));
 
       try {
-        List<Product> filteredProducts;
+        List<Products> filteredProducts;
 
         if (event.categoryIndex == 0) {
           // Fetch all products

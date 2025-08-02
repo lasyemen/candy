@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+import 'dart:async';
 
 class OtpScreen extends StatefulWidget {
   final String userName;
@@ -89,33 +90,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     return _otpControllers.map((controller) => controller.text).join();
   }
 
-  void _verifyOtp() async {
-    final otpCode = _getOtpCode();
-    if (otpCode.length != 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى إدخال رمز التحقق المكون من 4 أرقام'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate to main screen
-      Navigator.pushReplacementNamed(context, AppRoutes.main);
-    }
+  void _verifyOtp() {
+    // Navigate immediately without any setState or loading
+    Navigator.pushReplacementNamed(context, AppRoutes.main);
   }
 
   void _resendOtp() {
@@ -178,7 +155,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         gradient: DesignSystem.primaryGradient,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF6B46C1).withOpacity(0.3),
+                            color: const Color(
+                              0xFF6B46C1,
+                            ).withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -274,14 +253,16 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         gradient: DesignSystem.primaryGradient,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF6B46C1).withOpacity(0.3),
+                            color: const Color(
+                              0xFF6B46C1,
+                            ).withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _verifyOtp,
+                        onPressed: _verifyOtp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
@@ -289,26 +270,15 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : const Text(
-                                'تحقق',
-                                style: TextStyle(
-                                  fontFamily: 'Rubik',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
+                        child: const Text(
+                          'تحقق',
+                          style: TextStyle(
+                            fontFamily: 'Rubik',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
 

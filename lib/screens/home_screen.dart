@@ -1,21 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
-import '../core/constants/app_colors.dart';
 import '../core/constants/design_system.dart';
-import '../core/constants/translations.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
 import '../widgets/home/home_product_card_widget.dart';
 import '../widgets/home/home_search_delegate.dart';
-import '../widgets/home/home_components.dart';
 import '../models/index.dart';
+import '../core/services/product_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,10 +23,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategory = 0;
-  bool _isGridView = true;
+  final bool _isGridView = true;
   int _currentBanner = 0;
   late PageController _bannerController;
   Timer? _bannerTimer;
+  List<Products> _products = [];
+  bool _isLoading = true;
 
   final List<Map<String, dynamic>> _banners = [
     {
@@ -82,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     });
+    _loadProducts();
   }
 
   @override
@@ -91,97 +91,61 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  List<Product> _getProducts(String language) {
-    return [
-      Product(
-        id: '1',
-        name: language == 'ar' ? 'كاندي ٣٣٠ مل' : 'Candy 330ml',
-        price: 21.84,
-        category: '330 مل',
-        merchantId: 'merchant_1',
-        imageUrl: 'assets/icon/iconApp.png',
-        status: 'active',
-        totalSold: 120,
-        rating: 4.5,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Product(
-        id: '2',
-        name: language == 'ar' ? 'كاندي ٢٠٠ مل' : 'Candy 200ml',
-        price: 21.84,
-        category: '200 مل',
-        merchantId: 'merchant_1',
-        imageUrl: 'assets/icon/iconApp.png',
-        status: 'active',
-        totalSold: 95,
-        rating: 4.8,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Product(
-        id: '3',
-        name: language == 'ar' ? 'كاندي ٥٠٠ مل' : 'Candy 500ml',
-        price: 25.50,
-        category: '500 مل',
-        merchantId: 'merchant_1',
-        imageUrl: 'assets/icon/iconApp.png',
-        status: 'active',
-        totalSold: 78,
-        rating: 4.2,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Product(
-        id: '4',
-        name: language == 'ar' ? 'كاندي ١ لتر' : 'Candy 1L',
-        price: 30.00,
-        category: '1 لتر',
-        merchantId: 'merchant_1',
-        imageUrl: 'assets/icon/iconApp.png',
-        status: 'active',
-        totalSold: 45,
-        rating: 4.7,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Product(
-        id: '5',
-        name: language == 'ar' ? 'كاندي معدنية' : 'Candy Mineral',
-        price: 35.00,
-        category: 'معدنية',
-        merchantId: 'merchant_1',
-        imageUrl: 'assets/icon/iconApp.png',
-        status: 'active',
-        totalSold: 200,
-        rating: 4.6,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Product(
-        id: '6',
-        name: language == 'ar' ? 'كاندي غازية' : 'Candy Sparkling',
-        price: 28.00,
-        category: 'غازية',
-        merchantId: 'merchant_1',
-        imageUrl: 'assets/icon/iconApp.png',
-        status: 'active',
-        totalSold: 67,
-        rating: 4.9,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    ];
+  Future<void> _loadProducts() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final products = await ProductService.fetchProducts();
+
+      print('Loaded ${products.length} products from database');
+
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحميل المنتجات: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    // If no products loaded and no error, show empty state
+    if (mounted && _products.isEmpty && !_isLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا يوجد منتجات في قاعدة البيانات'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
-  List<Product> _getFilteredProducts(String language) {
+  List<Products> _getProducts(String language) {
+    // Return products from Supabase only
+    return _products;
+  }
+
+  List<Products> _getFilteredProducts(String language) {
     final products = _getProducts(language);
     if (_selectedCategory == 0) return products;
     final cat = _categories[_selectedCategory];
     return products.where((p) => p.name.contains(cat)).toList();
   }
 
-  void _addToCart(Product product) {
+  void _addToCart(Products product) {
     final appBloc = context.read<AppBloc>();
 
     // Add haptic feedback
@@ -206,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -219,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Animate(
@@ -260,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           product.name,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             fontFamily: 'Rubik',
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -274,10 +238,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
@@ -285,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${product.price.toStringAsFixed(2)}',
+                          product.price.toStringAsFixed(2),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -310,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -342,7 +306,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  String _getProductDescription(Product product) {
+  String _getProductDescription(Products product) {
+    // Use the actual description from the product if available
+    if (product.description != null && product.description!.isNotEmpty) {
+      return product.description!;
+    }
+
+    // Fallback to hardcoded descriptions if no description is available
     if (product.category == '330 مل') return '١ كرتون - ٤٠ عبوة بلاستيك';
     if (product.category == '200 مل') return '١ كرتون - ٤٨ عبوة بلاستيك';
     if (product.category == '500 مل') return '١ كرتون - ٢٤ عبوة بلاستيك';
@@ -425,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -441,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 decoration: BoxDecoration(
                                   color: _currentBanner == i
                                       ? Colors.white
-                                      : Colors.white.withOpacity(0.5),
+                                      : Colors.white.withValues(alpha: 0.5),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                               );
@@ -629,7 +599,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -653,7 +625,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   horizontal: 14,
                   vertical: 8,
                 ),
-                sliver: products.isEmpty
+                sliver: _isLoading
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(
+                                color: Color(0xFF6B46C1),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'جاري تحميل المنتجات...',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : products.isEmpty
                     ? SliverToBoxAdapter(
                         child: Center(
                           child: Column(
@@ -666,7 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 14),
                               const Text(
-                                "لا يوجد منتجات في هذا القسم حاليا.",
+                                "لا يوجد منتجات متاحة حالياً.",
                                 style: TextStyle(
                                   color: Color(0xFF6B46C1),
                                   fontSize: 16,
@@ -723,13 +716,13 @@ class _HomeScreenState extends State<HomeScreen> {
         gradient: banner['gradient'] as LinearGradient,
         boxShadow: [
           BoxShadow(
-            color: banner['color'].withOpacity(0.15),
+            color: banner['color'].withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: banner['color'].withOpacity(0.08),
+            color: banner['color'].withValues(alpha: 0.08),
             blurRadius: 40,
             offset: const Offset(0, 16),
             spreadRadius: 0,
@@ -745,8 +738,8 @@ class _HomeScreenState extends State<HomeScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.05),
+                Colors.white.withValues(alpha: 0.1),
+                Colors.white.withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
@@ -794,8 +787,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       colors: [
-                        Colors.white.withOpacity(0.3),
-                        Colors.white.withOpacity(0.1),
+                        Colors.white.withValues(alpha: 0.3),
+                        Colors.white.withValues(alpha: 0.1),
                       ],
                       center: Alignment.center,
                       radius: 0.8,

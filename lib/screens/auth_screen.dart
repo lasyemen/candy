@@ -142,7 +142,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           // Navigate to sign in screen
-                          Navigator.pushNamed(context, AppRoutes.signin);
+                          Navigator.pushReplacementNamed(
+                            context,
+                            AppRoutes.main,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -186,10 +189,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          // Navigate to merchant signup screen
-                          Navigator.pushNamed(
+                          // Navigate to merchant sign in screen
+                          Navigator.pushReplacementNamed(
                             context,
-                            AppRoutes.merchantSignup,
+                            AppRoutes.main,
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -218,17 +221,48 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Sign as Guest Button
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushReplacementNamed(context, AppRoutes.main);
-                    },
-                    child: Text(
-                      'تسجيل كضيف',
-                      style: TextStyle(
-                        fontFamily: 'Rubik',
-                        color: Colors.grey[600],
-                        fontSize: 14,
+                  // Sign as Guest Button (Outlined with Gradient)
+                  Container(
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: DesignSystem.primaryGradient,
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // Navigate directly to main screen as guest
+                          Navigator.pushReplacementNamed(
+                            context,
+                            AppRoutes.main,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: ShaderMask(
+                          shaderCallback: (bounds) =>
+                              DesignSystem.primaryGradient.createShader(bounds),
+                          child: const Text(
+                            'تسجيل كضيف',
+                            style: TextStyle(
+                              fontFamily: 'Rubik',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

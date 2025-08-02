@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/cart.dart';
-import '../models/product.dart';
+import '../models/products.dart';
 import '../core/services/cart_service.dart';
 
 // Events
@@ -17,7 +17,7 @@ class SetCartItemCountEvent extends AppEvent {
 }
 
 class AddToCartEvent extends AppEvent {
-  final Product product;
+  final Products product;
   AddToCartEvent(this.product);
 }
 
@@ -201,7 +201,7 @@ class AppBloc extends ChangeNotifier {
     }
   }
 
-  void _addToCart(Product product) async {
+  void _addToCart(Products product) async {
     if (_state is AppLoadedState) {
       final currentState = _state as AppLoadedState;
 
