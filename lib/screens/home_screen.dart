@@ -302,6 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
+            centerTitle: true,
             title: ShaderMask(
               shaderCallback: (Rect bounds) {
                 return DesignSystem.getBrandGradient(
@@ -658,7 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(35),
         gradient: banner['gradient'] as LinearGradient,
         boxShadow: [
           BoxShadow(
@@ -676,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(35),
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(

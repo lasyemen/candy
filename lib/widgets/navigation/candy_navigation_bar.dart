@@ -71,105 +71,124 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(32),
-                      // Gradient with opaque center and transparent sides
+                      // Enhanced glassmorphism effect
                       gradient: LinearGradient(
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                         colors: Theme.of(context).brightness == Brightness.dark
                             ? [
-                                Colors.black.withOpacity(0.6), // شفاف في الأطراف
-                                Colors.black.withOpacity(0.95), // معتم في الوسط
-                                Colors.black.withOpacity(0.95), // معتم في الوسط
-                                Colors.black.withOpacity(0.6), // شفاف في الأطراف
+                                Colors.black.withOpacity(0.6),
+                                Colors.black.withOpacity(0.95),
+                                Colors.black.withOpacity(0.95),
+                                Colors.black.withOpacity(0.6),
                               ]
                             : [
-                                Colors.white.withOpacity(0.7), // شفاف في الأطراف
-                                Colors.white.withOpacity(1.0), // معتم في الوسط
-                                Colors.white.withOpacity(1.0), // معتم في الوسط
-                                Colors.white.withOpacity(0.7), // شفاف في الأطراف
+                                Colors.white.withOpacity(0.7),
+                                Colors.white.withOpacity(1.0),
+                                Colors.white.withOpacity(1.0),
+                                Colors.white.withOpacity(0.7),
                               ],
                         stops: const [0.0, 0.3, 0.7, 1.0],
                       ),
-                      border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white.withOpacity(0.15)
-                            : Colors.black.withOpacity(0.08),
-                        width: 0.8,
-                      ),
                       boxShadow: [
+                        // Main shadow - reduced
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withOpacity(0.05),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                           spreadRadius: 0,
                         ),
+                        // Border shadows - Top - reduced
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 30,
-                          offset: const Offset(0, 12),
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 1,
+                          offset: const Offset(0, -1),
                           spreadRadius: 0,
                         ),
-                        // Left side effect
+                        // Border shadows - Bottom - reduced
                         BoxShadow(
-                          color: Colors.white.withOpacity(0.3),
-                          blurRadius: 25,
-                          offset: const Offset(-8, 0),
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 1,
+                          offset: const Offset(0, 1),
                           spreadRadius: 0,
                         ),
-                        // Right side effect
+                        // Border shadows - Left - reduced
                         BoxShadow(
-                          color: Colors.white.withOpacity(0.3),
-                          blurRadius: 25,
-                          offset: const Offset(8, 0),
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 1,
+                          offset: const Offset(-1, 0),
+                          spreadRadius: 0,
+                        ),
+                        // Border shadows - Right - reduced
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 1,
+                          offset: const Offset(1, 0),
+                          spreadRadius: 0,
+                        ),
+                        // Edge highlights - reduced
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(-3, 0),
+                          spreadRadius: 0,
+                        ),
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(3, 0),
                           spreadRadius: 0,
                         ),
                       ],
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(32),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildModernNavItem(
-                              icon: FontAwesomeIcons.user,
-                              label: 'حسابي',
-                              isActive: appBloc.currentIndex == 0,
-                              onTap: () => _onNavTap(0),
-                            ),
-                            _buildModernNavItem(
-                              icon: FontAwesomeIcons.heart,
-                              label: 'الصحة',
-                              isActive: appBloc.currentIndex == 1,
-                              onTap: () => _onNavTap(1),
-                            ),
-                            _buildModernNavItem(
-                              icon: FontAwesomeIcons.home,
-                              label: 'الرئيسية',
-                              isActive: appBloc.currentIndex == 2,
-                              onTap: () => _onNavTap(2),
-                              isHome: true,
-                            ),
-                            _buildModernNavItem(
-                              icon: FontAwesomeIcons.shoppingCart,
-                              label: 'السلة',
-                              isActive: appBloc.currentIndex == 3,
-                              onTap: () => _onNavTap(3),
-                              badge: appBloc.cartItemCount > 0
-                                  ? appBloc.cartItemCount
-                                  : null,
-                            ),
-                            _buildModernNavItem(
-                              icon: FontAwesomeIcons.listAlt,
-                              label: 'طلباتي',
-                              isActive: appBloc.currentIndex == 4,
-                              onTap: () => _onNavTap(4),
-                            ),
-                          ],
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 4,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildModernNavItem(
+                                icon: FontAwesomeIcons.user,
+                                label: 'حسابي',
+                                isActive: appBloc.currentIndex == 0,
+                                onTap: () => _onNavTap(0),
+                              ),
+                              _buildModernNavItem(
+                                icon: FontAwesomeIcons.heart,
+                                label: 'الصحة',
+                                isActive: appBloc.currentIndex == 1,
+                                onTap: () => _onNavTap(1),
+                              ),
+                              _buildModernNavItem(
+                                icon: FontAwesomeIcons.home,
+                                label: 'الرئيسية',
+                                isActive: appBloc.currentIndex == 2,
+                                onTap: () => _onNavTap(2),
+                                isHome: true,
+                              ),
+                              _buildModernNavItem(
+                                icon: FontAwesomeIcons.shoppingCart,
+                                label: 'السلة',
+                                isActive: appBloc.currentIndex == 3,
+                                onTap: () => _onNavTap(3),
+                                badge: appBloc.cartItemCount > 0
+                                    ? appBloc.cartItemCount
+                                    : null,
+                              ),
+                              _buildModernNavItem(
+                                icon: FontAwesomeIcons.listAlt,
+                                label: 'طلباتي',
+                                isActive: appBloc.currentIndex == 4,
+                                onTap: () => _onNavTap(4),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
