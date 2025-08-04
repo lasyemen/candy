@@ -15,6 +15,7 @@ import '../widgets/home/home_product_card_widget.dart';
 import '../widgets/home/home_search_delegate.dart';
 import '../models/index.dart';
 import '../core/services/product_service.dart';
+import '../core/services/ads_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,34 +31,47 @@ class _HomeScreenState extends State<HomeScreen> {
   late PageController _bannerController;
   Timer? _bannerTimer;
   List<Products> _products = [];
+  List<Ads> _ads = [];
   bool _isLoading = true;
+  bool _isLoadingAds = true;
 
-  final List<Map<String, dynamic>> _banners = [
-    {
-      'title': 'عرض خاص!',
-      'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
-      'image': 'assets/icon/iconApp.png',
-      'color': const Color(0xFF6B46C1),
-      'gradient': DesignSystem.primaryGradient, // Purple to Blue
-      'icon': Icons.local_offer,
-    },
-    {
-      'title': 'توصيل مجاني',
-      'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
-      'image': 'assets/icon/iconApp.png',
-      'color': const Color(0xFF6B46C1),
-      'gradient': DesignSystem.primaryGradient, // Purple to Blue
-      'icon': Icons.delivery_dining,
-    },
-    {
-      'title': 'مياه معدنية طبيعية',
-      'subtitle': 'جودة عالية مع معادن طبيعية مفيدة',
-      'image': 'assets/icon/iconApp.png',
-      'color': const Color(0xFF6B46C1),
-      'gradient': DesignSystem.primaryGradient, // Purple to Blue
-      'icon': Icons.water_drop,
-    },
-  ];
+  List<Map<String, dynamic>> get _banners {
+    if (_ads.isEmpty) {
+      // Fallback banners if no ads are loaded
+      return [
+        {
+          'title': 'عرض خاص!',
+          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+          'image': 'assets/icon/iconApp.png',
+          'color': const Color(0xFF6B46C1),
+          'gradient': DesignSystem.primaryGradient,
+          'icon': Icons.local_offer,
+        },
+        {
+          'title': 'توصيل مجاني',
+          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
+          'image': 'assets/icon/iconApp.png',
+          'color': const Color(0xFF6B46C1),
+          'gradient': DesignSystem.primaryGradient,
+          'icon': Icons.delivery_dining,
+        },
+      ];
+    }
+
+    // Convert ads to banner format
+    return _ads
+        .map(
+          (ad) => {
+            'title': 'إعلان',
+            'subtitle': 'عرض خاص من كاندي',
+            'image': ad.imageUrl,
+            'color': const Color(0xFF6B46C1),
+            'gradient': DesignSystem.primaryGradient,
+            'icon': Icons.local_offer,
+          },
+        )
+        .toList();
+  }
 
   final List<String> _categories = [
     'الكل',
@@ -84,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     _loadProducts();
+    _loadAds();
   }
 
   @override
@@ -132,6 +147,29 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.orange,
         ),
       );
+    }
+  }
+
+  Future<void> _loadAds() async {
+    try {
+      setState(() {
+        _isLoadingAds = true;
+      });
+
+      final ads = await AdsService.fetchAds();
+
+      if (mounted) {
+        setState(() {
+          _ads = ads;
+          _isLoadingAds = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingAds = false;
+        });
+      }
     }
   }
 
@@ -334,7 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
             centerTitle: true,
             title: ShaderMask(
               shaderCallback: (Rect bounds) {
-                return DesignSystem.getBrandGradient('primary').createShader(bounds);
+                return DesignSystem.getBrandGradient(
+                  'primary',
+                ).createShader(bounds);
               },
               blendMode: BlendMode.srcIn,
               child: const Text(
@@ -346,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontFamily: 'Rubik',
                 ),
               ),
-            ),  
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.search, color: Color(0xFF6B46C1)),
@@ -369,24 +409,38 @@ class _HomeScreenState extends State<HomeScreen> {
               SliverToBoxAdapter(
                 child: Container(
                   height: 220,
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
-                      PageView.builder(
-                        controller: _bannerController,
-                        onPageChanged: (idx) => setState(() => _currentBanner = idx),
-                        itemCount: _banners.length,
-                        itemBuilder: (_, idx) => _buildBannerItem(_banners[idx]),
-                      ),
+                      _isLoadingAds
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF6B46C1),
+                              ),
+                            )
+                          : PageView.builder(
+                              controller: _bannerController,
+                              onPageChanged: (idx) =>
+                                  setState(() => _currentBanner = idx),
+                              itemCount: _banners.length,
+                              itemBuilder: (_, idx) =>
+                                  _buildBannerItem(_banners[idx]),
+                            ),
                       Positioned(
                         bottom: 12,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.3),
                             borderRadius: BorderRadius.circular(20),
-                          ),  
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(_banners.length, (i) {
@@ -394,7 +448,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 duration: const Duration(milliseconds: 400),
                                 width: _currentBanner == i ? 20 : 8,
                                 height: 8,
-                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: _currentBanner == i
                                       ? Colors.white
@@ -402,19 +458,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                               );
-                            }),  
+                            }),
                           ),
-                        ),  
+                        ),
                       ),
-                    ],  
+                    ],
                   ),
-                ),  
+                ),
               ),
               // Categories
               SliverToBoxAdapter(
                 child: Container(
                   height: 36,
-                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 14,
+                  ),
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     scrollDirection: Axis.horizontal,
@@ -437,13 +496,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
-                                  boxShadow: DesignSystem.getBrandShadow('medium'),
+                                  boxShadow: DesignSystem.getBrandShadow(
+                                    'medium',
+                                  ),
                                 ),
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(20),
-                                    onTap: () => setState(() => _selectedCategory = idx),
+                                    onTap: () =>
+                                        setState(() => _selectedCategory = idx),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 12,
@@ -471,7 +533,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
-                                 	borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Container(
                                   margin: const EdgeInsets.all(1),
@@ -483,7 +545,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: Colors.transparent,
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(18),
-                                      onTap: () => setState(() => _selectedCategory = idx),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 12,
@@ -493,7 +557,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                           shaderCallback: (Rect bounds) {
                                             return const LinearGradient(
                                               colors: [
-                                                Color.fromARGB(255, 179, 58, 255),
+                                                Color.fromARGB(
+                                                  255,
+                                                  179,
+                                                  58,
+                                                  255,
+                                                ),
                                                 Color.fromARGB(255, 23, 6, 212),
                                               ],
                                               begin: Alignment.topLeft,
@@ -540,8 +609,14 @@ class _HomeScreenState extends State<HomeScreen> {
               // Info bar
               SliverToBoxAdapter(
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
@@ -552,9 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                    ),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: const [
@@ -566,81 +639,84 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 12,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
-                        ),  
-                      ),  
-                    ],  
-                  ),  
-                ),  
-              ),  
-              // Product List/Grid  
-              SliverPadding(  
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),  
-                sliver: _isLoading  
-                    ? SliverToBoxAdapter(  
-                        child: Center(  
-                          child: Column(  
-                            mainAxisAlignment: MainAxisAlignment.center,  
-                            children: [  
-                              const CircularProgressIndicator(  
-                                color: Color(0xFF6B46C1),  
-                              ),  
-                              const SizedBox(height: 16),  
-                              Text(  
-                                'جاري تحميل المنتجات...',  
-                                style: TextStyle(  
-                                  color: Colors.grey[600],  
-                                  fontSize: 16,  
-                                ),  
-                              ),  
-                            ],  
-                          ),  
-                        ),  
-                      )  
-                    : products.isEmpty  
-                        ? SliverToBoxAdapter(  
-                            child: Center(  
-                              child: Column(  
-                                mainAxisAlignment: MainAxisAlignment.center,  
-                                children: [  
-                                  const Icon(  
-                                    Icons.inbox_rounded,  
-                                    color: Color(0xFF6B46C1),  
-                                    size: 40,  
-                                  ),  
-                                  const SizedBox(height: 14),  
-                                  const Text(  
-                                    "لا يوجد منتجات متاحة حالياً.",  
-                                    style: TextStyle(  
-                                      color: Color(0xFF6B46C1),  
-                                      fontSize: 16,  
-                                    ),  
-                                  ),  
-                                ],  
-                              ),  
-                            ),  
-                          )  
-                        : SliverGrid(  
-                            gridDelegate:  
-                                const SliverGridDelegateWithFixedCrossAxisCount(  
-                              crossAxisCount: 2,  
-                              childAspectRatio: 0.65, // taller cards  
-                              crossAxisSpacing: 4,      // reduced gap  
-                              mainAxisSpacing: 10,  
-                            ),  
-                            delegate: SliverChildBuilderDelegate(  
-                              (context, idx) => HomeProductCardWidget(  
-                                product: products[idx],  
-                                onAddToCart: () => _addToCart(products[idx]),  
-                              ),  
-                              childCount: products.length,  
-                            ),  
-                          ),  
-              ),  
-            ],  
-          ),  
-        );  
-      },  
-    );  
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Product List/Grid
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                sliver: _isLoading
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(
+                                color: Color(0xFF6B46C1),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'جاري تحميل المنتجات...',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : products.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.inbox_rounded,
+                                color: Color(0xFF6B46C1),
+                                size: 40,
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                "لا يوجد منتجات متاحة حالياً.",
+                                style: TextStyle(
+                                  color: Color(0xFF6B46C1),
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.65, // taller cards
+                              crossAxisSpacing: 4, // reduced gap
+                              mainAxisSpacing: 10,
+                            ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, idx) => HomeProductCardWidget(
+                            product: products[idx],
+                            onAddToCart: () => _addToCart(products[idx]),
+                          ),
+                          childCount: products.length,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildBannerItem(Map<String, dynamic> banner) {
@@ -731,12 +807,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
-                    child: Image.asset(
-                      banner['image'] as String,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.contain,
-                    ),
+                    child: banner['image'].toString().startsWith('http')
+                        ? Image.network(
+                            banner['image'] as String,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Image.asset(
+                                'assets/icon/iconApp.png',
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.contain,
+                              );
+                            },
+                          )
+                        : Image.asset(
+                            banner['image'] as String,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.contain,
+                          ),
                   ),
                 ),
               ),

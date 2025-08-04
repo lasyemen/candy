@@ -266,8 +266,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               if (_selectedQuantity > 1) setState(() => _selectedQuantity--);
             },
             child: Container(
-              width: 36,
-              height: 36,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(12),
@@ -290,8 +290,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           GestureDetector(
             onTap: () => setState(() => _selectedQuantity++),
             child: Container(
-              width: 36,
-              height: 36,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(12),

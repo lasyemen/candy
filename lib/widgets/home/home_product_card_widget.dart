@@ -8,6 +8,7 @@ import '../../models/products.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
+import '../../screens/product_details_screen.dart';
 
 class HomeProductCardWidget extends StatelessWidget {
   final Products product;
@@ -75,10 +76,32 @@ class HomeProductCardWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    AppRoutes.navigateTo(
-                      context,
-                      AppRoutes.productDetails,
-                      arguments: product,
+                    Navigator.of(context).push(
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) {
+                          return ProductDetailsScreen(product: product);
+                        },
+                        transitionsBuilder:
+                            (context, animation, secondaryAnimation, child) {
+                              const begin = Offset(1.0, 0.0);
+                              const end = Offset.zero;
+                              const curve = Curves.easeInOut;
+
+                              var tween = Tween(
+                                begin: begin,
+                                end: end,
+                              ).chain(CurveTween(curve: curve));
+
+                              return SlideTransition(
+                                position: animation.drive(tween),
+                                child: child,
+                              );
+                            },
+                        transitionDuration: const Duration(milliseconds: 400),
+                        reverseTransitionDuration: const Duration(
+                          milliseconds: 300,
+                        ),
+                      ),
                     );
                   },
                   child: Padding(
