@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../screens/index.dart';
+import '../../models/products.dart';
 
 /// App Routes Configuration
 /// This file contains all the routes for the application
@@ -23,6 +24,7 @@ class AppRoutes {
   static const String healthTracker = '/health-tracker';
   static const String deliveryLocation = '/delivery-location';
   static const String paymentTracking = '/payment-tracking';
+  static const String productDetails = '/product-details';
 
   /// Get all routes for the application
   static Map<String, WidgetBuilder> getRoutes() {
@@ -66,6 +68,12 @@ class AppRoutes {
         final deliveryData =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         return PaymentTrackingScreen(deliveryData: deliveryData);
+      },
+
+      // Product Routes
+      productDetails: (context) {
+        final product = ModalRoute.of(context)?.settings.arguments as Products?;
+        return ProductDetailsScreen(product: product!);
       },
     };
   }

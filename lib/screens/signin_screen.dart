@@ -226,20 +226,9 @@ class _SignInScreenState extends State<SignInScreen>
                       const SizedBox(height: 32),
 
                       // Sign In Button
-                      Container(
+                      SizedBox(
                         width: double.infinity,
                         height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: DesignSystem.primaryGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6B46C1).withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _submitForm,
                           style: ElevatedButton.styleFrom(

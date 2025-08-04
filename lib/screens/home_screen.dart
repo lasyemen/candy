@@ -1,3 +1,5 @@
+// lib/screens/home_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -170,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -183,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Animate(
@@ -210,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
+                        const Text(
                           'تم إضافة المنتج للسلة',
                           style: TextStyle(
                             fontSize: 14,
@@ -224,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           product.name,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: Colors.white.withOpacity(0.9),
                             fontFamily: 'Rubik',
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -238,10 +240,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: Colors.white.withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -250,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           product.price.toStringAsFixed(2),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -274,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -296,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    overlay.insert(overlayEntry);
+    overlay!.insert(overlayEntry);
 
     // Remove the overlay after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
@@ -307,12 +309,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getProductDescription(Products product) {
-    // Use the actual description from the product if available
     if (product.description != null && product.description!.isNotEmpty) {
       return product.description!;
     }
-
-    // Fallback to hardcoded descriptions if no description is available
     if (product.category == '330 مل') return '١ كرتون - ٤٠ عبوة بلاستيك';
     if (product.category == '200 مل') return '١ كرتون - ٤٨ عبوة بلاستيك';
     if (product.category == '500 مل') return '١ كرتون - ٢٤ عبوة بلاستيك';
@@ -335,9 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
             centerTitle: true,
             title: ShaderMask(
               shaderCallback: (Rect bounds) {
-                return DesignSystem.getBrandGradient(
-                  'primary',
-                ).createShader(bounds);
+                return DesignSystem.getBrandGradient('primary').createShader(bounds);
               },
               blendMode: BlendMode.srcIn,
               child: const Text(
@@ -349,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontFamily: 'Rubik',
                 ),
               ),
-            ),
+            ),  
             actions: [
               IconButton(
                 icon: const Icon(Icons.search, color: Color(0xFF6B46C1)),
@@ -372,32 +369,24 @@ class _HomeScreenState extends State<HomeScreen> {
               SliverToBoxAdapter(
                 child: Container(
                   height: 220,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
                       PageView.builder(
                         controller: _bannerController,
-                        onPageChanged: (idx) =>
-                            setState(() => _currentBanner = idx),
+                        onPageChanged: (idx) => setState(() => _currentBanner = idx),
                         itemCount: _banners.length,
-                        itemBuilder: (_, idx) =>
-                            _buildBannerItem(_banners[idx]),
+                        itemBuilder: (_, idx) => _buildBannerItem(_banners[idx]),
                       ),
                       Positioned(
                         bottom: 12,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.3),
+                            color: Colors.black.withOpacity(0.3),
                             borderRadius: BorderRadius.circular(20),
-                          ),
+                          ),  
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(_banners.length, (i) {
@@ -405,32 +394,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                 duration: const Duration(milliseconds: 400),
                                 width: _currentBanner == i ? 20 : 8,
                                 height: 8,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
                                 decoration: BoxDecoration(
                                   color: _currentBanner == i
                                       ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.5),
+                                      : Colors.white.withOpacity(0.5),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                               );
-                            }),
+                            }),  
                           ),
-                        ),
+                        ),  
                       ),
-                    ],
+                    ],  
                   ),
-                ),
+                ),  
               ),
               // Categories
               SliverToBoxAdapter(
                 child: Container(
                   height: 36,
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 14,
-                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     scrollDirection: Axis.horizontal,
@@ -445,29 +429,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? Container(
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
-                                    colors: [
-                                      Color.fromARGB(
-                                        255,
-                                        179,
-                                        58,
-                                        255,
-                                      ), // Purple
-                                      Color.fromARGB(255, 23, 6, 212), // Blue
-                                    ],
                                   ),
                                   borderRadius: BorderRadius.circular(20),
-                                  boxShadow: DesignSystem.getBrandShadow(
-                                    'medium',
-                                  ),
+                                  boxShadow: DesignSystem.getBrandShadow('medium'),
                                 ),
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(20),
-                                    onTap: () =>
-                                        setState(() => _selectedCategory = idx),
+                                    onTap: () => setState(() => _selectedCategory = idx),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 12,
@@ -488,19 +464,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             : Container(
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
-                                    colors: [
-                                      Color.fromARGB(
-                                        255,
-                                        179,
-                                        58,
-                                        255,
-                                      ), // Purple
-                                      Color.fromARGB(255, 23, 6, 212), // Blue
-                                    ],
                                   ),
-                                  borderRadius: BorderRadius.circular(20),
+                                 	borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Container(
                                   margin: const EdgeInsets.all(1),
@@ -512,9 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: Colors.transparent,
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(18),
-                                      onTap: () => setState(
-                                        () => _selectedCategory = idx,
-                                      ),
+                                      onTap: () => setState(() => _selectedCategory = idx),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 12,
@@ -523,22 +492,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                         child: ShaderMask(
                                           shaderCallback: (Rect bounds) {
                                             return const LinearGradient(
+                                              colors: [
+                                                Color.fromARGB(255, 179, 58, 255),
+                                                Color.fromARGB(255, 23, 6, 212),
+                                              ],
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
-                                              colors: [
-                                                Color.fromARGB(
-                                                  255,
-                                                  179,
-                                                  58,
-                                                  255,
-                                                ), // Purple
-                                                Color.fromARGB(
-                                                  255,
-                                                  23,
-                                                  6,
-                                                  212,
-                                                ), // Blue
-                                              ],
                                             ).createShader(bounds);
                                           },
                                           blendMode: BlendMode.srcIn,
@@ -561,13 +520,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Toggle view
+              // Toggle view label
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
-                    children: [
-                      const Text(
+                    children: const [
+                      Text(
                         'المنتجات',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -581,131 +540,107 @@ class _HomeScreenState extends State<HomeScreen> {
               // Info bar
               SliverToBoxAdapter(
                 child: Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 4,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 179, 58, 255),
+                        Color.fromARGB(255, 23, 6, 212),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color.fromARGB(255, 179, 58, 255), // Purple
-                        Color.fromARGB(255, 23, 6, 212), // Blue
-                      ],
                     ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: Colors.white.withOpacity(0.3),
                     ),
                   ),
                   child: Row(
-                    children: [
+                    children: const [
                       Icon(Icons.info_outline, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         'الاسعار شاملة ضريبة القيمة المضافة',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Product List/Grid
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                sliver: _isLoading
-                    ? SliverToBoxAdapter(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const CircularProgressIndicator(
-                                color: Color(0xFF6B46C1),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'جاري تحميل المنتجات...',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : products.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.inbox_rounded,
-                                color: Color(0xFF6B46C1),
-                                size: 40,
-                              ),
-                              const SizedBox(height: 14),
-                              const Text(
-                                "لا يوجد منتجات متاحة حالياً.",
-                                style: TextStyle(
-                                  color: Color(0xFF6B46C1),
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : _isGridView
-                    ? SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.65,
-                              crossAxisSpacing: 6,
-                              mainAxisSpacing: 8,
-                            ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, idx) => HomeProductCardWidget(
-                            product: products[idx],
-                            onAddToCart: () => _addToCart(products[idx]),
-                            getProductDescription: _getProductDescription,
-                          ),
-                          childCount: products.length,
-                        ),
-                      )
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, idx) => Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: HomeProductCardWidget(
-                              product: products[idx],
-                              onAddToCart: () => _addToCart(products[idx]),
-                              getProductDescription: _getProductDescription,
-                            ),
-                          ),
-                          childCount: products.length,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+                        ),  
+                      ),  
+                    ],  
+                  ),  
+                ),  
+              ),  
+              // Product List/Grid  
+              SliverPadding(  
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),  
+                sliver: _isLoading  
+                    ? SliverToBoxAdapter(  
+                        child: Center(  
+                          child: Column(  
+                            mainAxisAlignment: MainAxisAlignment.center,  
+                            children: [  
+                              const CircularProgressIndicator(  
+                                color: Color(0xFF6B46C1),  
+                              ),  
+                              const SizedBox(height: 16),  
+                              Text(  
+                                'جاري تحميل المنتجات...',  
+                                style: TextStyle(  
+                                  color: Colors.grey[600],  
+                                  fontSize: 16,  
+                                ),  
+                              ),  
+                            ],  
+                          ),  
+                        ),  
+                      )  
+                    : products.isEmpty  
+                        ? SliverToBoxAdapter(  
+                            child: Center(  
+                              child: Column(  
+                                mainAxisAlignment: MainAxisAlignment.center,  
+                                children: [  
+                                  const Icon(  
+                                    Icons.inbox_rounded,  
+                                    color: Color(0xFF6B46C1),  
+                                    size: 40,  
+                                  ),  
+                                  const SizedBox(height: 14),  
+                                  const Text(  
+                                    "لا يوجد منتجات متاحة حالياً.",  
+                                    style: TextStyle(  
+                                      color: Color(0xFF6B46C1),  
+                                      fontSize: 16,  
+                                    ),  
+                                  ),  
+                                ],  
+                              ),  
+                            ),  
+                          )  
+                        : SliverGrid(  
+                            gridDelegate:  
+                                const SliverGridDelegateWithFixedCrossAxisCount(  
+                              crossAxisCount: 2,  
+                              childAspectRatio: 0.65, // taller cards  
+                              crossAxisSpacing: 4,      // reduced gap  
+                              mainAxisSpacing: 10,  
+                            ),  
+                            delegate: SliverChildBuilderDelegate(  
+                              (context, idx) => HomeProductCardWidget(  
+                                product: products[idx],  
+                                onAddToCart: () => _addToCart(products[idx]),  
+                              ),  
+                              childCount: products.length,  
+                            ),  
+                          ),  
+              ),  
+            ],  
+          ),  
+        );  
+      },  
+    );  
   }
 
   Widget _buildBannerItem(Map<String, dynamic> banner) {
@@ -716,13 +651,13 @@ class _HomeScreenState extends State<HomeScreen> {
         gradient: banner['gradient'] as LinearGradient,
         boxShadow: [
           BoxShadow(
-            color: banner['color'].withValues(alpha: 0.15),
+            color: banner['color'].withOpacity(0.15),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: banner['color'].withValues(alpha: 0.08),
+            color: banner['color'].withOpacity(0.08),
             blurRadius: 40,
             offset: const Offset(0, 16),
             spreadRadius: 0,
@@ -738,8 +673,8 @@ class _HomeScreenState extends State<HomeScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withValues(alpha: 0.1),
-                Colors.white.withValues(alpha: 0.05),
+                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
@@ -787,8 +722,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       colors: [
-                        Colors.white.withValues(alpha: 0.3),
-                        Colors.white.withValues(alpha: 0.1),
+                        Colors.white.withOpacity(0.3),
+                        Colors.white.withOpacity(0.1),
                       ],
                       center: Alignment.center,
                       radius: 0.8,

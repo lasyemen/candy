@@ -6,18 +6,17 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../models/products.dart';
 import '../../core/constants/design_system.dart';
+import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
 
 class HomeProductCardWidget extends StatelessWidget {
   final Products product;
   final VoidCallback onAddToCart;
-  final String Function(Products) getProductDescription;
 
   const HomeProductCardWidget({
     super.key,
     required this.product,
     required this.onAddToCart,
-    required this.getProductDescription,
   });
 
   @override
@@ -76,21 +75,10 @@ class HomeProductCardWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        title: Text(product.name),
-                        content: Text(getProductDescription(product)),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('إغلاق'),
-                          ),
-                        ],
-                      ),
+                    AppRoutes.navigateTo(
+                      context,
+                      AppRoutes.productDetails,
+                      arguments: product,
                     );
                   },
                   child: Padding(
@@ -170,16 +158,31 @@ class HomeProductCardWidget extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
 
-                            // Product Description
-                            Text(
-                              getProductDescription(product),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                                height: 1.4,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            // Product Rating
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  size: 14,
+                                  color: Colors.amber[600],
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${product.rating}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '(${product.totalSold})',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
 

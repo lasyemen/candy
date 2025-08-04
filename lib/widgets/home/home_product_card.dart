@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/products.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/design_system.dart';
+import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
 
 class HomeProductCard extends StatefulWidget {
@@ -62,6 +63,14 @@ class _HomeProductCardState extends State<HomeProductCard>
     _controller.reverse();
   }
 
+  void _navigateToProductDetails() {
+    AppRoutes.navigateTo(
+      context,
+      AppRoutes.productDetails,
+      arguments: widget.product,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
@@ -71,6 +80,7 @@ class _HomeProductCardState extends State<HomeProductCard>
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
       onTapCancel: _onTapCancel,
+      onTap: _navigateToProductDetails,
       child: AnimatedBuilder(
         animation: _scaleAnimation,
         builder: (context, child) {
