@@ -9,8 +9,18 @@ class Ads {
   final String imageUrl;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
+  @JsonKey(name: 'storage_bucket')
+  final String? storageBucket;
+  @JsonKey(name: 'storage_path')
+  final String? storagePath;
 
-  Ads({required this.id, required this.imageUrl, required this.createdAt});
+  Ads({
+    required this.id,
+    required this.imageUrl,
+    required this.createdAt,
+    this.storageBucket,
+    this.storagePath,
+  });
 
   factory Ads.fromJson(Map<String, dynamic> json) => _$AdsFromJson(json);
   Map<String, dynamic> toJson() => _$AdsToJson(this);

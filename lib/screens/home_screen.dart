@@ -26,7 +26,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategory = 0;
-  final bool _isGridView = true;
   int _currentBanner = 0;
   late PageController _bannerController;
   Timer? _bannerTimer;
@@ -36,41 +35,36 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingAds = true;
 
   List<Map<String, dynamic>> get _banners {
+    print('Current ads count: ${_ads.length}'); // Debug log
+    print('Ads list: $_ads'); // Debug: show the actual ads list
+
     if (_ads.isEmpty) {
-      // Fallback banners if no ads are loaded
-      return [
-        {
-          'title': 'عرض خاص!',
-          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
-          'image': 'assets/icon/iconApp.png',
-          'color': const Color(0xFF6B46C1),
-          'gradient': DesignSystem.primaryGradient,
-          'icon': Icons.local_offer,
-        },
-        {
-          'title': 'توصيل مجاني',
-          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
-          'image': 'assets/icon/iconApp.png',
-          'color': const Color(0xFF6B46C1),
-          'gradient': DesignSystem.primaryGradient,
-          'icon': Icons.delivery_dining,
-        },
-      ];
+      print('No ads loaded from database');
+      return []; // Return empty list instead of fallback banners
     }
 
-    // Convert ads to banner format
-    return _ads
-        .map(
-          (ad) => {
-            'title': 'إعلان',
-            'subtitle': 'عرض خاص من كاندي',
-            'image': ad.imageUrl,
-            'color': const Color(0xFF6B46C1),
-            'gradient': DesignSystem.primaryGradient,
-            'icon': Icons.local_offer,
-          },
-        )
-        .toList();
+    print('Converting ${_ads.length} ads to banners');
+    // Convert ads to banner format with fallback images
+    return _ads.map((ad) {
+      print('Processing ad: ID=${ad.id}, ImageURL=${ad.imageUrl}');
+
+      // Use fallback image if the ad image URL is invalid or missing
+      String imageUrl = ad.imageUrl;
+      if (imageUrl.isEmpty || !imageUrl.startsWith('http')) {
+        print('Using fallback image for ad ${ad.id}');
+        imageUrl = 'https://picsum.photos/400/200?random=ad_${ad.id}';
+      }
+
+      return {
+        'title': 'إعلان كاندي',
+        'subtitle': 'عرض خاص من كاندي',
+        'image': imageUrl,
+        'color': const Color(0xFF6B46C1),
+        'gradient': DesignSystem.primaryGradient,
+        'icon': Icons.local_offer,
+        'ad_id': ad.id, // Add ad ID for debugging
+      };
+    }).toList();
   }
 
   final List<String> _categories = [
@@ -152,19 +146,64 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadAds() async {
     try {
+      print('Loading ads from database...');
       setState(() {
         _isLoadingAds = true;
       });
 
       final ads = await AdsService.fetchAds();
+      print('Loaded ${ads.length} ads from database');
 
-      if (mounted) {
-        setState(() {
-          _ads = ads;
-          _isLoadingAds = false;
-        });
+      // If no ads found, add sample ads automatically
+      if (ads.isEmpty) {
+        print('No ads found in database, adding sample ads...');
+        final success = await AdsService.addSampleAds();
+        if (success) {
+          // Reload ads after adding samples
+          final newAds = await AdsService.fetchAds();
+          print('Reloaded ${newAds.length} ads after adding samples');
+
+          if (mounted) {
+            setState(() {
+              _ads = newAds;
+              _isLoadingAds = false;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _isLoadingAds = false;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _ads = ads;
+            _isLoadingAds = false;
+          });
+        }
+      }
+
+      print('Ads state updated, total ads: ${_ads.length}');
+
+      // Display ads information
+      if (_ads.isNotEmpty) {
+        print('=== DATABASE ADS INFORMATION ===');
+        for (int i = 0; i < _ads.length; i++) {
+          final ad = _ads[i];
+          print('Ad ${i + 1}:');
+          print('  ID: ${ad.id}');
+          print('  Image URL: ${ad.imageUrl}');
+          print('  Created: ${ad.createdAt}');
+          print('  Will be displayed as banner');
+          print('---');
+        }
+      } else {
+        print('No ads found in database - showing fallback banners');
       }
     } catch (e) {
+      print('Error loading ads from database: $e');
       if (mounted) {
         setState(() {
           _isLoadingAds = false;
@@ -336,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    overlay!.insert(overlayEntry);
+    overlay.insert(overlayEntry);
 
     // Remove the overlay after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
@@ -344,17 +383,6 @@ class _HomeScreenState extends State<HomeScreen> {
         overlayEntry.remove();
       }
     });
-  }
-
-  String _getProductDescription(Products product) {
-    if (product.description != null && product.description!.isNotEmpty) {
-      return product.description!;
-    }
-    if (product.category == '330 مل') return '١ كرتون - ٤٠ عبوة بلاستيك';
-    if (product.category == '200 مل') return '١ كرتون - ٤٨ عبوة بلاستيك';
-    if (product.category == '500 مل') return '١ كرتون - ٢٤ عبوة بلاستيك';
-    if (product.category == '1 لتر') return '١ كرتون - ١٢ عبوة بلاستيك';
-    return '١ كرتون - ٢٠ عبوة بلاستيك';
   }
 
   @override
@@ -388,6 +416,36 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
+              // Debug button for ads
+              IconButton(
+                icon: const Icon(Icons.bug_report, color: Color(0xFF6B46C1)),
+                onPressed: () async {
+                  print('Debugging ads...');
+                  final ads = await AdsService.fetchAds();
+                  print('Database has ${ads.length} ads');
+
+                  if (ads.isEmpty) {
+                    print('Adding sample ads...');
+                    await AdsService.addSampleAds();
+                    await _loadAds();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('تم إضافة إعلانات تجريبية'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    print('Reloading existing ads...');
+                    await _loadAds();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تم تحميل ${ads.length} إعلان'),
+                        backgroundColor: Colors.blue,
+                      ),
+                    );
+                  }
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.search, color: Color(0xFF6B46C1)),
                 onPressed: () {
@@ -408,10 +466,12 @@ class _HomeScreenState extends State<HomeScreen> {
               // Banner carousel
               SliverToBoxAdapter(
                 child: Container(
-                  height: 220,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
+                  height: 320,
+                  margin: const EdgeInsets.only(
+                    left: 8,
+                    right: 8,
+                    top: 8,
+                    bottom: 32,
                   ),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
@@ -422,6 +482,47 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Color(0xFF6B46C1),
                               ),
                             )
+                          : _banners.isEmpty
+                          ? Container(
+                              height: 180,
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: DesignSystem.primaryGradient,
+                                borderRadius: BorderRadius.circular(35),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                    spreadRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.local_offer,
+                                      size: 40,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'لا توجد إعلانات حالياً',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
                           : PageView.builder(
                               controller: _bannerController,
                               onPageChanged: (idx) =>
@@ -430,38 +531,39 @@ class _HomeScreenState extends State<HomeScreen> {
                               itemBuilder: (_, idx) =>
                                   _buildBannerItem(_banners[idx]),
                             ),
-                      Positioned(
-                        bottom: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(_banners.length, (i) {
-                              return AnimatedContainer(
-                                duration: const Duration(milliseconds: 400),
-                                width: _currentBanner == i ? 20 : 8,
-                                height: 8,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _currentBanner == i
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              );
-                            }),
+                      if (_banners.isNotEmpty)
+                        Positioned(
+                          bottom: 20,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(_banners.length, (i) {
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 400),
+                                  width: _currentBanner == i ? 20 : 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _currentBanner == i
+                                        ? Colors.white
+                                        : Colors.white.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                );
+                              }),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -712,6 +814,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
               ),
+              // Bottom padding to prevent navigation bar from covering last items
+              SliverToBoxAdapter(
+                child: Container(
+                  height:
+                      100, // Adjust this value based on your navigation bar height
+                ),
+              ),
             ],
           ),
         );
@@ -720,119 +829,166 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBannerItem(Map<String, dynamic> banner) {
+    final imageUrl = banner['image'] as String;
+    print('Building banner with image: $imageUrl');
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(35),
-        gradient: banner['gradient'] as LinearGradient,
         boxShadow: [
           BoxShadow(
-            color: banner['color'].withOpacity(0.15),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: banner['color'].withOpacity(0.08),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 40,
             offset: const Offset(0, 16),
             spreadRadius: 0,
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.05),
-              ],
+      child: Container(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(35)),
+        clipBehavior: Clip.antiAlias,
+        child: _buildBannerBackgroundImage(imageUrl),
+      ),
+    );
+  }
+
+  Widget _buildBannerBackgroundImage(String imageUrl) {
+    print('Building background image with URL: $imageUrl');
+
+    // Check if it's a network image (starts with http or https)
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      print('Loading network image: $imageUrl');
+
+      // Load all network images normally, including Supabase URLs
+
+      return Image.network(
+        imageUrl,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading network background image: $error');
+          return _buildFallbackImage();
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            print('Network image loaded successfully');
+            return child;
+          }
+          print(
+            'Loading network image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}',
+          );
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[200],
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                    : null,
+                strokeWidth: 3,
+                color: Colors.grey[600],
+              ),
             ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          banner['icon'] ?? Icons.star,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          banner['title'] as String,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      banner['subtitle'] as String,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
+          );
+        },
+      );
+    } else {
+      // Local asset image
+      print('Loading asset image: $imageUrl');
+      return Image.asset(
+        imageUrl,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading asset background image: $error');
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[300],
+            child: Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 60,
+                color: Colors.grey[600],
               ),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.3),
-                        Colors.white.withOpacity(0.1),
-                      ],
-                      center: Alignment.center,
-                      radius: 0.8,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: banner['image'].toString().startsWith('http')
-                        ? Image.network(
-                            banner['image'] as String,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Image.asset(
-                                'assets/icon/iconApp.png',
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.contain,
-                              );
-                            },
-                          )
-                        : Image.asset(
-                            banner['image'] as String,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.contain,
-                          ),
-                  ),
-                ),
-              ),
-            ],
+            ),
+          );
+        },
+      );
+    }
+  }
+
+  /// Build a Supabase image with better error handling
+  Widget _buildSupabaseImage(String imageUrl) {
+    return Image.network(
+      imageUrl,
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        print('Supabase image not found: $imageUrl');
+        // For Supabase images that don't exist, show a placeholder immediately
+        return _buildFallbackImage();
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          print('Supabase image loaded successfully: $imageUrl');
+          return child;
+        }
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: Colors.grey[200],
+          child: Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                  : null,
+              strokeWidth: 3,
+              color: Colors.grey[600],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  /// Build a fallback image when network images fail
+  Widget _buildFallbackImage() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: DesignSystem.primaryGradient,
+        borderRadius: BorderRadius.circular(35),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.local_offer, size: 40, color: Colors.white),
+            SizedBox(height: 8),
+            Text(
+              'عرض خاص',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );
