@@ -110,29 +110,114 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     final appBloc = context.read<AppBloc>();
     HapticFeedback.lightImpact();
 
+    print('=== UPDATE QUANTITY DEBUG ===');
     print(
         '_updateQuantity called with itemId: $itemId, newQuantity: $newQuantity');
+    print('Current cart items count: ${_cartItemsWithProducts.length}');
+
+    // Validate itemId
+    if (itemId.isEmpty || itemId == 'null') {
+      print('Error: Invalid item ID provided');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: معرف المنتج غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
 
     try {
-      await CartManager.instance.updateQuantity(itemId, newQuantity);
-      print('CartManager updateQuantity completed successfully');
+      // Check if this is a temporary ID (local item)
+      if (itemId.startsWith('temp_')) {
+        print('Handling temporary item ID: $itemId');
+        // For temporary IDs, we need to handle them differently
+        // Try to find the actual item in the cart and update it
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['product_id']?.toString() == itemId.split('_')[1] ||
+              item['id']?.toString() == itemId,
+        );
 
-      // Update app bloc
-      if (newQuantity <= 0) {
-        appBloc.add(RemoveFromCartEvent(itemId));
+        print('Found item at index: $itemIndex');
+
+        if (itemIndex != -1) {
+          final actualItem = _cartItemsWithProducts[itemIndex];
+          final actualItemId = actualItem['id']?.toString() ??
+              actualItem['product_id']?.toString() ??
+              itemId;
+          final productId = actualItem['product_id']?.toString() ?? itemId;
+
+          print('Actual item ID: $actualItemId');
+          print('Product ID: $productId');
+
+          if (newQuantity <= 0) {
+            // Remove item
+            print('Removing item with quantity <= 0');
+            await CartManager.instance.removeProduct(actualItemId);
+            appBloc.add(RemoveFromCartEvent(productId));
+          } else {
+            // Update quantity
+            print('Updating quantity to: $newQuantity');
+            await CartManager.instance
+                .updateQuantity(actualItemId, newQuantity);
+            appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+          }
+        } else {
+          throw Exception('Item not found in cart');
+        }
       } else {
-        appBloc.add(UpdateCartItemQuantityEvent(itemId, newQuantity));
+        // Regular item ID handling
+        print('Handling regular item ID: $itemId');
+
+        // Find the product ID for this item
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) => item['id']?.toString() == itemId,
+        );
+
+        print('Found item at index: $itemIndex');
+
+        String productId = itemId; // fallback
+        if (itemIndex != -1) {
+          productId =
+              _cartItemsWithProducts[itemIndex]['product_id']?.toString() ??
+                  itemId;
+          print('Product ID found: $productId');
+        } else {
+          print('Item not found in cart items, using itemId as productId');
+        }
+
+        await CartManager.instance.updateQuantity(itemId, newQuantity);
+        print('CartManager updateQuantity completed successfully');
+
+        // Update app bloc with productId (not itemId)
+        if (newQuantity <= 0) {
+          print('Removing item from app bloc');
+          appBloc.add(RemoveFromCartEvent(productId));
+        } else {
+          print('Updating item quantity in app bloc');
+          appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+        }
       }
 
       // Refresh cart data
+      print('Refreshing cart data...');
       _loadCartData();
+      print('=== UPDATE QUANTITY SUCCESS ===');
     } catch (e) {
+      print('=== UPDATE QUANTITY ERROR ===');
       print('Error updating quantity: $e');
+      print('Error type: ${e.runtimeType}');
+      print('Stack trace: ${StackTrace.current}');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطأ في تحديث الكمية: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -158,11 +243,14 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
           print(
               'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items');
 
-          // Debug: Print each item
+          // Debug: Print each item with detailed structure
           for (int i = 0; i < _cartItemsWithProducts.length; i++) {
             final item = _cartItemsWithProducts[i];
             print(
                 'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}');
+            print('CartScreen - Item $i structure: ${item.keys.toList()}');
+            print('CartScreen - Item $i ID: ${item['id']}');
+            print('CartScreen - Item $i product_id: ${item['product_id']}');
           }
         });
       }
@@ -181,6 +269,25 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       } catch (retryError) {
         print('CartScreen - Error retrying cart data load: $retryError');
       }
+    }
+  }
+
+  // Debug method to print cart item structure
+  void _debugCartItemStructure() {
+    print('CartScreen - Debugging cart item structure:');
+    for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+      final item = _cartItemsWithProducts[i];
+      print('Item $i:');
+      print('  Keys: ${item.keys.toList()}');
+      print('  ID: ${item['id']} (type: ${item['id']?.runtimeType})');
+      print(
+          '  Product ID: ${item['product_id']} (type: ${item['product_id']?.runtimeType})');
+      print(
+          '  Quantity: ${item['quantity']} (type: ${item['quantity']?.runtimeType})');
+      if (item['products'] != null) {
+        print('  Product: ${item['products']}');
+      }
+      print('  ---');
     }
   }
 
@@ -320,11 +427,51 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     final appBloc = context.read<AppBloc>();
     HapticFeedback.mediumImpact();
 
-    try {
-      await CartManager.instance.removeProduct(itemId);
+    print('_removeItem called with itemId: $itemId');
 
-      // Update app bloc
-      appBloc.add(RemoveFromCartEvent(itemId));
+    // Validate itemId
+    if (itemId.isEmpty || itemId == 'null') {
+      print('Error: Invalid item ID provided for removal');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: معرف المنتج غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Check if this is a temporary ID (local item)
+      if (itemId.startsWith('temp_')) {
+        print('Handling temporary item ID for removal: $itemId');
+        // For temporary IDs, we need to handle them differently
+        // Try to find the actual item in the cart and remove it
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['product_id']?.toString() == itemId.split('_')[1] ||
+              item['id']?.toString() == itemId,
+        );
+
+        if (itemIndex != -1) {
+          final actualItem = _cartItemsWithProducts[itemIndex];
+          final actualItemId = actualItem['id']?.toString() ??
+              actualItem['product_id']?.toString() ??
+              itemId;
+          final productId = actualItem['product_id']?.toString() ?? itemId;
+
+          await CartManager.instance.removeProduct(actualItemId);
+          appBloc.add(RemoveFromCartEvent(productId));
+        } else {
+          throw Exception('Item not found in cart for removal');
+        }
+      } else {
+        // Regular item ID handling
+        await CartManager.instance.removeProduct(itemId);
+        appBloc.add(RemoveFromCartEvent(itemId));
+      }
 
       // Refresh cart data
       _loadCartData();
@@ -523,6 +670,11 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Debug cart item structure when screen is built
+    if (_cartItemsWithProducts.isNotEmpty) {
+      _debugCartItemStructure();
+    }
+
     return Scaffold(
       backgroundColor: DesignSystem.background,
       appBar: PreferredSize(
@@ -963,7 +1115,22 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     final productPrice = product?['price'] as double? ?? 0.0;
     final productImage = product?['image_url'] as String?;
     final quantity = cartItem['quantity'] as int;
-    final itemId = cartItem['id'] as String? ?? '';
+
+    // Improved item ID extraction with fallback
+    String itemId = '';
+    if (cartItem['id'] != null && cartItem['id'].toString().isNotEmpty) {
+      itemId = cartItem['id'].toString();
+    } else if (cartItem['product_id'] != null) {
+      // Use product_id as fallback for local items
+      itemId = cartItem['product_id'].toString();
+    } else {
+      // Generate a temporary ID if neither exists
+      itemId = 'temp_${index}_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    print(
+        'Building cart item: itemId=$itemId, quantity=$quantity, productName=$productName');
+    print('Cart item structure: ${cartItem.keys.toList()}');
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1150,6 +1317,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   onPressed: () {
                     print(
                         'Decrease button pressed for item: $itemId, current quantity: $quantity');
+                    print(
+                        'Item ID type: ${itemId.runtimeType}, value: "$itemId"');
                     _updateQuantity(itemId, quantity - 1);
                   },
                   isDecrease: true,
@@ -1169,6 +1338,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   onPressed: () {
                     print(
                         'Increase button pressed for item: $itemId, current quantity: $quantity');
+                    print(
+                        'Item ID type: ${itemId.runtimeType}, value: "$itemId"');
                     _updateQuantity(itemId, quantity + 1);
                   },
                   isDecrease: false,
@@ -1487,18 +1658,20 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     required VoidCallback onPressed,
     required bool isDecrease,
   }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(6),
+    return GestureDetector(
+      onTap: () {
+        print('Button tapped: ${isDecrease ? "decrease" : "increase"}');
+        onPressed();
+      },
       child: Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           gradient: DesignSystem.getBrandGradient('primary'),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
-          size: 14,
+          size: 16,
           color: Colors.white,
         ),
       ),

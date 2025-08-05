@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../models/products.dart';
 import '../core/constants/app_colors.dart';
 import '../widgets/riyal_icon.dart';
+import '../core/services/cart_service.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Products product;
@@ -344,30 +345,66 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(Icons.check_circle_rounded,
-                          color: AppColors.textInverse, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Added ${widget.product.name} to cart',
-                        style: const TextStyle(
-                          fontFamily: 'Rubik',
-                          fontWeight: FontWeight.w600,
-                        ),
+            onTap: () async {
+              try {
+                print('Adding product to cart: ${widget.product.id}');
+                await CartManager.instance
+                    .addProduct(widget.product.id, quantity: _selectedQuantity);
+                print('Product added to cart successfully');
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: AppColors.textInverse, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'تم إضافة ${widget.product.name} إلى السلة',
+                            style: const TextStyle(
+                              fontFamily: 'Rubik',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  margin: const EdgeInsets.all(16),
-                ),
-              );
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
+              } catch (e) {
+                print('Error adding product to cart: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.error_rounded,
+                              color: AppColors.textInverse, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'خطأ في إضافة المنتج إلى السلة',
+                            style: const TextStyle(
+                              fontFamily: 'Rubik',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
+              }
             },
             child: const Center(
               child: Text(
@@ -387,8 +424,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   Widget _buildPlaceholderImage() => Container(
         color: Colors.grey[200],
         child: Center(
-          child:
-              Icon(Icons.image_outlined, size: 80, color: AppColors.textInverse),
+          child: Icon(Icons.image_outlined,
+              size: 80, color: AppColors.textInverse),
         ),
       );
 }
