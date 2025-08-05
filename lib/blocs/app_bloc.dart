@@ -206,6 +206,10 @@ class AppBloc extends ChangeNotifier {
       final currentState = _state as AppLoadedState;
 
       try {
+        // Debug: Print product information
+        print('AppBloc - Adding to cart - Product ID: ${product.id}');
+        print('AppBloc - Adding to cart - Product Name: ${product.name}');
+
         // For now, we'll use a simple approach
         // In a real app, you'd get the customer ID from user session
         const customerId = 'temp-customer-id';
@@ -213,26 +217,51 @@ class AppBloc extends ChangeNotifier {
         // Get or create cart
         Cart? cart = currentState.cart;
         if (cart == null) {
+          print('AppBloc - Creating new cart for customer: $customerId');
           cart = await CartService.createCart(customerId);
+          print('AppBloc - New cart created with ID: ${cart.id}');
+        } else {
+          print('AppBloc - Using existing cart: ${cart.id}');
         }
 
         // Add item to cart
-        await CartService.addToCart(cart.id, product.id, 1);
+        print('AppBloc - Adding item to cart: ${cart.id}');
+        final cartItem = await CartService.addToCart(cart.id, product.id, 1);
+        print('AppBloc - Cart item added successfully: ${cartItem.id}');
 
         // Refresh cart
-        cart = await CartService.getCart(customerId);
-
-        _state = currentState.copyWith(
-          cart: cart,
-          cartItemCount: cart?.items?.length ?? 0,
+        print('AppBloc - Refreshing cart data');
+        cart = await CartService.getCurrentCustomerCart();
+        print(
+          'AppBloc - Cart items after refresh: ${cart?.items?.length ?? 0}',
         );
-        notifyListeners();
+
+        if (cart != null) {
+          print(
+            'AppBloc - Updating state with cart: ${cart.items?.length ?? 0} items',
+          );
+          _state = currentState.copyWith(
+            cart: cart,
+            cartItemCount: cart.items?.length ?? 0,
+          );
+          notifyListeners();
+          print('AppBloc - Cart updated successfully in state');
+        } else {
+          print('AppBloc - Warning: Cart is null after refresh');
+          _state = currentState.copyWith(
+            errorMessage: 'Failed to refresh cart data',
+          );
+          notifyListeners();
+        }
       } catch (e) {
+        print('AppBloc - Error adding to cart: $e');
         _state = currentState.copyWith(
           errorMessage: 'Error adding to cart: $e',
         );
         notifyListeners();
       }
+    } else {
+      print('AppBloc - Error: App is not in loaded state');
     }
   }
 
@@ -252,8 +281,7 @@ class AppBloc extends ChangeNotifier {
           await CartService.removeFromCart(itemToRemove.id);
 
           // Refresh cart
-          const customerId = 'temp-customer-id';
-          final cart = await CartService.getCart(customerId);
+          final cart = await CartService.getCurrentCustomerCart();
 
           _state = currentState.copyWith(
             cart: cart,
@@ -289,8 +317,7 @@ class AppBloc extends ChangeNotifier {
           }
 
           // Refresh cart
-          const customerId = 'temp-customer-id';
-          final cart = await CartService.getCart(customerId);
+          final cart = await CartService.getCurrentCustomerCart();
 
           _state = currentState.copyWith(
             cart: cart,
@@ -343,9 +370,9 @@ class AppBloc extends ChangeNotifier {
 
     double total = 0;
     for (final item in currentCart!.items!) {
-      // Note: This is a simplified calculation
-      // In a real app, you'd fetch product details to get the price
-      total += item.quantity * 0; // Placeholder for product price
+      // Use a default price of 5.0 for now
+      // In a real app, you'd fetch product details to get the actual price
+      total += item.quantity * 5.0;
     }
     return total;
   }
@@ -362,7 +389,7 @@ class AppBloc extends ChangeNotifier {
       // In a real app, you'd fetch the actual product details
       final mockProduct = {
         'id': item.productId,
-        'name': 'مياه ${item.productId}', // Mock name
+        'name': 'مياه كاندي ${item.productId}', // Mock name
         'price': 5.0, // Mock price
       };
 

@@ -16,6 +16,7 @@ import '../widgets/home/home_search_delegate.dart';
 import '../models/index.dart';
 import '../core/services/product_service.dart';
 import '../core/services/ads_service.dart';
+import '../core/services/cart_service.dart'; // Added import for CartService
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentBanner = 0;
   late PageController _bannerController;
   Timer? _bannerTimer;
+  Timer? _refreshTimer;
   List<Products> _products = [];
   List<Ads> _ads = [];
   bool _isLoading = true;
@@ -39,26 +41,36 @@ class _HomeScreenState extends State<HomeScreen> {
     print('Ads list: $_ads'); // Debug: show the actual ads list
 
     if (_ads.isEmpty) {
-      print('No ads loaded from database');
-      return []; // Return empty list instead of fallback banners
+      print('No ads loaded, showing fallback banners');
+      // Fallback banners if no ads are loaded
+      return [
+        {
+          'title': 'عرض خاص!',
+          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+          'image': 'https://picsum.photos/400/200?random=fallback1',
+          'color': const Color(0xFF6B46C1),
+          'gradient': DesignSystem.primaryGradient,
+          'icon': Icons.local_offer,
+        },
+        {
+          'title': 'توصيل مجاني',
+          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
+          'image': 'https://picsum.photos/400/200?random=fallback2',
+          'color': const Color(0xFF6B46C1),
+          'gradient': DesignSystem.primaryGradient,
+          'icon': Icons.delivery_dining,
+        },
+      ];
     }
 
     print('Converting ${_ads.length} ads to banners');
-    // Convert ads to banner format with fallback images
+    // Convert ads to banner format
     return _ads.map((ad) {
       print('Processing ad: ID=${ad.id}, ImageURL=${ad.imageUrl}');
-
-      // Use fallback image if the ad image URL is invalid or missing
-      String imageUrl = ad.imageUrl;
-      if (imageUrl.isEmpty || !imageUrl.startsWith('http')) {
-        print('Using fallback image for ad ${ad.id}');
-        imageUrl = 'https://picsum.photos/400/200?random=ad_${ad.id}';
-      }
-
       return {
         'title': 'إعلان كاندي',
         'subtitle': 'عرض خاص من كاندي',
-        'image': imageUrl,
+        'imageUrl': ad.imageUrl, // Use imageUrl key to match banner widget
         'color': const Color(0xFF6B46C1),
         'gradient': DesignSystem.primaryGradient,
         'icon': Icons.local_offer,
@@ -87,26 +99,78 @@ class _HomeScreenState extends State<HomeScreen> {
         _bannerController.animateToPage(
           next,
           duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+          curve: Curves.easeInOut,
         );
+        setState(() {
+          _currentBanner = next;
+        });
       }
     });
+
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (mounted) {
+        _loadProducts(showLoading: false);
+        _loadAds();
+      }
+    });
+
+    // Test cart functionality on startup
+    _testCartFunctionality();
+
     _loadProducts();
     _loadAds();
+  }
+
+  // Test cart functionality
+  Future<void> _testCartFunctionality() async {
+    try {
+      print('HomeScreen - Cart functionality is ready');
+    } catch (e) {
+      print('HomeScreen - Cart functionality test failed: $e');
+    }
   }
 
   @override
   void dispose() {
     _bannerController.dispose();
     _bannerTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
+  // Background refresh method that doesn't show loading
+  Future<void> _refreshDataSilently() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      // Refresh products silently
+      final products = await ProductService.fetchProducts();
+      if (mounted && products.length != _products.length) {
+        setState(() {
+          _products = products;
+        });
+        print('Silently refreshed ${products.length} products');
+      }
+
+      // Refresh ads silently
+      final ads = await AdsService.fetchAds();
+      if (mounted && ads.length != _ads.length) {
+        setState(() {
+          _ads = ads;
+        });
+        print('Silently refreshed ${ads.length} ads');
+      }
+    } catch (e) {
+      print('Silent refresh error: $e');
+      // Don't show error messages for background refreshes
+    }
+  }
+
+  Future<void> _loadProducts({bool showLoading = true}) async {
+    try {
+      if (showLoading) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
 
       final products = await ProductService.fetchProducts();
 
@@ -123,18 +187,20 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isLoading = false;
         });
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في تحميل المنتجات: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Show error message only if it's not a background refresh
+        if (showLoading) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطأ في تحميل المنتجات: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
 
-    // If no products loaded and no error, show empty state
-    if (mounted && _products.isEmpty && !_isLoading) {
+    // If no products loaded and no error, show empty state only on initial load
+    if (mounted && _products.isEmpty && !_isLoading && showLoading) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('لا يوجد منتجات في قاعدة البيانات'),
@@ -151,38 +217,38 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingAds = true;
       });
 
+      // First check if table exists
+      final tableExists = await AdsService.tableExists();
+      if (!tableExists) {
+        print('Ads table does not exist or is not accessible');
+        setState(() {
+          _isLoadingAds = false;
+        });
+        return;
+      }
+
+      // Check if table has data
+      final hasData = await AdsService.hasAds();
+      if (!hasData) {
+        print('Ads table is empty - adding sample ads');
+        final added = await AdsService.addSampleAds();
+        if (!added) {
+          print('Failed to add sample ads');
+          setState(() {
+            _isLoadingAds = false;
+          });
+          return;
+        }
+      }
+
       final ads = await AdsService.fetchAds();
       print('Loaded ${ads.length} ads from database');
 
-      // If no ads found, add sample ads automatically
-      if (ads.isEmpty) {
-        print('No ads found in database, adding sample ads...');
-        final success = await AdsService.addSampleAds();
-        if (success) {
-          // Reload ads after adding samples
-          final newAds = await AdsService.fetchAds();
-          print('Reloaded ${newAds.length} ads after adding samples');
-
-          if (mounted) {
-            setState(() {
-              _ads = newAds;
-              _isLoadingAds = false;
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _isLoadingAds = false;
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _ads = ads;
-            _isLoadingAds = false;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _ads = ads;
+          _isLoadingAds = false;
+        });
       }
 
       print('Ads state updated, total ads: ${_ads.length}');
@@ -229,6 +295,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Add haptic feedback
     HapticFeedback.lightImpact();
+
+    // Debug: Print product information
+    print('Adding to cart - Product ID: ${product.id}');
+    print('Adding to cart - Product Name: ${product.name}');
+    print('Adding to cart - Product Price: ${product.price}');
 
     // Add product to cart
     appBloc.add(AddToCartEvent(product));
@@ -393,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final products = _getFilteredProducts(lang);
 
         return Scaffold(
-          backgroundColor: Colors.grey[50],
+          backgroundColor: Colors.white,
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -416,36 +487,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
-              // Debug button for ads
-              IconButton(
-                icon: const Icon(Icons.bug_report, color: Color(0xFF6B46C1)),
-                onPressed: () async {
-                  print('Debugging ads...');
-                  final ads = await AdsService.fetchAds();
-                  print('Database has ${ads.length} ads');
-
-                  if (ads.isEmpty) {
-                    print('Adding sample ads...');
-                    await AdsService.addSampleAds();
-                    await _loadAds();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('تم إضافة إعلانات تجريبية'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  } else {
-                    print('Reloading existing ads...');
-                    await _loadAds();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('تم تحميل ${ads.length} إعلان'),
-                        backgroundColor: Colors.blue,
-                      ),
-                    );
-                  }
-                },
-              ),
               IconButton(
                 icon: const Icon(Icons.search, color: Color(0xFF6B46C1)),
                 onPressed: () {
@@ -466,12 +507,12 @@ class _HomeScreenState extends State<HomeScreen> {
               // Banner carousel
               SliverToBoxAdapter(
                 child: Container(
-                  height: 320,
+                  height: 230,
                   margin: const EdgeInsets.only(
                     left: 8,
                     right: 8,
                     top: 8,
-                    bottom: 32,
+                    bottom: 8,
                   ),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
@@ -482,47 +523,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Color(0xFF6B46C1),
                               ),
                             )
-                          : _banners.isEmpty
-                          ? Container(
-                              height: 180,
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: DesignSystem.primaryGradient,
-                                borderRadius: BorderRadius.circular(35),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                    spreadRadius: 0,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.local_offer,
-                                      size: 40,
-                                      color: Colors.white,
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'لا توجد إعلانات حالياً',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
                           : PageView.builder(
                               controller: _bannerController,
                               onPageChanged: (idx) =>
@@ -531,39 +531,38 @@ class _HomeScreenState extends State<HomeScreen> {
                               itemBuilder: (_, idx) =>
                                   _buildBannerItem(_banners[idx]),
                             ),
-                      if (_banners.isNotEmpty)
-                        Positioned(
-                          bottom: 20,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(_banners.length, (i) {
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 400),
-                                  width: _currentBanner == i ? 20 : 8,
-                                  height: 8,
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _currentBanner == i
-                                        ? Colors.white
-                                        : Colors.white.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                );
-                              }),
-                            ),
+                      Positioned(
+                        bottom: 20,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(_banners.length, (i) {
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 400),
+                                width: _currentBanner == i ? 20 : 8,
+                                height: 8,
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _currentBanner == i
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              );
+                            }),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -728,7 +727,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withOpacity(0.3)),
                   ),
                   child: Row(
@@ -829,24 +828,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBannerItem(Map<String, dynamic> banner) {
-    final imageUrl = banner['image'] as String;
+    final imageUrl = banner['imageUrl'] as String?;
     print('Building banner with image: $imageUrl');
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      print('No image URL found, using fallback');
+      return _buildBannerBackgroundImage('assets/icon/iconApp.png');
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(35),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-            spreadRadius: 0,
-          ),
+          // Main shadow - same as nav bar
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 40,
-            offset: const Offset(0, 16),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Top
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, -1),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Bottom
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Left
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(-1, 0),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Right
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(1, 0),
             spreadRadius: 0,
           ),
         ],
@@ -859,15 +886,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBannerBackgroundImage(String imageUrl) {
+  Widget _buildBannerBackgroundImage(String? imageUrl) {
     print('Building background image with URL: $imageUrl');
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      print('No image URL provided, using fallback');
+      return Image.asset(
+        'assets/icon/iconApp.png',
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, assetError, stackTrace) {
+          print('Error loading fallback asset image: $assetError');
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[300],
+            child: Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 60,
+                color: Colors.grey[600],
+              ),
+            ),
+          );
+        },
+      );
+    }
 
     // Check if it's a network image (starts with http or https)
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       print('Loading network image: $imageUrl');
-
-      // Load all network images normally, including Supabase URLs
-
       return Image.network(
         imageUrl,
         width: double.infinity,
@@ -875,7 +924,28 @@ class _HomeScreenState extends State<HomeScreen> {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           print('Error loading network background image: $error');
-          return _buildFallbackImage();
+          // Fallback to local asset if network fails
+          return Image.asset(
+            'assets/icon/iconApp.png',
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, assetError, stackTrace) {
+              print('Error loading fallback asset image: $assetError');
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.grey[300],
+                child: Center(
+                  child: Icon(
+                    Icons.image_not_supported,
+                    size: 60,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              );
+            },
+          );
         },
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) {
@@ -927,70 +997,5 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
     }
-  }
-
-  /// Build a Supabase image with better error handling
-  Widget _buildSupabaseImage(String imageUrl) {
-    return Image.network(
-      imageUrl,
-      width: double.infinity,
-      height: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        print('Supabase image not found: $imageUrl');
-        // For Supabase images that don't exist, show a placeholder immediately
-        return _buildFallbackImage();
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          print('Supabase image loaded successfully: $imageUrl');
-          return child;
-        }
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          color: Colors.grey[200],
-          child: Center(
-            child: CircularProgressIndicator(
-              value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                  : null,
-              strokeWidth: 3,
-              color: Colors.grey[600],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Build a fallback image when network images fail
-  Widget _buildFallbackImage() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: BoxDecoration(
-        gradient: DesignSystem.primaryGradient,
-        borderRadius: BorderRadius.circular(35),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.local_offer, size: 40, color: Colors.white),
-            SizedBox(height: 8),
-            Text(
-              'عرض خاص',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

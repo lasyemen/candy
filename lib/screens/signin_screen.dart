@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+import '../core/services/auth_service.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -59,23 +60,74 @@ class _SignInScreenState extends State<SignInScreen>
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      print('Sign-in form submitted with phone: ${_phoneController.text}');
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate to OTP screen
-      Navigator.pushNamed(
-        context,
-        AppRoutes.otp,
-        arguments: {
-          'userName': 'User', // Generic name for signin
-          'userPhone': _phoneController.text,
-        },
+      // Check if customer exists
+      final customerExists = await AuthService.instance.customerExists(
+        phone: _phoneController.text,
       );
+
+      print('Customer exists check result: $customerExists');
+      if (!customerExists) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('رقم الهاتف غير مسجل. يرجى إنشاء حساب جديد.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      print('Proceeding with customer login...');
+      // Login customer
+      final customer = await AuthService.instance.loginCustomer(
+        phone: _phoneController.text,
+      );
+
+      print('Login result: ${customer?.name}');
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (customer != null) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم تسجيل الدخول بنجاح! مرحباً ${customer.name}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate to main screen (which includes navigation bar)
+          Navigator.pushReplacementNamed(context, AppRoutes.main);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -226,9 +278,20 @@ class _SignInScreenState extends State<SignInScreen>
                       const SizedBox(height: 32),
 
                       // Sign In Button
-                      SizedBox(
+                      Container(
                         width: double.infinity,
                         height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: DesignSystem.primaryGradient,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6B46C1).withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _submitForm,
                           style: ElevatedButton.styleFrom(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+import '../core/services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -62,23 +63,77 @@ class _SignUpScreenState extends State<SignUpScreen>
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // Navigate directly to OTP screen
-      Navigator.pushNamed(
-        context,
-        AppRoutes.otp,
-        arguments: {
-          'userName': _nameController.text,
-          'userPhone': _phoneController.text,
-        },
+    try {
+      print(
+        'Sign-up form submitted with name: ${_nameController.text}, phone: ${_phoneController.text}',
       );
+
+      // Check if customer already exists
+      final customerExists = await AuthService.instance.customerExists(
+        phone: _phoneController.text,
+      );
+
+      print('Customer exists check result: $customerExists');
+      if (customerExists) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('رقم الهاتف مسجل بالفعل. يرجى تسجيل الدخول.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      print('Proceeding with customer registration...');
+      // Register new customer
+      final customer = await AuthService.instance.registerCustomer(
+        name: _nameController.text,
+        phone: _phoneController.text,
+      );
+
+      print('Registration result: ${customer?.name}');
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (customer != null) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate to main screen (which includes navigation bar)
+          Navigator.pushReplacementNamed(context, AppRoutes.main);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('حدث خطأ في إنشاء الحساب. يرجى المحاولة مرة أخرى.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

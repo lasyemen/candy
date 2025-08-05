@@ -6,9 +6,8 @@ part 'customer.g.dart';
 class Customer {
   final String id;
   final String name;
-  final String email;
   final String phone;
-  final String address;
+  final String? address;
   final String? avatar;
   @JsonKey(name: 'is_active')
   final bool isActive;
@@ -27,9 +26,8 @@ class Customer {
   Customer({
     required this.id,
     required this.name,
-    required this.email,
     required this.phone,
-    required this.address,
+    this.address,
     this.avatar,
     required this.isActive,
     this.lastLogin,

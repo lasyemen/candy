@@ -71,4 +71,4 @@ class SupabaseService {
   Future<void> deleteData(String table, String id) async {
     await client.from(table).delete().eq('id', id);
   }
-}
+} 

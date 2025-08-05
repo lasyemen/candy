@@ -20,7 +20,7 @@ class HomeBannerWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 180,
+      height: 100,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: PageView.builder(
         controller: controller,

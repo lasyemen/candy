@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
+import '../core/services/cart_service.dart';
 import '../models/cart.dart';
 
 import '../widgets/riyal_icon.dart';
@@ -23,6 +24,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   late Animation<Offset> _slideAnimation;
   late List<Animation<Offset>> _itemAnimations = [];
   bool _showSummaryCard = false;
+  List<Map<String, dynamic>> _cartItemsWithProducts = [];
 
   @override
   void initState() {
@@ -247,6 +249,43 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     );
   }
 
+  // Load cart items with product details
+  Future<void> _loadCartItemsWithProducts(String cartId) async {
+    try {
+      final cartItemsWithProducts = await CartService.getCartItemsWithProducts(
+        cartId,
+      );
+      // Store the cart items with products for display
+      setState(() {
+        _cartItemsWithProducts = cartItemsWithProducts;
+      });
+    } catch (e) {
+      print('Error loading cart items with products: $e');
+    }
+  }
+
+  // Helper method to get product name
+  String _getProductName(String productId) {
+    final item = _cartItemsWithProducts.firstWhere(
+      (item) => item['product_id'] == productId,
+      orElse: () => {
+        'products': {'name': 'مياه كاندي'},
+      },
+    );
+    return item['products']?['name'] ?? 'مياه كاندي';
+  }
+
+  // Helper method to get product price
+  double _getProductPrice(String productId) {
+    final item = _cartItemsWithProducts.firstWhere(
+      (item) => item['product_id'] == productId,
+      orElse: () => {
+        'products': {'price': 5.0},
+      },
+    );
+    return (item['products']?['price'] ?? 5.0).toDouble();
+  }
+
   void _clearCart() {
     showModalBottomSheet(
       context: context,
@@ -371,6 +410,16 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       builder: (context, appBloc, child) {
         final cartItems = appBloc.cart?.items ?? [];
         final cartTotal = appBloc.cartTotal;
+
+        // Debug: Print cart information
+        print('Cart Screen - Cart Items Count: ${cartItems.length}');
+        print('Cart Screen - Cart Total: $cartTotal');
+        print('Cart Screen - Cart Object: ${appBloc.cart}');
+
+        // Fetch cart items with product details
+        if (appBloc.cart != null) {
+          _loadCartItemsWithProducts(appBloc.cart!.id);
+        }
 
         if (cartItems.isNotEmpty &&
             _itemAnimations.length != cartItems.length) {
@@ -811,7 +860,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'مياه ${cartItem.productId}', // Using productId since we don't have product details
+                  _getProductName(cartItem.productId),
                   style: DesignSystem.titleMedium.copyWith(
                     color: DesignSystem.textPrimary,
                     fontWeight: FontWeight.bold,
@@ -822,7 +871,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                 Row(
                   children: [
                     Text(
-                      '5.00', // Mock price since we don't have product details
+                      _getProductPrice(cartItem.productId).toStringAsFixed(2),
                       style: DesignSystem.bodyLarge.copyWith(
                         color: DesignSystem.primary,
                         fontWeight: FontWeight.w600,

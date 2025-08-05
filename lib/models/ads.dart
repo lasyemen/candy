@@ -6,7 +6,7 @@ part 'ads.g.dart';
 class Ads {
   final String id;
   @JsonKey(name: 'image_url')
-  final String imageUrl;
+  final String? imageUrl;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
   @JsonKey(name: 'storage_bucket')
@@ -16,7 +16,7 @@ class Ads {
 
   Ads({
     required this.id,
-    required this.imageUrl,
+    this.imageUrl,
     required this.createdAt,
     this.storageBucket,
     this.storagePath,

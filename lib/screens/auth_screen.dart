@@ -142,10 +142,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           // Navigate to sign in screen
-                          Navigator.pushReplacementNamed(
-                            context,
-                            AppRoutes.main,
-                          );
+                          Navigator.pushNamed(context, AppRoutes.signin);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -224,7 +221,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   // Sign as Guest Button (Grey Text Button)
                   TextButton(
                     onPressed: () {
-                      // Navigate directly to main screen as guest
+                      // Navigate to main screen as guest (includes navigation bar)
                       Navigator.pushReplacementNamed(context, AppRoutes.main);
                     },
                     style: TextButton.styleFrom(

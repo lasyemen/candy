@@ -17,12 +17,15 @@ class AdsService {
       }
 
       // Fetch all ads with detailed logging
+      print('Attempting to fetch ads from table: ads');
       final response = await _supabase
           .from('ads')
           .select('*')
           .order('created_at', ascending: false);
 
       print('Raw ads response: $response'); // Debug log
+      print('Response type: ${response.runtimeType}');
+      print('Response length: ${response is List ? response.length : 'N/A'}');
 
       if (response == null) {
         print('No ads response from database');
@@ -49,31 +52,14 @@ class AdsService {
                 return null;
               }
 
-              // Handle both relative paths and full URLs
-              String imageUrl;
-              if (json['image_url'].toString().startsWith('http')) {
-                // Already a full URL (like products table)
-                imageUrl = json['image_url'];
-                print('Using full URL from database: $imageUrl');
-              } else {
-                // Relative path (like ads table) - construct full URL
+              // Check if image_url is already a full URL or just a path
+              String imageUrl = json['image_url'];
+              if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+                // If it's just a path, construct the full URL
                 final baseUrl =
-                    'https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/';
-                imageUrl = '$baseUrl${json['image_url']}';
-                print('Constructed full URL from relative path: $imageUrl');
+                    'https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/img/';
+                json['image_url'] = '$baseUrl$imageUrl';
               }
-
-              // Validate the URL format
-              if (!imageUrl.contains('ads/')) {
-                print(
-                  'Warning: Image URL does not contain expected bucket path: $imageUrl',
-                );
-              }
-
-              // Keep all ads from database, even if images might be missing
-              // The UI will handle missing images gracefully
-
-              json['image_url'] = imageUrl;
 
               final ad = Ads.fromJson(json);
               print(
@@ -131,19 +117,48 @@ class AdsService {
 
   /// Add multiple sample ads to the database
   static Future<bool> addSampleAds() async {
-    print(
-      'addSampleAds method is deprecated. Use fetchAds to retrieve ads from the database.',
-    );
-    return false;
+    try {
+      print('Adding sample ads to database...');
+
+      final sampleAds = [
+        {
+          'id': '1',
+          'image_url': 'sample_ad_1.jpg',
+          'created_at': DateTime.now().toIso8601String(),
+          'storage_bucket': 'img',
+          'storage_path': 'sample_ad_1.jpg',
+        },
+        {
+          'id': '2',
+          'image_url': 'sample_ad_2.jpg',
+          'created_at': DateTime.now().toIso8601String(),
+          'storage_bucket': 'img',
+          'storage_path': 'sample_ad_2.jpg',
+        },
+      ];
+
+      for (final ad in sampleAds) {
+        await _supabase.from('ads').insert(ad);
+        print('Added sample ad: ${ad['id']}');
+      }
+
+      print('Successfully added ${sampleAds.length} sample ads');
+      return true;
+    } catch (e) {
+      print('Error adding sample ads: $e');
+      return false;
+    }
   }
 
   /// Check if ads table has any data
   static Future<bool> hasAds() async {
     try {
+      print('Checking if ads table has data...');
       final response = await _supabase.from('ads').select('id').limit(1);
 
       final hasData = response.isNotEmpty;
       print('Ads table has data: $hasData');
+      print('Response: $response');
       return hasData;
     } catch (e) {
       print('Error checking ads table: $e');
@@ -151,93 +166,15 @@ class AdsService {
     }
   }
 
-  /// Test if an image URL is accessible
-  static Future<bool> testImageUrl(String imageUrl) async {
+  /// Check if ads table exists and is accessible
+  static Future<bool> tableExists() async {
     try {
-      final response = await _supabase.storage
-          .from('ads')
-          .getPublicUrl(imageUrl.split('/').last);
-
-      print('Testing image URL: $imageUrl');
-      print('Generated public URL: ${response}');
-
-      // You can also make an HTTP request to test if the file exists
-      // This would require adding http package to your dependencies
-
+      print('Checking if ads table exists...');
+      final response = await _supabase.from('ads').select('count').limit(1);
+      print('Table exists and is accessible');
       return true;
     } catch (e) {
-      print('Error testing image URL: $e');
-      return false;
-    }
-  }
-
-  /// Debug method to check if ads have valid images
-  static Future<void> debugAdsImages() async {
-    try {
-      final ads = await fetchAds();
-      print('=== DEBUGGING ADS IMAGES ===');
-      for (final ad in ads) {
-        print('Ad ID: ${ad.id}');
-        print('Image URL: ${ad.imageUrl}');
-        print('Is Valid URL: ${ad.imageUrl.startsWith('http')}');
-        print('---');
-      }
-    } catch (e) {
-      print('Error debugging ads: $e');
-    }
-  }
-
-  /// Get admin instructions for correct image upload format
-  static String getAdminInstructions() {
-    return '''
-ADMIN INSTRUCTIONS FOR UPLOADING ADS:
-
-1. Upload image to Supabase storage bucket: 'ads'
-2. Store FULL URL in database (like products table):
-   Example: https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/ads/filename.png
-3. DO NOT store relative paths like: ads/filename.png
-
-Current products table format (CORRECT):
-- image_url: https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/img/img/filename.png
-
-Current ads table format (INCORRECT):
-- image_url: ads/filename.png
-
-Please update the admin upload process to match the products table format.
-''';
-  }
-
-  /// Update existing ads to use full URLs (like products table)
-  static Future<bool> updateAdsToFullUrls() async {
-    try {
-      print('Updating ads to use full URLs...');
-
-      // Get all ads with relative paths
-      final response = await _supabase
-          .from('ads')
-          .select('*')
-          .not('image_url', 'like', 'https%');
-
-      print('Found ${response.length} ads with relative paths');
-
-      for (final ad in response) {
-        final relativePath = ad['image_url'];
-        final fullUrl =
-            'https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/$relativePath';
-
-        print('Updating ad ${ad['id']}: $relativePath -> $fullUrl');
-
-        // Update the ad with full URL
-        await _supabase
-            .from('ads')
-            .update({'image_url': fullUrl})
-            .eq('id', ad['id']);
-      }
-
-      print('Successfully updated all ads to use full URLs');
-      return true;
-    } catch (e) {
-      print('Error updating ads to full URLs: $e');
+      print('Error accessing ads table: $e');
       return false;
     }
   }

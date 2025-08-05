@@ -1,26 +1,92 @@
 import '../../models/cart.dart';
-
 import 'supabase_service.dart';
+import 'customer_session.dart';
 
 class CartService {
-  // Get cart for a customer
-  static Future<Cart?> getCart(String customerId) async {
+  // Get cart for current customer
+  static Future<Cart?> getCurrentCustomerCart() async {
     try {
+      final customerPhone = CustomerSession.instance.currentCustomerPhone;
+      if (customerPhone == null) {
+        print('CartService - No customer logged in');
+        return null;
+      }
+
+      print('CartService - Getting cart for customer phone: $customerPhone');
+
+      // First, get the customer ID from phone number
+      final customerResponse = await SupabaseService.instance.client
+          .from('customers')
+          .select('id')
+          .eq('phone', customerPhone)
+          .single();
+
+      final customerId = customerResponse['id'];
+      print('CartService - Customer ID: $customerId');
+
       final response = await SupabaseService.instance.client
           .from('carts')
           .select('*, cart_items(*)')
           .eq('customer_id', customerId)
           .single();
 
+      print('CartService - Cart retrieved successfully: ${response}');
       return Cart.fromJson(response);
     } catch (e) {
+      print('CartService - Error getting cart: $e');
       return null;
     }
   }
 
-  // Create a new cart
-  static Future<Cart> createCart(String customerId) async {
+  // Get cart for a customer by phone
+  static Future<Cart?> getCartByPhone(String customerPhone) async {
     try {
+      print('CartService - Getting cart for customer phone: $customerPhone');
+
+      // First, get the customer ID from phone number
+      final customerResponse = await SupabaseService.instance.client
+          .from('customers')
+          .select('id')
+          .eq('phone', customerPhone)
+          .single();
+
+      final customerId = customerResponse['id'];
+      print('CartService - Customer ID: $customerId');
+
+      final response = await SupabaseService.instance.client
+          .from('carts')
+          .select('*, cart_items(*)')
+          .eq('customer_id', customerId)
+          .single();
+
+      print('CartService - Cart retrieved successfully: ${response}');
+      return Cart.fromJson(response);
+    } catch (e) {
+      print('CartService - Error getting cart: $e');
+      return null;
+    }
+  }
+
+  // Create a new cart for current customer
+  static Future<Cart> createCartForCurrentCustomer() async {
+    try {
+      final customerPhone = CustomerSession.instance.currentCustomerPhone;
+      if (customerPhone == null) {
+        throw Exception('No customer logged in');
+      }
+
+      print('CartService - Creating cart for customer phone: $customerPhone');
+
+      // First, get the customer ID from phone number
+      final customerResponse = await SupabaseService.instance.client
+          .from('customers')
+          .select('id')
+          .eq('phone', customerPhone)
+          .single();
+
+      final customerId = customerResponse['id'];
+      print('CartService - Customer ID: $customerId');
+
       final response = await SupabaseService.instance.client
           .from('carts')
           .insert({
@@ -31,8 +97,33 @@ class CartService {
           .select()
           .single();
 
+      print('CartService - Cart created successfully: ${response}');
       return Cart.fromJson(response);
     } catch (e) {
+      print('CartService - Error creating cart: $e');
+      throw Exception('Error creating cart: $e');
+    }
+  }
+
+  // Create a new cart
+  static Future<Cart> createCart(String customerId) async {
+    try {
+      print('CartService - Creating cart for customer: $customerId');
+
+      final response = await SupabaseService.instance.client
+          .from('carts')
+          .insert({
+            'customer_id': customerId,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
+
+      print('CartService - Cart created successfully: ${response}');
+      return Cart.fromJson(response);
+    } catch (e) {
+      print('CartService - Error creating cart: $e');
       throw Exception('Error creating cart: $e');
     }
   }
@@ -44,20 +135,53 @@ class CartService {
     int quantity,
   ) async {
     try {
-      final response = await SupabaseService.instance.client
-          .from('cart_items')
-          .insert({
-            'cart_id': cartId,
-            'product_id': productId,
-            'quantity': quantity,
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .select()
-          .single();
+      print(
+        'CartService - Adding item to cart: cartId=$cartId, productId=$productId, quantity=$quantity',
+      );
 
-      return CartItem.fromJson(response);
+      // First, check if the item already exists in the cart
+      final existingItems = await SupabaseService.instance.client
+          .from('cart_items')
+          .select()
+          .eq('cart_id', cartId)
+          .eq('product_id', productId);
+
+      if (existingItems.isNotEmpty) {
+        print('CartService - Item already exists, updating quantity');
+        final existingItem = existingItems.first;
+        final newQuantity = (existingItem['quantity'] as int) + quantity;
+
+        final response = await SupabaseService.instance.client
+            .from('cart_items')
+            .update({
+              'quantity': newQuantity,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existingItem['id'])
+            .select()
+            .single();
+
+        print('CartService - Item quantity updated successfully: ${response}');
+        return CartItem.fromJson(response);
+      } else {
+        print('CartService - Creating new cart item');
+        final response = await SupabaseService.instance.client
+            .from('cart_items')
+            .insert({
+              'cart_id': cartId,
+              'product_id': productId,
+              'quantity': quantity,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .select()
+            .single();
+
+        print('CartService - Item added successfully: ${response}');
+        return CartItem.fromJson(response);
+      }
     } catch (e) {
+      print('CartService - Error adding item to cart: $e');
       throw Exception('Error adding item to cart: $e');
     }
   }
