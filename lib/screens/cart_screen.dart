@@ -48,11 +48,11 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+          ),
+        );
 
     _animationController.forward();
 
@@ -111,7 +111,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     HapticFeedback.lightImpact();
 
     print(
-        '_updateQuantity called with itemId: $itemId, newQuantity: $newQuantity');
+      '_updateQuantity called with itemId: $itemId, newQuantity: $newQuantity',
+    );
 
     try {
       await CartManager.instance.updateQuantity(itemId, newQuantity);
@@ -149,20 +150,24 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       final cartSummary = await CartManager.instance.getCartSummary();
       print('CartScreen - Cart summary: $cartSummary');
       print(
-          'CartScreen - Items in summary: ${cartSummary['items']?.length ?? 0}');
+        'CartScreen - Items in summary: ${cartSummary['items']?.length ?? 0}',
+      );
 
       if (mounted) {
         setState(() {
-          _cartItemsWithProducts =
-              List<Map<String, dynamic>>.from(cartSummary['items'] ?? []);
+          _cartItemsWithProducts = List<Map<String, dynamic>>.from(
+            cartSummary['items'] ?? [],
+          );
           print(
-              'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items');
+            'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items',
+          );
 
           // Debug: Print each item
           for (int i = 0; i < _cartItemsWithProducts.length; i++) {
             final item = _cartItemsWithProducts[i];
             print(
-                'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}');
+              'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}',
+            );
           }
         });
       }
@@ -174,8 +179,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
         final cartSummary = await CartManager.instance.getCartSummary();
         if (mounted) {
           setState(() {
-            _cartItemsWithProducts =
-                List<Map<String, dynamic>>.from(cartSummary['items'] ?? []);
+            _cartItemsWithProducts = List<Map<String, dynamic>>.from(
+              cartSummary['items'] ?? [],
+            );
           });
         }
       } catch (retryError) {
@@ -346,8 +352,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
           ),
           backgroundColor: const Color(0xFF059669),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           margin: const EdgeInsets.all(20),
           elevation: 8,
           duration: const Duration(seconds: 3),
@@ -533,10 +540,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
           automaticallyImplyLeading: false,
           flexibleSpace: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -623,8 +627,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
             return SlideTransition(
               position:
                   _itemAnimations.isNotEmpty && index < _itemAnimations.length
-                      ? _itemAnimations[index]
-                      : AlwaysStoppedAnimation(Offset.zero),
+                  ? _itemAnimations[index]
+                  : AlwaysStoppedAnimation(Offset.zero),
               child: _buildCartItemFromMap(cartItem, index),
             );
           },
@@ -988,11 +992,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
           ),
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
-          child: const Icon(
-            Icons.delete,
-            color: Colors.white,
-            size: 30,
-          ),
+          child: const Icon(Icons.delete, color: Colors.white, size: 30),
         ),
         confirmDismiss: (direction) async {
           return await showDialog(
@@ -1015,10 +1015,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     onPressed: () => Navigator.of(context).pop(false),
                     child: Text(
                       'إلغاء',
-                      style: TextStyle(
-                        fontFamily: 'Rubik',
-                        color: Colors.grey,
-                      ),
+                      style: TextStyle(fontFamily: 'Rubik', color: Colors.grey),
                     ),
                   ),
                   TextButton(
@@ -1067,8 +1064,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             decoration: BoxDecoration(
-                              gradient:
-                                  DesignSystem.getBrandGradient('primary'),
+                              gradient: DesignSystem.getBrandGradient(
+                                'primary',
+                              ),
                               borderRadius: BorderRadius.circular(15),
                             ),
                             child: Center(
@@ -1149,7 +1147,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   icon: Icons.remove,
                   onPressed: () {
                     print(
-                        'Decrease button pressed for item: $itemId, current quantity: $quantity');
+                      'Decrease button pressed for item: $itemId, current quantity: $quantity',
+                    );
                     _updateQuantity(itemId, quantity - 1);
                   },
                   isDecrease: true,
@@ -1168,7 +1167,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   icon: Icons.add,
                   onPressed: () {
                     print(
-                        'Increase button pressed for item: $itemId, current quantity: $quantity');
+                      'Increase button pressed for item: $itemId, current quantity: $quantity',
+                    );
                     _updateQuantity(itemId, quantity + 1);
                   },
                   isDecrease: false,
@@ -1211,8 +1211,10 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -1496,11 +1498,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
           gradient: DesignSystem.getBrandGradient('primary'),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(
-          icon,
-          size: 14,
-          color: Colors.white,
-        ),
+        child: Icon(icon, size: 14, color: Colors.white),
       ),
     );
   }

@@ -122,15 +122,18 @@ class _HomeScreenState extends State<HomeScreen> {
     ProductService.checkProductsTable();
     ProductService.testDatabaseAccess();
     ProductService.showCurrentProducts();
-    
+
     // Force populate products
     ProductService.forcePopulateProducts();
-    
+
     // Test single product addition
     ProductService.addSingleTestProduct();
 
-    _loadProducts();
-    _loadAds();
+    // Load data with mounted checks
+    if (mounted) {
+      _loadProducts();
+      _loadAds();
+    }
   }
 
   // Test cart functionality
@@ -178,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadProducts({bool showLoading = true}) async {
     try {
-      if (showLoading) {
+      if (showLoading && mounted) {
         setState(() {
           _isLoading = true;
         });
@@ -190,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
       print('HomeScreen - Testing database connection...');
       final connectionTest = await ProductService.testConnection();
       print('HomeScreen - Database connection test result: $connectionTest');
-      
+
       // Test database permissions
       print('HomeScreen - Testing database permissions...');
       final permissionsTest = await ProductService.testDatabasePermissions();
@@ -199,13 +202,15 @@ class _HomeScreenState extends State<HomeScreen> {
       // Check if products table has data
       final hasData = await ProductService.hasProducts();
       print('HomeScreen - Products table has data: $hasData');
-      
+
       if (!hasData) {
         print('HomeScreen - Products table is empty - adding sample products');
         final added = await ProductService.addSampleProducts();
         print('HomeScreen - Sample products added successfully: $added');
         if (!added) {
-          print('HomeScreen - Regular sample products failed, trying force populate...');
+          print(
+            'HomeScreen - Regular sample products failed, trying force populate...',
+          );
           final forceAdded = await ProductService.forcePopulateProducts();
           print('HomeScreen - Force populate successful: $forceAdded');
           if (!forceAdded) {
@@ -223,7 +228,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final products = await ProductService.fetchProducts();
 
       print('HomeScreen - Loaded ${products.length} products from database');
-      print('HomeScreen - Products list: ${products.map((p) => p.name).toList()}');
+      print(
+        'HomeScreen - Products list: ${products.map((p) => p.name).toList()}',
+      );
 
       if (mounted) {
         setState(() {
@@ -264,17 +271,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadAds() async {
     try {
       print('Loading ads from database...');
-      setState(() {
-        _isLoadingAds = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingAds = true;
+        });
+      }
 
       // First check if table exists
       final tableExists = await AdsService.tableExists();
       if (!tableExists) {
         print('Ads table does not exist or is not accessible');
-        setState(() {
-          _isLoadingAds = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoadingAds = false;
+          });
+        }
         return;
       }
 
@@ -285,9 +296,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final added = await AdsService.addSampleAds();
         if (!added) {
           print('Failed to add sample ads');
-          setState(() {
-            _isLoadingAds = false;
-          });
+          if (mounted) {
+            setState(() {
+              _isLoadingAds = false;
+            });
+          }
           return;
         }
       }
@@ -332,7 +345,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Products> _getProducts(String language) {
     // Return products from Supabase, with fallback to static products
     if (_products.isNotEmpty) {
-      print('HomeScreen - Returning ${_products.length} products from database');
+      print(
+        'HomeScreen - Returning ${_products.length} products from database',
+      );
       return _products;
     } else {
       // Fallback to static products if database is empty
@@ -364,10 +379,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       // Add product to cart using CartManager
       await CartManager.instance.addProduct(product.id);
-      
+
       // Update app bloc
       appBloc.add(AddToCartEvent(product));
-      
+
       print('Successfully added ${product.name} to cart');
     } catch (e) {
       print('Error adding product to cart: $e');
@@ -380,9 +395,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
+      return; // Exit early if there's an error
     }
 
+    // Check if widget is still mounted before showing overlay
+    if (!mounted) return;
+
     // Show success message with enhanced design at top
+    if (!mounted) return; // Double check before accessing context
+
     final overlay = Overlay.of(context);
     late final OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
@@ -528,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Remove the overlay after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
-      if (overlayEntry.mounted) {
+      if (mounted && overlayEntry.mounted) {
         overlayEntry.remove();
       }
     });
@@ -852,44 +873,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       )
                     : products.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.inbox_rounded,
-                                    color: Color(0xFF6B46C1),
-                                    size: 40,
-                                  ),
-                                  const SizedBox(height: 14),
-                                  const Text(
-                                    "لا يوجد منتجات متاحة حالياً.",
-                                    style: TextStyle(
-                                      color: Color(0xFF6B46C1),
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.inbox_rounded,
+                                color: Color(0xFF6B46C1),
+                                size: 40,
                               ),
-                            ),
-                          )
-                        : SliverGrid(
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              const SizedBox(height: 14),
+                              const Text(
+                                "لا يوجد منتجات متاحة حالياً.",
+                                style: TextStyle(
+                                  color: Color(0xFF6B46C1),
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               childAspectRatio: 0.65, // taller cards
                               crossAxisSpacing: 4, // reduced gap
                               mainAxisSpacing: 10,
                             ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, idx) => HomeProductCardWidget(
-                                product: products[idx],
-                                onAddToCart: () => _addToCart(products[idx]),
-                              ),
-                              childCount: products.length,
-                            ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, idx) => HomeProductCardWidget(
+                            product: products[idx],
+                            onAddToCart: () => _addToCart(products[idx]),
                           ),
+                          childCount: products.length,
+                        ),
+                      ),
               ),
               // Bottom padding to prevent navigation bar from covering last items
               SliverToBoxAdapter(
@@ -1041,7 +1062,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: CircularProgressIndicator(
                 value: loadingProgress.expectedTotalBytes != null
                     ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
+                          loadingProgress.expectedTotalBytes!
                     : null,
                 strokeWidth: 3,
                 color: Colors.grey[600],
