@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'blocs/app_bloc.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/supabase_service.dart';
+import 'core/services/cart_service.dart';
+import 'core/services/customer_session.dart';
 import 'screens/index.dart';
 import 'core/routes/index.dart';
 
@@ -21,6 +23,9 @@ void main() async {
 
   // Initialize Supabase
   await SupabaseService.instance.initialize();
+
+  // Initialize cart session
+  await CartService.initializeCartSession();
 
   runApp(const MyApp());
 }

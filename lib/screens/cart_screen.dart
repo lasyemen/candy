@@ -6,6 +6,7 @@ import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
 import '../core/services/cart_service.dart';
 import '../models/cart.dart';
+import '../models/cart_item.dart';
 
 import '../widgets/riyal_icon.dart';
 import 'delivery_location_screen.dart';
@@ -47,13 +48,19 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-          ),
-        );
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
 
     _animationController.forward();
+
+    // Load cart data
+    _loadCartData();
+
+    // Set up periodic refresh
+    _setupPeriodicRefresh();
   }
 
   @override
@@ -61,6 +68,23 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     _animationController.dispose();
     _listAnimationController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh cart data when screen becomes visible
+    _loadCartData();
+  }
+
+  void _setupPeriodicRefresh() {
+    // Refresh cart data every 2 seconds when screen is active
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        _loadCartData();
+        _setupPeriodicRefresh(); // Schedule next refresh
+      }
+    });
   }
 
   void _initializeItemAnimations(int itemCount) {
@@ -82,15 +106,88 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     _listAnimationController.forward();
   }
 
-  void _updateQuantity(String productId, int newQuantity) {
+  void _updateQuantity(String itemId, int newQuantity) async {
     final appBloc = context.read<AppBloc>();
     HapticFeedback.lightImpact();
 
-    if (newQuantity <= 0) {
-      appBloc.add(RemoveFromCartEvent(productId));
-    } else {
-      appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+    print(
+        '_updateQuantity called with itemId: $itemId, newQuantity: $newQuantity');
+
+    try {
+      await CartManager.instance.updateQuantity(itemId, newQuantity);
+      print('CartManager updateQuantity completed successfully');
+
+      // Update app bloc
+      if (newQuantity <= 0) {
+        appBloc.add(RemoveFromCartEvent(itemId));
+      } else {
+        appBloc.add(UpdateCartItemQuantityEvent(itemId, newQuantity));
+      }
+
+      // Refresh cart data
+      _loadCartData();
+    } catch (e) {
+      print('Error updating quantity: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحديث الكمية: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Future<void> _loadCartData() async {
+    try {
+      print('CartScreen - Loading cart data...');
+
+      // First, ensure session is initialized
+      await CartService.initializeCartSession();
+
+      final cartSummary = await CartManager.instance.getCartSummary();
+      print('CartScreen - Cart summary: $cartSummary');
+      print(
+          'CartScreen - Items in summary: ${cartSummary['items']?.length ?? 0}');
+
+      if (mounted) {
+        setState(() {
+          _cartItemsWithProducts =
+              List<Map<String, dynamic>>.from(cartSummary['items'] ?? []);
+          print(
+              'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items');
+
+          // Debug: Print each item
+          for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+            final item = _cartItemsWithProducts[i];
+            print(
+                'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}');
+          }
+        });
+      }
+    } catch (e) {
+      print('CartScreen - Error loading cart data: $e');
+      // If there's an error, try to initialize the session and retry
+      try {
+        await CartService.initializeCartSession();
+        final cartSummary = await CartManager.instance.getCartSummary();
+        if (mounted) {
+          setState(() {
+            _cartItemsWithProducts =
+                List<Map<String, dynamic>>.from(cartSummary['items'] ?? []);
+          });
+        }
+      } catch (retryError) {
+        print('CartScreen - Error retrying cart data load: $retryError');
+      }
+    }
+  }
+
+  void _showCartSummaryFromItems() {
+    setState(() {
+      _showSummaryCard = !_showSummaryCard;
+    });
   }
 
   void _showCartDetails(List<CartItem> cartItems, double cartTotal) {
@@ -219,34 +316,54 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _removeItem(String productId) {
+  void _removeItem(String itemId) async {
     final appBloc = context.read<AppBloc>();
     HapticFeedback.mediumImpact();
-    appBloc.add(RemoveFromCartEvent(productId));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
-            const SizedBox(width: 12),
-            Text(
-              'تم حذف المنتج من السلة',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontWeight: FontWeight.w500,
+    try {
+      await CartManager.instance.removeProduct(itemId);
+
+      // Update app bloc
+      appBloc.add(RemoveFromCartEvent(itemId));
+
+      // Refresh cart data
+      _loadCartData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
+              const SizedBox(width: 12),
+              Text(
+                'تم حذف المنتج من السلة',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: const Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.all(20),
+          elevation: 8,
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: const Color(0xFF059669),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        margin: const EdgeInsets.all(20),
-        elevation: 8,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    } catch (e) {
+      print('Error removing item: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في إزالة المنتج: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Load cart items with product details
@@ -406,98 +523,126 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppBloc>(
-      builder: (context, appBloc, child) {
-        final cartItems = appBloc.cart?.items ?? [];
-        final cartTotal = appBloc.cartTotal;
-
-        // Debug: Print cart information
-        print('Cart Screen - Cart Items Count: ${cartItems.length}');
-        print('Cart Screen - Cart Total: $cartTotal');
-        print('Cart Screen - Cart Object: ${appBloc.cart}');
-
-        // Fetch cart items with product details
-        if (appBloc.cart != null) {
-          _loadCartItemsWithProducts(appBloc.cart!.id);
-        }
-
-        if (cartItems.isNotEmpty &&
-            _itemAnimations.length != cartItems.length) {
-          _initializeItemAnimations(cartItems.length);
-        }
-
-        return Scaffold(
+    return Scaffold(
+      backgroundColor: DesignSystem.background,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: AppBar(
           backgroundColor: DesignSystem.background,
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(80),
-            child: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              automaticallyImplyLeading: false,
-              flexibleSpace: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'سلة التسوق',
-                              style: DesignSystem.headlineSmall.copyWith(
-                                color: DesignSystem.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Rubik',
-                              ),
-                            ),
-                            if (cartItems.isNotEmpty)
-                              Text(
-                                '${cartItems.length} منتج',
-                                style: DesignSystem.bodySmall.copyWith(
-                                  color: DesignSystem.textSecondary,
-                                  fontFamily: 'Rubik',
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (cartItems.isNotEmpty)
-                        IconButton(
-                          onPressed: () =>
-                              _showCartSummary(cartItems, cartTotal),
-                          icon: ShaderMask(
-                            shaderCallback: (bounds) => DesignSystem
-                                .primaryGradient
-                                .createShader(bounds),
-                            child: Icon(
-                              Icons.receipt_long,
-                              color: Colors.white,
-                              size: 24,
-                            ),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          flexibleSpace: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'سلة التسوق',
+                          style: DesignSystem.headlineSmall.copyWith(
+                            color: DesignSystem.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Rubik',
                           ),
                         ),
-                    ],
+                        if (_cartItemsWithProducts.isNotEmpty)
+                          Text(
+                            '${_cartItemsWithProducts.length} منتج',
+                            style: DesignSystem.bodySmall.copyWith(
+                              color: DesignSystem.textSecondary,
+                              fontFamily: 'Rubik',
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+                  if (_cartItemsWithProducts.isNotEmpty)
+                    IconButton(
+                      onPressed: () => _showCartSummaryFromItems(),
+                      icon: ShaderMask(
+                        shaderCallback: (bounds) =>
+                            DesignSystem.primaryGradient.createShader(bounds),
+                        child: Icon(
+                          Icons.receipt_long,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-          body: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: cartItems.isEmpty
-                  ? _buildEmptyCart()
-                  : _buildCartContent(cartItems, cartTotal),
-            ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadCartData();
+        },
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: _cartItemsWithProducts.isEmpty
+                ? _buildEmptyCart()
+                : _buildCartContentFromItems(),
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCartContentFromItems() {
+    // Calculate total
+    double cartTotal = 0;
+    for (final item in _cartItemsWithProducts) {
+      final quantity = item['quantity'] as int;
+      final product = item['products'] as Map<String, dynamic>?;
+      if (product != null) {
+        final price = product['price'] as double? ?? 0.0;
+        cartTotal += quantity * price;
+      }
+    }
+
+    return Stack(
+      children: [
+        ListView.separated(
+          padding: const EdgeInsets.all(20),
+          physics: const BouncingScrollPhysics(),
+          itemCount: _cartItemsWithProducts.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            final cartItem = _cartItemsWithProducts[index];
+            return SlideTransition(
+              position:
+                  _itemAnimations.isNotEmpty && index < _itemAnimations.length
+                      ? _itemAnimations[index]
+                      : AlwaysStoppedAnimation(Offset.zero),
+              child: _buildCartItemFromMap(cartItem, index),
+            );
+          },
+        ),
+        // Floating total card with slide-up animation
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          bottom: _showSummaryCard ? 100 : -200, // Slide up from bottom
+          left: 10,
+          right: 10,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: _showSummaryCard ? 1.0 : 0.0,
+            child: _buildSummaryCardContentFromItems(cartTotal),
+          ),
+        ),
+      ],
     );
   }
 
@@ -812,12 +957,344 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildCartItemFromMap(Map<String, dynamic> cartItem, int index) {
+    final product = cartItem['products'] as Map<String, dynamic>?;
+    final productName = product?['name'] ?? 'Product';
+    final productPrice = product?['price'] as double? ?? 0.0;
+    final productImage = product?['image_url'] as String?;
+    final quantity = cartItem['quantity'] as int;
+    final itemId = cartItem['id'] as String? ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Dismissible(
+        key: Key(itemId),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Icon(
+            Icons.delete,
+            color: Colors.white,
+            size: 30,
+          ),
+        ),
+        confirmDismiss: (direction) async {
+          return await showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(
+                  'حذف المنتج',
+                  style: TextStyle(
+                    fontFamily: 'Rubik',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                content: Text(
+                  'هل أنت متأكد من حذف هذا المنتج من السلة؟',
+                  style: TextStyle(fontFamily: 'Rubik'),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontFamily: 'Rubik',
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: Text(
+                      'حذف',
+                      style: TextStyle(
+                        fontFamily: 'Rubik',
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+        onDismissed: (direction) {
+          _removeItem(itemId);
+        },
+        child: Row(
+          children: [
+            // Product Image (kept in original place)
+            Container(
+              width: 85,
+              height: 85,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: productImage != null && productImage.isNotEmpty
+                    ? Image.network(
+                        productImage,
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              gradient:
+                                  DesignSystem.getBrandGradient('primary'),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                FontAwesomeIcons.droplet,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: DesignSystem.getBrandGradient('primary'),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            FontAwesomeIcons.droplet,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+
+            const SizedBox(width: 20),
+
+            // Product Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    productName,
+                    style: DesignSystem.titleMedium.copyWith(
+                      color: DesignSystem.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Rubik',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        productPrice.toStringAsFixed(2),
+                        style: DesignSystem.bodyLarge.copyWith(
+                          color: DesignSystem.primary,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Rubik',
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 14, color: DesignSystem.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        '/ الوحدة',
+                        style: DesignSystem.bodySmall.copyWith(
+                          color: DesignSystem.textSecondary,
+                          fontFamily: 'Rubik',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Quantity Controls on the right (which appears as left in RTL)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildQuantityButton(
+                  icon: Icons.remove,
+                  onPressed: () {
+                    print(
+                        'Decrease button pressed for item: $itemId, current quantity: $quantity');
+                    _updateQuantity(itemId, quantity - 1);
+                  },
+                  isDecrease: true,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    quantity.toString(),
+                    style: DesignSystem.bodyMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Rubik',
+                    ),
+                  ),
+                ),
+                _buildQuantityButton(
+                  icon: Icons.add,
+                  onPressed: () {
+                    print(
+                        'Increase button pressed for item: $itemId, current quantity: $quantity');
+                    _updateQuantity(itemId, quantity + 1);
+                  },
+                  isDecrease: false,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCardContentFromItems(double cartTotal) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        gradient: DesignSystem.primaryGradient,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: DesignSystem.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'المجموع الكلي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${_cartItemsWithProducts.length} منتج',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Rubik',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                cartTotal.toStringAsFixed(2),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Rubik',
+                  fontSize: 24,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const RiyalIcon(size: 24, color: Colors.white),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: 160, // Further reduced width
+            child: ElevatedButton.icon(
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DeliveryLocationScreen(),
+                  ),
+                );
+              },
+              icon: Icon(FontAwesomeIcons.creditCard, size: 18),
+              label: ShaderMask(
+                shaderCallback: (bounds) =>
+                    DesignSystem.primaryGradient.createShader(bounds),
+                child: Text(
+                  'المتابعة للدفع',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontFamily: 'Rubik',
+                  ),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: DesignSystem.primary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCartItem(CartItem cartItem, int index) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.06),
@@ -833,21 +1310,29 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              gradient: DesignSystem.getBrandGradient('primary'),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: DesignSystem.primary.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: Center(
-              child: Icon(
-                FontAwesomeIcons.droplet,
-                color: Colors.white,
-                size: 28,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: DesignSystem.getBrandGradient('primary'),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Center(
+                  child: Icon(
+                    FontAwesomeIcons.droplet,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
               ),
             ),
           ),
@@ -1004,30 +1489,17 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
   }) {
     return InkWell(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          gradient: isDecrease
-              ? LinearGradient(
-                  colors: [
-                    DesignSystem.background,
-                    DesignSystem.background.withOpacity(0.8),
-                  ],
-                )
-              : DesignSystem.getBrandGradient('primary'),
-          borderRadius: BorderRadius.circular(12),
-          border: isDecrease
-              ? Border.all(
-                  color: DesignSystem.textSecondary.withOpacity(0.2),
-                  width: 1,
-                )
-              : null,
+          gradient: DesignSystem.getBrandGradient('primary'),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Icon(
           icon,
-          size: 18,
-          color: isDecrease ? DesignSystem.textSecondary : Colors.white,
+          size: 14,
+          color: Colors.white,
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import '../../models/index.dart';
+import '../../models/customer.dart';
 import 'supabase_service.dart';
 import 'customer_session.dart';
 

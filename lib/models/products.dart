@@ -9,14 +9,14 @@ class Products {
   final String? description;
   final double price;
   final String category;
-  @JsonKey(name: 'merchant_id')
-  final String? merchantId; // Made nullable to match database
   @JsonKey(name: 'image_url')
   final String? imageUrl;
-  final String status;
-  @JsonKey(name: 'total_sold')
-  final int totalSold;
+  @JsonKey(name: 'stock_quantity')
+  final int? stockQuantity;
   final double rating;
+  @JsonKey(name: 'total_sold')
+  final int? totalSold;
+  final String status;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
   @JsonKey(name: 'updated_at')
@@ -28,11 +28,11 @@ class Products {
     this.description,
     required this.price,
     required this.category,
-    this.merchantId, // Made optional
     this.imageUrl,
-    required this.status,
-    required this.totalSold,
+    this.stockQuantity,
     required this.rating,
+    this.totalSold,
+    required this.status,
     required this.createdAt,
     required this.updatedAt,
   });

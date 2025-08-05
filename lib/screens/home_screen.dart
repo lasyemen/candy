@@ -17,6 +17,7 @@ import '../models/index.dart';
 import '../core/services/product_service.dart';
 import '../core/services/ads_service.dart';
 import '../core/services/cart_service.dart'; // Added import for CartService
+import '../core/utils/home_utils.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -117,6 +118,17 @@ class _HomeScreenState extends State<HomeScreen> {
     // Test cart functionality on startup
     _testCartFunctionality();
 
+    // Test database connection
+    ProductService.checkProductsTable();
+    ProductService.testDatabaseAccess();
+    ProductService.showCurrentProducts();
+    
+    // Force populate products
+    ProductService.forcePopulateProducts();
+    
+    // Test single product addition
+    ProductService.addSingleTestProduct();
+
     _loadProducts();
     _loadAds();
   }
@@ -172,17 +184,56 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
+      print('HomeScreen - Loading products from database...');
+
+      // First, test database connection
+      print('HomeScreen - Testing database connection...');
+      final connectionTest = await ProductService.testConnection();
+      print('HomeScreen - Database connection test result: $connectionTest');
+      
+      // Test database permissions
+      print('HomeScreen - Testing database permissions...');
+      final permissionsTest = await ProductService.testDatabasePermissions();
+      print('HomeScreen - Database permissions test result: $permissionsTest');
+
+      // Check if products table has data
+      final hasData = await ProductService.hasProducts();
+      print('HomeScreen - Products table has data: $hasData');
+      
+      if (!hasData) {
+        print('HomeScreen - Products table is empty - adding sample products');
+        final added = await ProductService.addSampleProducts();
+        print('HomeScreen - Sample products added successfully: $added');
+        if (!added) {
+          print('HomeScreen - Regular sample products failed, trying force populate...');
+          final forceAdded = await ProductService.forcePopulateProducts();
+          print('HomeScreen - Force populate successful: $forceAdded');
+          if (!forceAdded) {
+            print('HomeScreen - Failed to add products');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+
       final products = await ProductService.fetchProducts();
 
-      print('Loaded ${products.length} products from database');
+      print('HomeScreen - Loaded ${products.length} products from database');
+      print('HomeScreen - Products list: ${products.map((p) => p.name).toList()}');
 
       if (mounted) {
         setState(() {
           _products = products;
           _isLoading = false;
         });
+        print('HomeScreen - Updated state with ${_products.length} products');
       }
     } catch (e) {
+      print('Error loading products from database: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -279,8 +330,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Products> _getProducts(String language) {
-    // Return products from Supabase only
-    return _products;
+    // Return products from Supabase, with fallback to static products
+    if (_products.isNotEmpty) {
+      print('HomeScreen - Returning ${_products.length} products from database');
+      return _products;
+    } else {
+      // Fallback to static products if database is empty
+      print('HomeScreen - Using fallback static products');
+      final staticProducts = HomeUtils.getProducts(language);
+      print('HomeScreen - Static products count: ${staticProducts.length}');
+      return staticProducts;
+    }
   }
 
   List<Products> _getFilteredProducts(String language) {
@@ -290,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return products.where((p) => p.name.contains(cat)).toList();
   }
 
-  void _addToCart(Products product) {
+  void _addToCart(Products product) async {
     final appBloc = context.read<AppBloc>();
 
     // Add haptic feedback
@@ -301,8 +361,26 @@ class _HomeScreenState extends State<HomeScreen> {
     print('Adding to cart - Product Name: ${product.name}');
     print('Adding to cart - Product Price: ${product.price}');
 
-    // Add product to cart
-    appBloc.add(AddToCartEvent(product));
+    try {
+      // Add product to cart using CartManager
+      await CartManager.instance.addProduct(product.id);
+      
+      // Update app bloc
+      appBloc.add(AddToCartEvent(product));
+      
+      print('Successfully added ${product.name} to cart');
+    } catch (e) {
+      print('Error adding product to cart: $e');
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في إضافة المنتج إلى السلة: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
 
     // Show success message with enhanced design at top
     final overlay = Overlay.of(context);
@@ -774,44 +852,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       )
                     : products.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.inbox_rounded,
-                                color: Color(0xFF6B46C1),
-                                size: 40,
+                        ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.inbox_rounded,
+                                    color: Color(0xFF6B46C1),
+                                    size: 40,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Text(
+                                    "لا يوجد منتجات متاحة حالياً.",
+                                    style: TextStyle(
+                                      color: Color(0xFF6B46C1),
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 14),
-                              const Text(
-                                "لا يوجد منتجات متاحة حالياً.",
-                                style: TextStyle(
-                                  color: Color(0xFF6B46C1),
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
+                            ),
+                          )
+                        : SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               childAspectRatio: 0.65, // taller cards
                               crossAxisSpacing: 4, // reduced gap
                               mainAxisSpacing: 10,
                             ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, idx) => HomeProductCardWidget(
-                            product: products[idx],
-                            onAddToCart: () => _addToCart(products[idx]),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, idx) => HomeProductCardWidget(
+                                product: products[idx],
+                                onAddToCart: () => _addToCart(products[idx]),
+                              ),
+                              childCount: products.length,
+                            ),
                           ),
-                          childCount: products.length,
-                        ),
-                      ),
               ),
               // Bottom padding to prevent navigation bar from covering last items
               SliverToBoxAdapter(
@@ -963,7 +1041,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: CircularProgressIndicator(
                 value: loadingProgress.expectedTotalBytes != null
                     ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
+                        loadingProgress.expectedTotalBytes!
                     : null,
                 strokeWidth: 3,
                 color: Colors.grey[600],
