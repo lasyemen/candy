@@ -6,6 +6,7 @@ import 'storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'dart:convert';
+import 'dart:io';
 
 class CartSessionManager {
   static CartSessionManager? _instance;
@@ -17,6 +18,16 @@ class CartSessionManager {
   String? _currentCartId;
   String? _guestSessionId;
   String? _guestCartId; // Store guest cart ID for merging
+
+  // Check network connectivity
+  Future<bool> _isNetworkAvailable() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    }
+  }
 
   // Generate unique session ID for guests
   String _generateSessionId() {
@@ -64,23 +75,52 @@ class CartSessionManager {
     return _guestSessionId!;
   }
 
-  // Initialize cart session
+  // Initialize cart session with retry logic
   Future<void> initializeSession() async {
-    try {
-      if (CustomerSession.instance.isLoggedIn) {
-        await _initializeCustomerSession();
-      } else {
-        try {
-          await _initializeGuestSession();
-        } catch (guestError) {
-          print('CartSessionManager - Guest session failed, trying alternative approach: $guestError');
-          // Try alternative approach - create a simpler guest session
-          await _initializeSimpleGuestSession();
+    int retryCount = 0;
+    const maxRetries = 2;
+
+    while (retryCount < maxRetries) {
+      try {
+        if (CustomerSession.instance.isLoggedIn) {
+          await _initializeCustomerSession();
+        } else {
+          try {
+            await _initializeGuestSession();
+          } catch (guestError) {
+            print(
+              'CartSessionManager - Guest session failed, trying alternative approach: $guestError',
+            );
+            // Try alternative approach - create a simpler guest session
+            await _initializeSimpleGuestSession();
+          }
         }
+
+        // If we get here, initialization was successful
+        print('CartSessionManager - Session initialized successfully');
+        return;
+      } catch (e) {
+        retryCount++;
+        print(
+          'CartSessionManager - Error initializing session (attempt $retryCount): $e',
+        );
+
+        if (retryCount >= maxRetries) {
+          print(
+            'CartSessionManager - Max retries reached for session initialization',
+          );
+          throw Exception(
+            'Error initializing session after $maxRetries attempts: $e',
+          );
+        }
+
+        // Wait before retrying
+        final delay = Duration(milliseconds: 2000 * retryCount);
+        print(
+          'CartSessionManager - Retrying session initialization in ${delay.inMilliseconds}ms...',
+        );
+        await Future.delayed(delay);
       }
-    } catch (e) {
-      print('CartSessionManager - Error initializing session: $e');
-      throw Exception('Error initializing session: $e');
     }
   }
 
@@ -158,7 +198,9 @@ class CartSessionManager {
       if (existingCart != null) {
         _currentCartId = existingCart['id'];
         _guestCartId = existingCart['id'];
-        print('CartSessionManager - Found existing guest cart: ${existingCart['id']}');
+        print(
+          'CartSessionManager - Found existing guest cart: ${existingCart['id']}',
+        );
       } else {
         // Create new cart for guest
         try {
@@ -174,7 +216,9 @@ class CartSessionManager {
 
           _currentCartId = response['id'];
           _guestCartId = response['id'];
-          print('CartSessionManager - Created new guest cart: ${response['id']}');
+          print(
+            'CartSessionManager - Created new guest cart: ${response['id']}',
+          );
         } catch (e) {
           print('CartSessionManager - Error creating guest cart: $e');
           throw Exception('Failed to create guest cart: $e');
@@ -186,49 +230,126 @@ class CartSessionManager {
     }
   }
 
-  // Add item to cart
-  Future<void> addItem(String productId, {int quantity = 1}) async {
+  // Initialize simple guest session (fallback)
+  Future<void> _initializeSimpleGuestSession() async {
     try {
-      if (_currentCartId == null) {
-        await initializeSession();
-      }
+      final sessionId = await getGuestSessionId();
+      print(
+        'CartSessionManager - Initializing simple guest session with ID: $sessionId',
+      );
 
-      if (_currentCartId == null) {
-        throw Exception('Failed to initialize cart session');
-      }
+      // Use a simpler approach - create customer with a different strategy
+      final tempCustomerId = _generateUUID();
 
-      // Check if item already exists
-      final existingItems = await SupabaseService.instance.client
-          .from('cart_items')
-          .select()
-          .eq('cart_id', _currentCartId!)
-          .eq('product_id', productId);
-
-      if (existingItems.isNotEmpty) {
-        // Update quantity
-        final existingItem = existingItems.first;
-        final newQuantity = (existingItem['quantity'] as int) + quantity;
-
-        await SupabaseService.instance.client
-            .from('cart_items')
-            .update({
-              'quantity': newQuantity,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', existingItem['id']);
-      } else {
-        // Add new item
-        await SupabaseService.instance.client.from('cart_items').insert({
-          'cart_id': _currentCartId!,
-          'product_id': productId,
-          'quantity': quantity,
+      // Try to create customer with minimal data
+      try {
+        await SupabaseService.instance.client.from('customers').insert({
+          'id': tempCustomerId,
+          'phone': 'guest_${sessionId.substring(0, 8)}',
+          'name': 'Guest',
+          'address': 'Guest Address',
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         });
+        print(
+          'CartSessionManager - Simple guest customer created successfully',
+        );
+      } catch (customerError) {
+        print(
+          'CartSessionManager - Error creating simple guest customer: $customerError',
+        );
+        // If customer creation fails, we can't proceed
+        throw Exception('Failed to create guest customer: $customerError');
+      }
+
+      // Create cart
+      try {
+        final response = await SupabaseService.instance.client
+            .from('carts')
+            .insert({
+              'customer_id': tempCustomerId,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .select()
+            .single();
+
+        _currentCartId = response['id'];
+        _guestCartId = response['id'];
+        print(
+          'CartSessionManager - Simple guest cart created: ${response['id']}',
+        );
+      } catch (cartError) {
+        print(
+          'CartSessionManager - Error creating simple guest cart: $cartError',
+        );
+        throw Exception('Failed to create guest cart: $cartError');
       }
     } catch (e) {
-      print('CartSessionManager - Error adding item: $e');
-      throw Exception('Error adding item: $e');
+      print('CartSessionManager - Error in _initializeSimpleGuestSession: $e');
+      throw Exception('Error initializing simple guest session: $e');
+    }
+  }
+
+  // Add item to cart with optimized performance
+  Future<void> addItem(String productId, {int quantity = 1}) async {
+    // Check network connectivity first
+    final isNetworkAvailable = await _isNetworkAvailable();
+    if (!isNetworkAvailable) {
+      print('CartSessionManager - No network connectivity available');
+      throw Exception(
+        'No network connectivity. Please check your internet connection.',
+      );
+    }
+
+    int retryCount = 0;
+    const maxRetries = 2; // Reduced from 3 to 2
+
+    while (retryCount < maxRetries) {
+      try {
+        if (_currentCartId == null) {
+          await initializeSession();
+        }
+
+        if (_currentCartId == null) {
+          throw Exception('Failed to initialize cart session');
+        }
+
+        // Optimized: Use upsert operation instead of separate check and insert
+        await SupabaseService.instance.client
+            .from('cart_items')
+            .upsert({
+              'cart_id': _currentCartId!,
+              'product_id': productId,
+              'quantity': quantity,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'cart_id,product_id')
+            .timeout(
+              const Duration(seconds: 5),
+            ); // Reduced timeout from 10 to 5 seconds
+
+        // If we get here, the operation was successful
+        print('CartSessionManager - Successfully added item to cart');
+        return;
+      } catch (e) {
+        retryCount++;
+        print(
+          'CartSessionManager - Error adding item (attempt $retryCount): $e',
+        );
+
+        if (retryCount >= maxRetries) {
+          print('CartSessionManager - Max retries reached, throwing error');
+          throw Exception('Error adding item after $maxRetries attempts: $e');
+        }
+
+        // Reduced delay before retrying (faster retry)
+        final delay = Duration(
+          milliseconds: 300 * retryCount,
+        ); // Reduced from 1000 to 300
+        print('CartSessionManager - Retrying in ${delay.inMilliseconds}ms...');
+        await Future.delayed(delay);
+      }
     }
   }
 

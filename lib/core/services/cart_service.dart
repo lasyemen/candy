@@ -3,6 +3,7 @@ import '../../models/cart_item.dart';
 import 'supabase_service.dart';
 import 'customer_session.dart';
 import 'cart_session_manager.dart';
+import 'cart_cache_manager.dart';
 import 'dart:math';
 
 class CartService {
@@ -108,7 +109,8 @@ class CartService {
     try {
       final sessionId = getGuestSessionId();
       print(
-          'CartService - Getting or creating cart for guest session: $sessionId');
+        'CartService - Getting or creating cart for guest session: $sessionId',
+      );
 
       // For guests, we'll use the session ID as a temporary customer_id
       // This is a workaround since there's no session_id column
@@ -287,7 +289,9 @@ class CartService {
 
   // Add item to current session's cart
   static Future<CartItem> addToCurrentCart(
-      String productId, int quantity) async {
+    String productId,
+    int quantity,
+  ) async {
     try {
       await CartSessionManager.instance.addItem(productId, quantity: quantity);
 
@@ -464,12 +468,7 @@ class CartService {
       return await CartSessionManager.instance.getCartSummary();
     } catch (e) {
       print('CartService - Error getting cart summary: $e');
-      return {
-        'cartId': null,
-        'itemCount': 0,
-        'total': 0.0,
-        'items': [],
-      };
+      return {'cartId': null, 'itemCount': 0, 'total': 0.0, 'items': []};
     }
   }
 }
@@ -486,9 +485,22 @@ class CartManager {
     try {
       await CartSessionManager.instance.addItem(productId, quantity: quantity);
       print('CartManager - Added product $productId to cart');
+
+      // Invalidate cart cache when items are added
+      await _invalidateCartCache();
     } catch (e) {
       print('CartManager - Error adding product to cart: $e');
       throw Exception('Error adding product to cart: $e');
+    }
+  }
+
+  // Invalidate cart cache to force refresh
+  Future<void> _invalidateCartCache() async {
+    try {
+      await CartCacheManager.instance.invalidateCache();
+      print('CartManager - Cart cache invalidated successfully');
+    } catch (e) {
+      print('CartManager - Error invalidating cache: $e');
     }
   }
 

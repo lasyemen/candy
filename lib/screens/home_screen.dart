@@ -9,6 +9,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
+import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
 import '../widgets/home/home_product_card_widget.dart';
@@ -368,25 +369,30 @@ class _HomeScreenState extends State<HomeScreen> {
   void _addToCart(Products product) async {
     final appBloc = context.read<AppBloc>();
 
-    // Add haptic feedback
+    // Add haptic feedback immediately
     HapticFeedback.lightImpact();
 
-    // Debug: Print product information
-    print('Adding to cart - Product ID: ${product.id}');
-    print('Adding to cart - Product Name: ${product.name}');
-    print('Adding to cart - Product Price: ${product.price}');
+    // Optimistic UI update - show notification immediately
+    if (mounted) {
+      _showCartNotification(product);
+    }
 
+    // Update app bloc immediately for UI responsiveness
+    appBloc.add(AddToCartEvent(product));
+
+    // Fire and forget cart addition (non-blocking)
+    _addToCartAsync(product);
+  }
+
+  // Non-blocking cart addition
+  void _addToCartAsync(Products product) async {
     try {
-      // Add product to cart using CartManager
+      // Add product to cart using CartManager (non-blocking)
       await CartManager.instance.addProduct(product.id);
-
-      // Update app bloc
-      appBloc.add(AddToCartEvent(product));
-
       print('Successfully added ${product.name} to cart');
     } catch (e) {
       print('Error adding product to cart: $e');
-      // Show error message to user
+      // Show error message to user if there's an issue
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -395,14 +401,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
-      return; // Exit early if there's an error
     }
+  }
 
-    // Check if widget is still mounted before showing overlay
+  // Show cart notification immediately
+  void _showCartNotification(Products product) {
     if (!mounted) return;
 
-    // Show success message with enhanced design at top
-    if (!mounted) return; // Double check before accessing context
+    print('Showing cart notification for: ${product.name}');
 
     final overlay = Overlay.of(context);
     late final OverlayEntry overlayEntry;
@@ -438,11 +444,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Animate(
                       effects: const [
                         ScaleEffect(
-                          duration: Duration(milliseconds: 200),
+                          duration: Duration(milliseconds: 150),
                           curve: Curves.easeOut,
                         ),
                         ShakeEffect(
-                          duration: Duration(milliseconds: 300),
+                          duration: Duration(milliseconds: 200),
                           hz: 3,
                         ),
                       ],
@@ -514,8 +520,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: () {
+                      print('View cart button tapped');
                       overlayEntry.remove();
-                      appBloc.add(SetCurrentIndexEvent(3)); // Cart is index 3
+                      context.read<AppBloc>().add(
+                        SetCurrentIndexEvent(3),
+                      ); // Cart is index 3
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -547,9 +556,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     overlay.insert(overlayEntry);
 
-    // Remove the overlay after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && overlayEntry.mounted) {
+    // Auto-remove after 2.5 seconds (faster than before)
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (overlayEntry.mounted) {
         overlayEntry.remove();
       }
     });
@@ -567,7 +576,8 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            centerTitle: true,
+            centerTitle: false,
+            automaticallyImplyLeading: false,
             title: ShaderMask(
               shaderCallback: (Rect bounds) {
                 return DesignSystem.getBrandGradient(

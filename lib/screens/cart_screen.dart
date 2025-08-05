@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
 import '../core/services/cart_service.dart';
+import '../core/services/cart_cache_manager.dart';
 import '../models/cart.dart';
 import '../models/cart_item.dart';
 
@@ -18,20 +19,31 @@ class CartScreen extends StatefulWidget {
   State<CartScreen> createState() => _CartScreenState();
 }
 
-class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
+class _CartScreenState extends State<CartScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _animationController;
   late AnimationController _listAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late List<Animation<Offset>> _itemAnimations = [];
+  late List<Animation<double>> _itemFadeAnimations = [];
+  late List<Animation<double>> _itemScaleAnimations = [];
   bool _showSummaryCard = false;
   List<Map<String, dynamic>> _cartItemsWithProducts = [];
+  bool _animationsInitialized = false;
+  bool _isFirstLoad = true;
+  bool _isLoading = false;
+  bool _hasLoadedOnce = false;
+
+  // State preservation is now handled by CartCacheManager
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
     _listAnimationController = AnimationController(
@@ -42,109 +54,314 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.4, curve: Curves.easeOutQuart),
       ),
     );
 
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _animationController,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+            curve: const Interval(0.1, 0.6, curve: Curves.easeOutQuart),
           ),
         );
 
     _animationController.forward();
 
-    // Load cart data
+    // Load cart data on init - use cached data if available and valid
     _loadCartData();
 
-    // Set up periodic refresh
-    _setupPeriodicRefresh();
+    _animationsInitialized = true;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     _listAnimationController.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Refresh cart data when screen becomes visible
-    _loadCartData();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && _animationsInitialized) {
+      // Don't reload cart data when app resumes - preserve state
+    }
   }
 
-  void _setupPeriodicRefresh() {
-    // Refresh cart data every 2 seconds when screen is active
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        _loadCartData();
-        _setupPeriodicRefresh(); // Schedule next refresh
-      }
+  // Method to manually refresh cart data
+  Future<void> _refreshCartData() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
     });
+
+    try {
+      await _loadCartData(forceRefresh: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _triggerItemAnimations() {
+    if (_cartItemsWithProducts.isNotEmpty) {
+      _initializeItemAnimations(_cartItemsWithProducts.length);
+    }
   }
 
   void _initializeItemAnimations(int itemCount) {
     _itemAnimations.clear();
+    _itemFadeAnimations.clear();
+    _itemScaleAnimations.clear();
+
     for (int i = 0; i < itemCount; i++) {
+      // Slide animation
       _itemAnimations.add(
         Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _listAnimationController,
             curve: Interval(
-              i * 0.1,
-              0.5 + (i * 0.1),
+              i * 0.12,
+              0.4 + (i * 0.12),
+              curve: Curves.easeOutCubic,
+            ),
+          ),
+        ),
+      );
+
+      // Fade animation
+      _itemFadeAnimations.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _listAnimationController,
+            curve: Interval(
+              i * 0.12,
+              0.4 + (i * 0.12),
+              curve: Curves.easeOutCubic,
+            ),
+          ),
+        ),
+      );
+
+      // Scale animation
+      _itemScaleAnimations.add(
+        Tween<double>(begin: 0.8, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _listAnimationController,
+            curve: Interval(
+              i * 0.12,
+              0.4 + (i * 0.12),
               curve: Curves.easeOutCubic,
             ),
           ),
         ),
       );
     }
-    _listAnimationController.forward();
+
+    if (_isFirstLoad || _cartItemsWithProducts.length != itemCount) {
+      _listAnimationController.reset();
+      _listAnimationController.forward();
+      _isFirstLoad = false;
+    }
   }
 
   void _updateQuantity(String itemId, int newQuantity) async {
     final appBloc = context.read<AppBloc>();
     HapticFeedback.lightImpact();
 
+    print('=== UPDATE QUANTITY DEBUG ===');
     print(
       '_updateQuantity called with itemId: $itemId, newQuantity: $newQuantity',
     );
+    print('Current cart items count: ${_cartItemsWithProducts.length}');
+
+    if (itemId.isEmpty || itemId == 'null') {
+      print('Error: Invalid item ID provided');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: معرف المنتج غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
 
     try {
-      await CartManager.instance.updateQuantity(itemId, newQuantity);
-      print('CartManager updateQuantity completed successfully');
+      if (itemId.startsWith('temp_')) {
+        print('Handling temporary item ID: $itemId');
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['product_id']?.toString() == itemId.split('_')[1] ||
+              item['id']?.toString() == itemId,
+        );
 
-      // Update app bloc
-      if (newQuantity <= 0) {
-        appBloc.add(RemoveFromCartEvent(itemId));
+        print('Found item at index: $itemIndex');
+
+        if (itemIndex != -1) {
+          final actualItem = _cartItemsWithProducts[itemIndex];
+          final actualItemId =
+              actualItem['id']?.toString() ??
+              actualItem['product_id']?.toString() ??
+              itemId;
+          final productId = actualItem['product_id']?.toString() ?? itemId;
+
+          print('Actual item ID: $actualItemId');
+          print('Product ID: $productId');
+
+          if (newQuantity <= 0) {
+            print('Removing item with quantity <= 0');
+            await CartManager.instance.removeProduct(actualItemId);
+            appBloc.add(RemoveFromCartEvent(productId));
+          } else {
+            print('Updating quantity to: $newQuantity');
+            await CartManager.instance.updateQuantity(
+              actualItemId,
+              newQuantity,
+            );
+            appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+          }
+        } else {
+          throw Exception('Item not found in cart');
+        }
       } else {
-        appBloc.add(UpdateCartItemQuantityEvent(itemId, newQuantity));
+        print('Handling regular item ID: $itemId');
+
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) => item['id']?.toString() == itemId,
+        );
+
+        print('Found item at index: $itemIndex');
+
+        String productId = itemId;
+        if (itemIndex != -1) {
+          productId =
+              _cartItemsWithProducts[itemIndex]['product_id']?.toString() ??
+              itemId;
+          print('Product ID found: $productId');
+        } else {
+          print('Item not found in cart items, using itemId as productId');
+        }
+
+        await CartManager.instance.updateQuantity(itemId, newQuantity);
+        print('CartManager updateQuantity completed successfully');
+
+        if (newQuantity <= 0) {
+          print('Removing item from app bloc');
+          appBloc.add(RemoveFromCartEvent(productId));
+        } else {
+          print('Updating item quantity in app bloc');
+          appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+        }
       }
 
-      // Refresh cart data
-      _loadCartData();
+      // Update local state immediately for better UX
+      _updateLocalCartState(itemId, newQuantity);
+
+      // Reload cart data to reflect changes
+      await _loadCartData();
+      print('=== UPDATE QUANTITY SUCCESS ===');
     } catch (e) {
+      print('=== UPDATE QUANTITY ERROR ===');
       print('Error updating quantity: $e');
+      print('Error type: ${e.runtimeType}');
+      print('Stack trace: ${StackTrace.current}');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطأ في تحديث الكمية: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
     }
   }
 
-  Future<void> _loadCartData() async {
+  // Update local cart state immediately for better UX
+  void _updateLocalCartState(String itemId, int newQuantity) {
+    setState(() {
+      if (newQuantity <= 0) {
+        // Remove item
+        _cartItemsWithProducts.removeWhere(
+          (item) =>
+              item['id']?.toString() == itemId ||
+              item['product_id']?.toString() == itemId,
+        );
+      } else {
+        // Update quantity
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['id']?.toString() == itemId ||
+              item['product_id']?.toString() == itemId,
+        );
+        if (itemIndex != -1) {
+          _cartItemsWithProducts[itemIndex]['quantity'] = newQuantity;
+        }
+      }
+    });
+
+    // Update cache asynchronously
+    _updateCartCache();
+  }
+
+  // Update cart cache with current state
+  Future<void> _updateCartCache() async {
+    await CartCacheManager.instance.updateCache(_cartItemsWithProducts);
+  }
+
+  // Check if cached data is still valid
+  Future<bool> _isCacheValid() async {
+    return await CartCacheManager.instance.isCacheValid();
+  }
+
+  // Invalidate cache when items are added from other screens
+  static Future<void> invalidateCache() async {
+    await CartCacheManager.instance.invalidateCache();
+  }
+
+  // Clear cache completely
+  static Future<void> clearCache() async {
+    await CartCacheManager.instance.clearCache();
+  }
+
+  Future<void> _loadCartData({bool forceRefresh = false}) async {
+    if (_isLoading && !forceRefresh) return;
+
+    // Use cached data if available and valid, unless force refresh is requested
+    if (!forceRefresh) {
+      final isCacheValid = await _isCacheValid();
+      final cachedItems = await CartCacheManager.instance.getCachedCartItems();
+
+      if (isCacheValid && cachedItems.isNotEmpty) {
+        setState(() {
+          _cartItemsWithProducts = cachedItems;
+          _hasLoadedOnce = true;
+          _isLoading = false;
+        });
+
+        if (_cartItemsWithProducts.isNotEmpty) {
+          _triggerItemAnimations();
+        }
+        return;
+      }
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       print('CartScreen - Loading cart data...');
 
-      // First, ensure session is initialized
       await CartService.initializeCartSession();
 
       final cartSummary = await CartManager.instance.getCartSummary();
@@ -154,39 +371,166 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       );
 
       if (mounted) {
-        setState(() {
-          _cartItemsWithProducts = List<Map<String, dynamic>>.from(
-            cartSummary['items'] ?? [],
-          );
-          print(
-            'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items',
-          );
+        final newCartItems = List<Map<String, dynamic>>.from(
+          cartSummary['items'] ?? [],
+        );
 
-          // Debug: Print each item
-          for (int i = 0; i < _cartItemsWithProducts.length; i++) {
-            final item = _cartItemsWithProducts[i];
+        if (_cartItemsWithProducts.length != newCartItems.length ||
+            !_areCartItemsEqual(_cartItemsWithProducts, newCartItems)) {
+          setState(() {
+            _cartItemsWithProducts = newCartItems;
+            _hasLoadedOnce = true;
             print(
-              'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}',
+              'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items',
             );
-          }
-        });
+
+            if (_cartItemsWithProducts.isNotEmpty) {
+              _triggerItemAnimations();
+            }
+
+            for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+              final item = _cartItemsWithProducts[i];
+              print(
+                'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}',
+              );
+              print('CartScreen - Item $i structure: ${item.keys.toList()}');
+              print('CartScreen - Item $i ID: ${item['id']}');
+              print('CartScreen - Item $i product_id: ${item['product_id']}');
+            }
+          });
+
+          // Update cache with new data
+          await _updateCartCache();
+        }
       }
     } catch (e) {
       print('CartScreen - Error loading cart data: $e');
-      // If there's an error, try to initialize the session and retry
-      try {
-        await CartService.initializeCartSession();
-        final cartSummary = await CartManager.instance.getCartSummary();
-        if (mounted) {
-          setState(() {
-            _cartItemsWithProducts = List<Map<String, dynamic>>.from(
-              cartSummary['items'] ?? [],
+
+      if (!_hasLoadedOnce) {
+        try {
+          await CartService.initializeCartSession();
+          final cartSummary = await CartManager.instance.getCartSummary();
+          if (mounted) {
+            setState(() {
+              _cartItemsWithProducts = List<Map<String, dynamic>>.from(
+                cartSummary['items'] ?? [],
+              );
+              _hasLoadedOnce = true;
+            });
+
+            // Update cache with fallback data
+            await _updateCartCache();
+          }
+        } catch (retryError) {
+          print('CartScreen - Error retrying cart data load: $retryError');
+          if (mounted) {
+            setState(() {
+              _hasLoadedOnce = true;
+            });
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.wifi_off, color: Colors.white, size: 16),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'لا يمكن تحميل السلة حالياً. تحقق من اتصالك بالإنترنت.',
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                margin: const EdgeInsets.all(20),
+                duration: const Duration(seconds: 4),
+              ),
             );
-          });
+          }
         }
-      } catch (retryError) {
-        print('CartScreen - Error retrying cart data load: $retryError');
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  bool _areCartItemsEqual(
+    List<Map<String, dynamic>> oldItems,
+    List<Map<String, dynamic>> newItems,
+  ) {
+    if (oldItems.length != newItems.length) return false;
+
+    for (int i = 0; i < oldItems.length; i++) {
+      final oldItem = oldItems[i];
+      final newItem = newItems[i];
+
+      if (oldItem['id'] != newItem['id'] ||
+          oldItem['quantity'] != newItem['quantity'] ||
+          oldItem['product_id'] != newItem['product_id']) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _resetCartState() {
+    setState(() {
+      _cartItemsWithProducts = [];
+      _hasLoadedOnce = false;
+      _isLoading = false;
+    });
+    _loadCartData();
+  }
+
+  void _debugCartState() {
+    print('=== CART STATE DEBUG ===');
+    print('Cart items count: ${_cartItemsWithProducts.length}');
+    print('Has loaded once: $_hasLoadedOnce');
+    print('Is loading: $_isLoading');
+    print('Is first load: $_isFirstLoad');
+    print('Animations initialized: $_animationsInitialized');
+    print('Show summary card: $_showSummaryCard');
+
+    for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+      final item = _cartItemsWithProducts[i];
+      print(
+        'Item $i: ID=${item['id']}, ProductID=${item['product_id']}, Quantity=${item['quantity']}',
+      );
+    }
+    print('=== END CART STATE DEBUG ===');
+  }
+
+  void _debugCartItemStructure() {
+    print('CartScreen - Debugging cart item structure:');
+    for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+      final item = _cartItemsWithProducts[i];
+      print('Item $i:');
+      print('  Keys: ${item.keys.toList()}');
+      print('  ID: ${item['id']} (type: ${item['id']?.runtimeType})');
+      print(
+        '  Product ID: ${item['product_id']} (type: ${item['product_id']?.runtimeType})',
+      );
+      print(
+        '  Quantity: ${item['quantity']} (type: ${item['quantity']?.runtimeType})',
+      );
+      if (item['products'] != null) {
+        print('  Product: ${item['products']}');
+      }
+      print('  ---');
     }
   }
 
@@ -326,14 +670,53 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     final appBloc = context.read<AppBloc>();
     HapticFeedback.mediumImpact();
 
+    print('_removeItem called with itemId: $itemId');
+
+    if (itemId.isEmpty || itemId == 'null') {
+      print('Error: Invalid item ID provided for removal');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: معرف المنتج غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
-      await CartManager.instance.removeProduct(itemId);
+      // Update local state immediately for better UX
+      _updateLocalCartState(itemId, 0); // 0 quantity means remove
 
-      // Update app bloc
-      appBloc.add(RemoveFromCartEvent(itemId));
+      if (itemId.startsWith('temp_')) {
+        print('Handling temporary item ID for removal: $itemId');
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['product_id']?.toString() == itemId.split('_')[1] ||
+              item['id']?.toString() == itemId,
+        );
 
-      // Refresh cart data
-      _loadCartData();
+        if (itemIndex != -1) {
+          final actualItem = _cartItemsWithProducts[itemIndex];
+          final actualItemId =
+              actualItem['id']?.toString() ??
+              actualItem['product_id']?.toString() ??
+              itemId;
+          final productId = actualItem['product_id']?.toString() ?? itemId;
+
+          await CartManager.instance.removeProduct(actualItemId);
+          appBloc.add(RemoveFromCartEvent(productId));
+        } else {
+          throw Exception('Item not found in cart for removal');
+        }
+      } else {
+        await CartManager.instance.removeProduct(itemId);
+        appBloc.add(RemoveFromCartEvent(itemId));
+      }
+
+      // Reload cart data to reflect changes
+      await _loadCartData();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -530,6 +913,14 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Debug cart state when screen is built
+    _debugCartState();
+
+    // Debug cart item structure when screen is built
+    if (_cartItemsWithProducts.isNotEmpty) {
+      _debugCartItemStructure();
+    }
+
     return Scaffold(
       backgroundColor: DesignSystem.background,
       appBar: PreferredSize(
@@ -588,13 +979,15 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await _loadCartData();
+          await _refreshCartData();
         },
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
-            child: _cartItemsWithProducts.isEmpty
+            child: _isLoading && !_hasLoadedOnce
+                ? _buildLoadingState()
+                : _cartItemsWithProducts.isEmpty
                 ? _buildEmptyCart()
                 : _buildCartContentFromItems(),
           ),
@@ -617,31 +1010,50 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
     return Stack(
       children: [
-        ListView.separated(
+        ListView.builder(
+          // Changed from ListView.separated for better performance
           padding: const EdgeInsets.all(20),
           physics: const BouncingScrollPhysics(),
           itemCount: _cartItemsWithProducts.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
             final cartItem = _cartItemsWithProducts[index];
-            return SlideTransition(
-              position:
-                  _itemAnimations.isNotEmpty && index < _itemAnimations.length
-                  ? _itemAnimations[index]
-                  : AlwaysStoppedAnimation(Offset.zero),
-              child: _buildCartItemFromMap(cartItem, index),
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index < _cartItemsWithProducts.length - 1 ? 16 : 0,
+              ),
+              child: SlideTransition(
+                position:
+                    _itemAnimations.isNotEmpty && index < _itemAnimations.length
+                    ? _itemAnimations[index]
+                    : AlwaysStoppedAnimation(Offset.zero),
+                child: FadeTransition(
+                  opacity:
+                      _itemFadeAnimations.isNotEmpty &&
+                          index < _itemFadeAnimations.length
+                      ? _itemFadeAnimations[index]
+                      : AlwaysStoppedAnimation(1.0),
+                  child: ScaleTransition(
+                    scale:
+                        _itemScaleAnimations.isNotEmpty &&
+                            index < _itemScaleAnimations.length
+                        ? _itemScaleAnimations[index]
+                        : AlwaysStoppedAnimation(1.0),
+                    child: _buildCartItemFromMap(cartItem, index),
+                  ),
+                ),
+              ),
             );
           },
         ),
         // Floating total card with slide-up animation
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
+          duration: const Duration(milliseconds: 200), // Faster animation
+          curve: Curves.easeOutQuart, // More responsive curve
           bottom: _showSummaryCard ? 100 : -200, // Slide up from bottom
           left: 10,
           right: 10,
           child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 200), // Faster opacity
             opacity: _showSummaryCard ? 1.0 : 0.0,
             child: _buildSummaryCardContentFromItems(cartTotal),
           ),
@@ -859,6 +1271,70 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     });
   }
 
+  Widget _buildLoadingState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    DesignSystem.surface,
+                    DesignSystem.surface.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(32),
+                boxShadow: [
+                  BoxShadow(
+                    color: DesignSystem.primary.withOpacity(0.1),
+                    blurRadius: 30,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: 80,
+                height: 80,
+                child: CircularProgressIndicator(
+                  strokeWidth: 4,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    DesignSystem.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'جاري تحميل السلة...',
+              style: DesignSystem.headlineMedium.copyWith(
+                color: DesignSystem.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Rubik',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'يرجى الانتظار بينما نقوم بتحميل محتويات سلة التسوق',
+              style: DesignSystem.bodyLarge.copyWith(
+                color: DesignSystem.textSecondary,
+                fontFamily: 'Rubik',
+                height: 1.6,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyCart() {
     return Center(
       child: Padding(
@@ -967,18 +1443,39 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     final productPrice = product?['price'] as double? ?? 0.0;
     final productImage = product?['image_url'] as String?;
     final quantity = cartItem['quantity'] as int;
-    final itemId = cartItem['id'] as String? ?? '';
 
-    return Container(
+    // Improved item ID extraction with fallback
+    String itemId = '';
+    if (cartItem['id'] != null && cartItem['id'].toString().isNotEmpty) {
+      itemId = cartItem['id'].toString();
+    } else if (cartItem['product_id'] != null) {
+      // Use product_id as fallback for local items
+      itemId = cartItem['product_id'].toString();
+    } else {
+      // Generate a temporary ID if neither exists
+      itemId = 'temp_${index}_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    print(
+      'Building cart item: itemId=$itemId, quantity=$quantity, productName=$productName',
+    );
+    print('Cart item structure: ${cartItem.keys.toList()}');
+
+    return AnimatedContainer(
+      // Added AnimatedContainer for smooth transitions
+      duration: const Duration(
+        milliseconds: 300,
+      ), // Slightly longer for smoother feel
+      curve: Curves.easeOutCubic,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1124,13 +1621,6 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                       const SizedBox(width: 4),
                       const RiyalIcon(size: 14, color: DesignSystem.primary),
                       const SizedBox(width: 8),
-                      Text(
-                        '/ الوحدة',
-                        style: DesignSystem.bodySmall.copyWith(
-                          color: DesignSystem.textSecondary,
-                          fontFamily: 'Rubik',
-                        ),
-                      ),
                     ],
                   ),
                 ],
@@ -1149,11 +1639,16 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     print(
                       'Decrease button pressed for item: $itemId, current quantity: $quantity',
                     );
+                    print(
+                      'Item ID type: ${itemId.runtimeType}, value: "$itemId"',
+                    );
                     _updateQuantity(itemId, quantity - 1);
                   },
                   isDecrease: true,
                 ),
-                Padding(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     quantity.toString(),
@@ -1168,6 +1663,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   onPressed: () {
                     print(
                       'Increase button pressed for item: $itemId, current quantity: $quantity',
+                    );
+                    print(
+                      'Item ID type: ${itemId.runtimeType}, value: "$itemId"',
                     );
                     _updateQuantity(itemId, quantity + 1);
                   },
@@ -1306,6 +1804,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Product Image
           Container(
@@ -1339,7 +1838,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          const SizedBox(width: 20),
+          const SizedBox(width: 16),
 
           // Product Info
           Expanded(
@@ -1353,6 +1852,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Rubik',
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -1368,19 +1869,13 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     const SizedBox(width: 4),
                     const RiyalIcon(size: 14, color: DesignSystem.primary),
                     const SizedBox(width: 8),
-                    Text(
-                      '/ الوحدة',
-                      style: DesignSystem.bodySmall.copyWith(
-                        color: DesignSystem.textSecondary,
-                        fontFamily: 'Rubik',
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
 
                 // Quantity Controls
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildQuantityButton(
                       icon: Icons.remove,
@@ -1392,10 +1887,10 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -1428,30 +1923,31 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
             ),
           ),
 
+          const SizedBox(width: 8),
+
           // Total Price & Info
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 onPressed: () => _showProductInfo(cartItem),
                 icon: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: DesignSystem.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     Icons.info_outline,
                     color: DesignSystem.primary,
-                    size: 16,
+                    size: 14,
                   ),
                 ),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -1459,21 +1955,21 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                       DesignSystem.primary.withOpacity(0.1),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${(cartItem.quantity * 5.0).toStringAsFixed(2)}', // Calculate total price
+                      '${(cartItem.quantity * 5.0).toStringAsFixed(2)}',
                       style: DesignSystem.labelLarge.copyWith(
                         color: DesignSystem.primary,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Rubik',
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const RiyalIcon(size: 12, color: DesignSystem.primary),
+                    const SizedBox(width: 2),
+                    const RiyalIcon(size: 10, color: DesignSystem.primary),
                   ],
                 ),
               ),
@@ -1489,16 +1985,32 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     required VoidCallback onPressed,
     required bool isDecrease,
   }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          gradient: DesignSystem.getBrandGradient('primary'),
-          borderRadius: BorderRadius.circular(6),
+    return AnimatedContainer(
+      // Added AnimatedContainer for smooth button transitions
+      duration: const Duration(
+        milliseconds: 200,
+      ), // Slightly longer for smoother feel
+      curve: Curves.easeOutCubic,
+      child: GestureDetector(
+        onTap: () {
+          print('Button tapped: ${isDecrease ? "decrease" : "increase"}');
+          onPressed();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: DesignSystem.getBrandGradient('primary'),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: DesignSystem.primary.withOpacity(0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(icon, size: 16, color: Colors.white),
         ),
-        child: Icon(icon, size: 14, color: Colors.white),
       ),
     );
   }
