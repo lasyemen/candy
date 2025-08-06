@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../screens/index.dart';
+import '../../screens/product_details_screen.dart';
 import '../../models/products.dart';
 
 /// App Routes Configuration
@@ -73,7 +74,10 @@ class AppRoutes {
       // Product Routes
       productDetails: (context) {
         final product = ModalRoute.of(context)?.settings.arguments as Products?;
-        return ProductDetailsScreen(product: product!);
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: ProductDetailsScreen(product: product!),
+        );
       },
     };
   }
@@ -118,5 +122,15 @@ class AppRoutes {
   /// Go back to a specific route
   static void goBackTo(BuildContext context, String routeName) {
     Navigator.popUntil(context, ModalRoute.withName(routeName));
+  }
+
+  /// Show product details as a bottom sheet
+  static void showProductDetails(BuildContext context, Products product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductDetailsScreen(product: product),
+    );
   }
 }

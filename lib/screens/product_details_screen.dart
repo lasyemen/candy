@@ -3,10 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/products.dart';
+import '../models/product_rating.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/design_system.dart';
 import '../widgets/riyal_icon.dart';
+import '../widgets/star_rating.dart';
 import '../core/services/cart_service.dart';
+import '../core/services/rating_service.dart';
+import '../core/services/customer_session.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Products product;
@@ -26,7 +30,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   late final Animation<Offset> _slideAnimation;
 
   int _selectedQuantity = 1;
-  bool _isFavorite = false;
+
+  // Rating state
+  ProductRatingSummary? _ratingSummary;
+  ProductRating? _userRating;
+  bool _isLoadingRating = true;
+  bool _isSubmittingRating = false;
+  double _selectedRating = 0;
+  final TextEditingController _reviewController = TextEditingController();
+  bool _showReviewInput = false;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -38,148 +51,629 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
-    _scaleController.forward();
 
     // Initialize slide animation for bottom sheet effect - exactly like showModalBottomSheet
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1.0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
-    _slideController.forward();
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 1.0), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
-    // Show bottom sheet after a short delay
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   _showProductDetailsBottomSheet();
-    // });
+    // Start image animation immediately
+    _scaleController.forward();
+
+    // Start bottom sheet animation after a delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted) {
+            _slideController.forward();
+          }
+        });
+      }
+    });
+
+    // Load rating data
+    _loadRatingData();
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _scaleController.dispose();
     _slideController.dispose();
+    _reviewController.dispose();
     super.dispose();
+  }
+
+  // Load rating data for the product
+  Future<void> _loadRatingData() async {
+    if (!CustomerSession.instance.isLoggedIn) {
+      if (!_isDisposed) {
+        setState(() {
+          _isLoadingRating = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final customerId = CustomerSession.instance.currentCustomerId!;
+
+      // Test table access first
+      final tableAccess = await RatingService.testTableAccess();
+      if (!tableAccess) {
+        print('RatingService - Table access failed, cannot load rating data');
+        if (!_isDisposed) {
+          setState(() {
+            _isLoadingRating = false;
+          });
+        }
+        return;
+      }
+
+      // Load rating summary and user rating in parallel
+      final results = await Future.wait([
+        RatingService.getProductRatingSummary(widget.product.id),
+        RatingService.getUserRating(widget.product.id, customerId),
+      ]);
+
+      if (!_isDisposed) {
+        setState(() {
+          _ratingSummary = results[0] as ProductRatingSummary?;
+          _userRating = results[1] as ProductRating?;
+          _isLoadingRating = false;
+
+          // Set initial values for rating input
+          if (_userRating != null) {
+            _selectedRating = _userRating!.rating.toDouble();
+            _reviewController.text = _userRating!.review ?? '';
+            _showReviewInput =
+                _userRating!.review != null && _userRating!.review!.isNotEmpty;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading rating data: $e');
+      if (!_isDisposed) {
+        setState(() {
+          _isLoadingRating = false;
+        });
+      }
+    }
+  }
+
+  // Submit user rating
+  Future<void> _submitRating() async {
+    if (!CustomerSession.instance.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى تسجيل الدخول لتقييم المنتج'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedRating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى اختيار تقييم'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (!_isDisposed) {
+      setState(() {
+        _isSubmittingRating = true;
+      });
+    }
+
+    try {
+      final customerId = CustomerSession.instance.currentCustomerId!;
+      final success = await RatingService.submitRating(
+        productId: widget.product.id,
+        customerId: customerId,
+        rating: _selectedRating.toInt(),
+        review: _reviewController.text.trim().isEmpty
+            ? null
+            : _reviewController.text.trim(),
+      );
+
+      if (success) {
+        // Reload rating data
+        await _loadRatingData();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال تقييمك بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'فشل في إرسال التقييم - تحقق من الاتصال بالإنترنت أو حاول مرة أخرى',
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error submitting rating: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ في إرسال التقييم'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (!_isDisposed) {
+        setState(() {
+          _isSubmittingRating = false;
+        });
+      }
+    }
+  }
+
+  // Build star rating display widget (for under title)
+  Widget _buildStarRatingDisplay() {
+    return Row(
+      children: [
+        if (_isLoadingRating)
+          const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else
+          StarRating(
+            rating: _ratingSummary?.averageRating ?? widget.product.rating,
+            size: 20,
+            readOnly: true,
+          ),
+        const SizedBox(width: 8),
+        Text(
+          '${(_ratingSummary?.averageRating ?? widget.product.rating).toStringAsFixed(1)}',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+            fontFamily: 'Rubik',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '(${_ratingSummary?.totalRatings ?? 0} تقييم)',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontFamily: 'Rubik',
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Build rating input section widget (for under description)
+  Widget _buildRatingInputSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // User rating input (only if logged in)
+        if (CustomerSession.instance.isLoggedIn) ...[
+          const Text(
+            'تقييمك',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+              fontFamily: 'Rubik',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: InteractiveStarRating(
+                  initialRating: _selectedRating,
+                  onRatingChanged: (rating) {
+                    setState(() {
+                      _selectedRating = rating;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 60,
+                height: 32,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: DesignSystem.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _isSubmittingRating ? null : _submitRating,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: 8,
+                      ),
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isSubmittingRating
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            _userRating != null ? 'تحديث' : 'إرسال',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Rubik',
+                              fontSize: 10,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+              if (_userRating != null) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 60,
+                  height: 32,
+                  child: OutlinedButton(
+                    onPressed: _isSubmittingRating ? null : _deleteRating,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'حذف',
+                      style: TextStyle(fontFamily: 'Rubik', fontSize: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ] else ...[
+          // Not logged in message
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'سجل دخولك لتقييم هذا المنتج',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontFamily: 'Rubik',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Delete user rating
+  Future<void> _deleteRating() async {
+    if (!CustomerSession.instance.isLoggedIn || _userRating == null) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف التقييم'),
+        content: const Text('هل أنت متأكد من حذف تقييمك؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('حذف'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final customerId = CustomerSession.instance.currentCustomerId!;
+      final success = await RatingService.deleteRating(
+        widget.product.id,
+        customerId,
+      );
+
+      if (success) {
+        if (!_isDisposed) {
+          await _loadRatingData();
+          setState(() {
+            _selectedRating = 0;
+            _reviewController.clear();
+            _showReviewInput = false;
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف تقييمك'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error deleting rating: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ في حذف التقييم'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // dark status‐bar icons on white background
-    SystemChrome.setSystemUIOverlayStyle(
-      SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
-    );
-
     return Scaffold(
-      backgroundColor: Colors.white,
-
-      // ───── BODY ─────
-      body: Column(
+      backgroundColor: Colors.transparent,
+      body: Stack(
         children: [
-          // Top image section
-          Expanded(
-            flex: 60,
+          // Full screen background image
+          Positioned.fill(
             child: Container(
               color: Colors.white,
-              child: Stack(
-                children: [
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: AnimatedBuilder(
-                        animation: _scaleAnimation,
-                        builder: (ctx, child) => Transform.scale(
-                          scale: _scaleAnimation.value,
-                          child: Hero(
-                            tag: 'product_${widget.product.id}',
-                            child: Image.network(
-                              widget.product.imageUrl ?? '',
-                              fit: BoxFit.contain,
-                              width: double.infinity,
-                              height: double.infinity,
-                              errorBuilder: (_, __, ___) =>
-                                  _buildPlaceholderImage(),
-                            ),
-                          ),
-                        ),
+              padding: const EdgeInsets.only(bottom: 320),
+              child: AnimatedBuilder(
+                animation: _scaleAnimation,
+                builder: (context, child) => Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: Image.network(
+                    widget.product.imageUrl ?? '',
+                    fit: BoxFit.contain,
+                    height: 50,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey[300],
+                      child: const Icon(
+                        Icons.image,
+                        size: 80,
+                        color: Colors.grey,
                       ),
                     ),
                   ),
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 16,
-                    left: 16,
-                    child: _buildNavButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      onTap: () => Navigator.pop(context),
-                    ),
-                  ),
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 16,
-                    right: 16,
-                    child: _buildNavButton(
-                      icon: _isFavorite
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      isActive: _isFavorite,
-                      onTap: () {
-                        setState(() => _isFavorite = !_isFavorite);
-                        _scaleController
-                          ..reset()
-                          ..forward();
-                      },
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
 
-          // Product details section - will be shown as bottom sheet
-          const SizedBox.shrink(),
-        ],
-      ),
+          // Gradient overlay for better text readability
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.2),
+                    Colors.black.withOpacity(0.1),
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.3),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
-      // ───── Bottom Nav Bar ─────
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          height: 56, // reduced height
-          color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 1,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          // Close button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            right: 16,
+            child: _buildNavButton(
+              icon: Icons.close_rounded,
+              onTap: () => Navigator.pop(context),
+            ),
+          ),
+
+          // Bottom sheet content
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.65,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    ShaderMask(
-                      shaderCallback: (bounds) =>
-                          AppColors.primaryGradient.createShader(bounds),
-                      child: Text(
-                        widget.product.price.toStringAsFixed(0),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                    // Handle bar
+                    Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    ShaderMask(
-                      shaderCallback: (bounds) =>
-                          AppColors.primaryGradient.createShader(bounds),
-                      child: RiyalIcon(size: 20, color: Colors.white),
+
+                    // Content
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Quantity + Title
+                            Row(
+                              textDirection: TextDirection.ltr,
+                              children: [
+                                _buildQuantitySelector(),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    widget.product.name,
+                                    textAlign: TextAlign.right,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                      fontFamily: 'Rubik',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Star Rating Display
+                            _buildStarRatingDisplay(),
+                            const SizedBox(height: 12),
+
+                            // Description
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: const Text(
+                                'الوصف',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                  fontFamily: 'Rubik',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.product.description ?? 'لا يوجد وصف.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                                height: 1.6,
+                                fontFamily: 'Rubik',
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Rating Input Section
+                            _buildRatingInputSection(),
+                            const SizedBox(height: 20),
+
+                            // Price and Add to Cart
+                            Row(
+                              children: [
+                                // Price
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ShaderMask(
+                                        shaderCallback: (bounds) => DesignSystem
+                                            .primaryGradient
+                                            .createShader(bounds),
+                                        child: Text(
+                                          widget.product.price.toStringAsFixed(
+                                            0,
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      ShaderMask(
+                                        shaderCallback: (bounds) => DesignSystem
+                                            .primaryGradient
+                                            .createShader(bounds),
+                                        child: RiyalIcon(
+                                          size: 20,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Add to Cart Button
+                                Expanded(
+                                  flex: 2,
+                                  child: _buildAddToCartButton(),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(flex: 2, child: _buildAddToCartButton()),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -194,7 +688,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            gradient: DesignSystem.primaryGradient,
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(Icons.remove_rounded, color: Colors.white),
@@ -218,7 +712,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            gradient: DesignSystem.primaryGradient,
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(Icons.add_rounded, color: Colors.white),
@@ -258,11 +752,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     child: Container(
       height: 56,
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        gradient: DesignSystem.primaryGradient,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
+            color: DesignSystem.primary.withOpacity(0.4),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

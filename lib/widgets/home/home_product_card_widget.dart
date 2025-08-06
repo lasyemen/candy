@@ -5,12 +5,14 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../models/products.dart';
+import '../../models/product_rating.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
 import '../../screens/product_details_screen.dart';
+import '../../core/services/rating_service.dart';
 
-class HomeProductCardWidget extends StatelessWidget {
+class HomeProductCardWidget extends StatefulWidget {
   final Products product;
   final VoidCallback onAddToCart;
 
@@ -19,6 +21,40 @@ class HomeProductCardWidget extends StatelessWidget {
     required this.product,
     required this.onAddToCart,
   });
+
+  @override
+  State<HomeProductCardWidget> createState() => _HomeProductCardWidgetState();
+}
+
+class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
+  ProductRatingSummary? _ratingSummary;
+  bool _isLoadingRating = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRatingData();
+  }
+
+  Future<void> _loadRatingData() async {
+    try {
+      final ratingSummary = await RatingService.getProductRatingSummary(
+        widget.product.id,
+      );
+      if (mounted) {
+        setState(() {
+          _ratingSummary = ratingSummary;
+          _isLoadingRating = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingRating = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,12 +112,7 @@ class HomeProductCardWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ProductDetailsScreen(product: product),
-                      ),
-                    );
+                    AppRoutes.showProductDetails(context, widget.product);
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -110,9 +141,9 @@ class HomeProductCardWidget extends StatelessWidget {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: product.imageUrl != null
+                              child: widget.product.imageUrl != null
                                   ? Image.network(
-                                      product.imageUrl!,
+                                      widget.product.imageUrl!,
                                       width: double.infinity,
                                       height: double.infinity,
                                       fit: BoxFit.cover,
@@ -148,7 +179,7 @@ class HomeProductCardWidget extends StatelessWidget {
                           children: [
                             // Product Name with Modern Typography
                             Text(
-                              product.name,
+                              widget.product.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -170,7 +201,9 @@ class HomeProductCardWidget extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '${product.rating}',
+                                  _isLoadingRating
+                                      ? '...'
+                                      : '${_ratingSummary?.averageRating?.toStringAsFixed(1) ?? widget.product.rating}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -178,7 +211,9 @@ class HomeProductCardWidget extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '(${product.totalSold})',
+                                  _isLoadingRating
+                                      ? '(0)'
+                                      : '(${_ratingSummary?.totalRatings ?? 0})',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[500],
@@ -208,7 +243,9 @@ class HomeProductCardWidget extends StatelessWidget {
                                         },
                                         blendMode: BlendMode.srcIn,
                                         child: Text(
-                                          product.price.toStringAsFixed(2),
+                                          widget.product.price.toStringAsFixed(
+                                            2,
+                                          ),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.w700,
@@ -247,7 +284,7 @@ class HomeProductCardWidget extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(16),
                                       onTap: () {
                                         HapticFeedback.lightImpact();
-                                        onAddToCart();
+                                        widget.onAddToCart();
                                       },
                                       child: const Center(
                                         child: FaIcon(

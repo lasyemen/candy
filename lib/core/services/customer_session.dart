@@ -34,29 +34,6 @@ class CustomerSession {
     }
   }
 
-  // Set current customer by ID (for testing)
-  Future<void> setCurrentCustomerById(String customerId) async {
-    try {
-      // Create a test customer with the given ID
-      final customer = Customer(
-        id: customerId,
-        name: 'Test User',
-        phone: '+966500000000',
-        isActive: true,
-        totalSpent: 0.0,
-        ordersCount: 0,
-        rating: 0.0,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await setCurrentCustomer(customer);
-      print('CustomerSession - Set current customer by ID: $customerId');
-    } catch (e) {
-      print('CustomerSession - Error setting customer by ID: $e');
-    }
-  }
-
   // Clear current customer (called on logout)
   void clearCurrentCustomer() {
     _currentCustomer = null;
