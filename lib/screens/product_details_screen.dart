@@ -48,11 +48,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1.0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
     _slideController.forward();
+
+    // Show bottom sheet after a short delay
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _showProductDetailsBottomSheet();
+    // });
   }
 
   @override
@@ -133,110 +135,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             ),
           ),
 
-          // Product details section with bottom sheet transition
-          Expanded(
-            flex: 40,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, -4), // shadow at top edge only
-                    ),
-                  ],
-                ),
-                                 child: SingleChildScrollView(
-                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                   physics: const BouncingScrollPhysics(),
-                   child: Column(
-                     crossAxisAlignment: CrossAxisAlignment.start,
-                     children: [
-                       // Quantity + Title
-                       Row(
-                         textDirection: TextDirection.ltr,
-                         children: [
-                           _buildQuantitySelector(),
-                           const Spacer(),
-                           Text(
-                             widget.product.name,
-                             textAlign: TextAlign.right,
-                             maxLines: 2,
-                             overflow: TextOverflow.ellipsis,
-                             style: const TextStyle(
-                               fontSize: 24,
-                               fontWeight: FontWeight.bold,
-                               color: Colors.black87,
-                               fontFamily: 'Rubik',
-                             ),
-                           ),
-                         ],
-                       ),
-                       const SizedBox(height: 16),
-
-                       // Rating
-                       Row(
-                         children: [
-                           Icon(
-                             Icons.star_rounded,
-                             color: Colors.yellow[700],
-                             size: 20,
-                           ),
-                           const SizedBox(width: 4),
-                           Text(
-                             '${widget.product.rating}',
-                             style: const TextStyle(
-                               fontSize: 16,
-                               fontWeight: FontWeight.bold,
-                               color: Colors.black87,
-                               fontFamily: 'Rubik',
-                             ),
-                           ),
-                           const SizedBox(width: 4),
-                           Text(
-                             '(${widget.product.totalSold} مراجعة)',
-                             style: TextStyle(
-                               fontSize: 14,
-                               color: Colors.grey[600],
-                               fontFamily: 'Rubik',
-                             ),
-                           ),
-                         ],
-                       ),
-                       const SizedBox(height: 12),
-
-                       // Description
-                       Align(
-                         alignment: Alignment.centerRight,
-                         child: const Text(
-                           'الوصف',
-                           style: TextStyle(
-                             fontSize: 20,
-                             fontWeight: FontWeight.bold,
-                             color: Colors.black87,
-                             fontFamily: 'Rubik',
-                           ),
-                         ),
-                       ),
-                       const SizedBox(height: 8),
-                       Text(
-                         widget.product.description ?? 'لا يوجد وصف.',
-                         style: const TextStyle(
-                           fontSize: 14,
-                           color: Colors.black54,
-                           height: 1.6,
-                           fontFamily: 'Rubik',
-                         ),
-                       ),
-                     ],
-                   ),
-                 ),
-               ),
-             ),
-           ),]
+          // Product details section - will be shown as bottom sheet
+          const SizedBox.shrink(),
+        ],
       ),
 
       // ───── Bottom Nav Bar ─────
