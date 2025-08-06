@@ -68,7 +68,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
                     // Product Description
                     Text(
-                      'تطبيق مياه كاندي يوفر لك أفضل أنواع المياه المعبأة بأسعار منافسة وتوصيل سريع إلى باب منزلك',
+                      'تطبيق مياه كاندي يوفر لك أفضل أنواع المياه المعبأة بأسعار\n منافسة وتوصيل سريع إلى باب منزلك',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Rubik',
