@@ -11,6 +11,9 @@ import '../widgets/star_rating.dart';
 import '../core/services/cart_service.dart';
 import '../core/services/rating_service.dart';
 import '../core/services/customer_session.dart';
+import '../widgets/product_details/star_rating_display.dart';
+import '../widgets/product_details/rating_input_section.dart';
+import '../widgets/product_details/quantity_selector.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Products product;
@@ -223,180 +226,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     }
   }
 
-  // Build star rating display widget (for under title)
-  Widget _buildStarRatingDisplay() {
-    return Row(
-      children: [
-        if (_isLoadingRating)
-          const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else
-          StarRating(
-            rating: _ratingSummary?.averageRating ?? widget.product.rating,
-            size: 22,
-            readOnly: true,
-          ),
-        const SizedBox(width: 8),
-        Text(
-          '${(_ratingSummary?.averageRating ?? widget.product.rating).toStringAsFixed(1)}',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontFamily: 'Rubik',
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '(${_ratingSummary?.totalRatings ?? 0} تقييم)',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontFamily: 'Rubik',
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Build rating input section widget (for under description)
-  Widget _buildRatingInputSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // User rating input (only if logged in)
-        if (CustomerSession.instance.isLoggedIn) ...[
-          Text(
-            'تقييمك',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Colors.black87,
-              fontFamily: 'Rubik',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: InteractiveStarRating(
-                  initialRating: _selectedRating,
-                  onRatingChanged: (rating) {
-                    setState(() {
-                      _selectedRating = rating;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 60,
-                height: 32,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: DesignSystem.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isSubmittingRating ? null : _submitRating,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 8,
-                      ),
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isSubmittingRating
-                        ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            _userRating != null ? 'تحديث' : 'إرسال',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Rubik',
-                              fontSize: 10,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              if (_userRating != null) ...[
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 60,
-                  height: 32,
-                  child: OutlinedButton(
-                    onPressed: _isSubmittingRating ? null : _deleteRating,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'حذف',
-                      style: TextStyle(fontFamily: 'Rubik', fontSize: 10),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ] else ...[
-          // Not logged in message
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'سجل دخولك لتقييم هذا المنتج',
-                    style: TextStyle(
-                      color: Colors.orange[700],
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   // Delete user rating
   Future<void> _deleteRating() async {
     if (!CustomerSession.instance.isLoggedIn || _userRating == null) {
@@ -580,7 +409,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             Row(
                               textDirection: TextDirection.ltr,
                               children: [
-                                _buildQuantitySelector(),
+                                QuantitySelector(
+                                  quantity: _selectedQuantity,
+                                  onIncrease: () => setState(() => _selectedQuantity++),
+                                  onDecrease: () {
+                                    if (_selectedQuantity > 1) {
+                                      setState(() => _selectedQuantity--);
+                                    }
+                                  },
+                                ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Text(
@@ -605,7 +442,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             const SizedBox(height: 16),
 
                             // Star Rating Display
-                            _buildStarRatingDisplay(),
+                            StarRatingDisplay(
+                              isLoading: _isLoadingRating,
+                              rating: _ratingSummary?.averageRating ?? widget.product.rating,
+                              totalRatings: _ratingSummary?.totalRatings ?? 0,
+                            ),
                             const SizedBox(height: 12),
 
                             // Description
@@ -642,7 +483,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             const SizedBox(height: 20),
 
                             // Rating Input Section
-                            _buildRatingInputSection(),
+                            RatingInputSection(
+                              isLoggedIn: CustomerSession.instance.isLoggedIn,
+                              selectedRating: _selectedRating,
+                              isSubmitting: _isSubmittingRating,
+                              onSubmit: _submitRating,
+                              onDelete: _userRating != null ? _deleteRating : null,
+                              onRatingChanged: (rating) {
+                                setState(() {
+                                  _selectedRating = rating;
+                                });
+                              },
+                            ),
                             const SizedBox(height: 20),
 
                             // Price and Add to Cart
@@ -703,51 +555,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       ),
     );
   }
-
-  Widget _buildQuantitySelector() => Row(
-    children: [
-      GestureDetector(
-        onTap: () {
-          if (_selectedQuantity > 1) setState(() => _selectedQuantity--);
-        },
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            gradient: DesignSystem.primaryGradient,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.remove_rounded, color: Colors.white),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Text(
-          '$_selectedQuantity',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontFamily: 'Rubik',
-          ),
-        ),
-      ),
-      GestureDetector(
-        onTap: () => setState(() => _selectedQuantity++),
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            gradient: DesignSystem.primaryGradient,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.add_rounded, color: Colors.white),
-        ),
-      ),
-    ],
-  );
 
   Widget _buildNavButton({
     required IconData icon,

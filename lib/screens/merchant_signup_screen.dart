@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
-import '../core/routes/index.dart';
+import '../core/services/merchant_service.dart';
 import 'merchant_documents_screen.dart'; // Added import for MerchantDocumentsScreen
 
 class MerchantSignupScreen extends StatefulWidget {
@@ -67,25 +67,35 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final String rawPhone = _phoneController.text.trim();
+      final String digitsOnly = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
+      final String phoneDisplay = '+966 ${digitsOnly}';
+      final String phoneE164 = '+966$digitsOnly';
 
-    if (mounted) {
+      final String merchantId = await MerchantService.instance.createMerchant(
+        storeName: _storeNameController.text.trim(),
+        ownerName: _ownerNameController.text.trim(),
+        phoneE164: phoneE164,
+        address: _addressController.text.trim(),
+      );
+
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
 
-      // Navigate to merchant documents screen
       Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               MerchantDocumentsScreen(
                 merchantData: {
-                  'storeName': _storeNameController.text,
-                  'ownerName': _ownerNameController.text,
-                  'phone': _phoneController.text,
-                  'address': _addressController.text,
+                  'merchantId': merchantId,
+                  'storeName': _storeNameController.text.trim(),
+                  'ownerName': _ownerNameController.text.trim(),
+                  'phone': phoneDisplay,
+                  'address': _addressController.text.trim(),
                 },
               ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -104,6 +114,17 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
             );
           },
           transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ أثناء إنشاء التاجر: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }

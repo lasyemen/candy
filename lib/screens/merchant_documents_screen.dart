@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+import 'dart:io';
+import '../core/services/merchant_service.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 
@@ -278,6 +281,8 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
       if (choice == null) return;
 
       String? fileName;
+      String? localPath;
+      Uint8List? bytes;
       if (choice == 'gallery') {
         final ImagePicker picker = ImagePicker();
         final XFile? image = await picker.pickImage(
@@ -285,21 +290,38 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
         );
         if (image != null) {
           fileName = image.name;
+          localPath = image.path;
         }
       } else if (choice == 'camera') {
         final ImagePicker picker = ImagePicker();
         final XFile? image = await picker.pickImage(source: ImageSource.camera);
         if (image != null) {
           fileName = image.name;
+          localPath = image.path;
         }
       } else if (choice == 'files') {
         FilePickerResult? result = await FilePicker.platform.pickFiles();
         if (result != null) {
           fileName = result.files.first.name;
+          localPath = result.files.first.path;
+          bytes = result.files.first.bytes;
         }
       }
 
       if (fileName != null) {
+        // Upload to Supabase storage + upsert metadata
+        final String merchantId = (widget.merchantData['merchantId'] ?? '').toString();
+        if (merchantId.isEmpty) {
+          throw Exception('merchantId is missing');
+        }
+
+        await MerchantService.instance.upsertDocument(
+          merchantId: merchantId,
+          docType: documentType,
+          localFilePath: localPath ?? fileName,
+          bytes: (bytes == null && localPath != null && !File(localPath).existsSync()) ? null : bytes,
+        );
+
         setState(() {
           _uploadedDocuments[documentType] = true;
           _documentNames[documentType] = fileName;
@@ -452,7 +474,7 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
 
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 2));
+    // No-op: already uploaded while selecting each document
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -575,33 +597,35 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Builder(builder: (context) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          if (isDark) {
-            return const Text(
-              'رفع المستندات',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+        title: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            if (isDark) {
+              return const Text(
+                'رفع المستندات',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              );
+            }
+            return ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: const Text(
+                'رفع المستندات',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             );
-          }
-          return ShaderMask(
-            shaderCallback: (bounds) =>
-                DesignSystem.primaryGradient.createShader(bounds),
-            child: const Text(
-              'رفع المستندات',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          );
-        }),
+          },
+        ),
         centerTitle: true,
       ),
       body: FadeTransition(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+import '../core/services/merchant_service.dart';
 
 class MerchantApprovalScreen extends StatefulWidget {
   final Map<String, dynamic> merchantData;
@@ -65,13 +66,26 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
 
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final String merchantId = (widget.merchantData['merchantId'] ?? '').toString();
+      if (merchantId.isEmpty) {
+        throw Exception('merchantId is missing');
+      }
+      await MerchantService.instance.acceptTerms(merchantId: merchantId);
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    // Navigate to main screen
-    Navigator.pushReplacementNamed(context, AppRoutes.main);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      Navigator.pushReplacementNamed(context, AppRoutes.main);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر إكمال التسجيل: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
