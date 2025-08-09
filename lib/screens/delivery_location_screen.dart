@@ -1,10 +1,11 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/app_colors.dart';
-import '../core/constants/design_system.dart';
+// import '../core/constants/design_system.dart';
 import '../widgets/navigation/navigation_wrapper.dart';
 import 'payment_tracking_screen.dart';
+import '../widgets/delivery/delivery_option_tile.dart';
+import '../widgets/delivery/gradient_header_card.dart';
 
 class DeliveryLocationScreen extends StatefulWidget {
   const DeliveryLocationScreen({super.key});
@@ -39,7 +40,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
     );
 
     _buttonAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 120),
       vsync: this,
     );
 
@@ -58,7 +59,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           ),
         );
 
-    _buttonScaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+    _buttonScaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
       CurvedAnimation(
         parent: _buttonAnimationController,
         curve: Curves.easeInOut,
@@ -97,17 +98,12 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                   ],
                 ),
               ),
-              child: AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildMainContent(),
-                    ),
-                  );
-                },
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: _buildMainContent(),
+                ),
               ),
             ),
           ),
@@ -215,7 +211,11 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           const SizedBox(height: 8),
 
           // Header section
-          _buildHeaderSection(),
+          const GradientHeaderCard(
+            icon: Icons.delivery_dining,
+            title: 'اختر مكان التوصيل',
+            subtitle: 'حدد المكان المناسب لاستلام طلبك بسهولة',
+          ),
           const SizedBox(height: 32),
 
           // Delivery options
@@ -240,208 +240,53 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
     );
   }
 
-  Widget _buildHeaderSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withOpacity(0.2),
-                  AppColors.secondary.withOpacity(0.2),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(
-              Icons.delivery_dining,
-              color: AppColors.primary,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'اختر مكان التوصيل',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Rubik',
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'حدد المكان المناسب لاستلام طلبك بسهولة',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                    fontFamily: 'Rubik',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Header extracted to GradientHeaderCard
 
   Widget _buildDeliveryOptions() {
     return Column(
       children: [
-        _buildDeliveryOption(
-          'home',
-          'التوصيل للمنزل',
-          'سيتم التوصيل إلى عنوان منزلك',
-          Icons.home_rounded,
-          AppColors.primary,
+        DeliveryOptionTile(
+          isSelected: selectedDeliveryType == 'home',
+          title: 'التوصيل للمنزل',
+          subtitle: 'سيتم التوصيل إلى عنوان منزلك',
+          icon: Icons.home_rounded,
+          accentColor: AppColors.primary,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => selectedDeliveryType = 'home');
+          },
         ),
         const SizedBox(height: 16),
 
-        _buildDeliveryOption(
-          'custom',
-          'مكان محدد',
-          'حدد عنوان مخصص للتوصيل',
-          Icons.location_on_rounded,
-          AppColors.secondary,
+        DeliveryOptionTile(
+          isSelected: selectedDeliveryType == 'custom',
+          title: 'مكان محدد',
+          subtitle: 'حدد عنوان مخصص للتوصيل',
+          icon: Icons.location_on_rounded,
+          accentColor: AppColors.secondary,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => selectedDeliveryType = 'custom');
+          },
         ),
         const SizedBox(height: 16),
 
-        _buildDeliveryOption(
-          'mosque',
-          'المسجد',
-          'التوصيل للمسجد القريب',
-          Icons.place_rounded,
-          const Color(0xFF4CAF50),
+        DeliveryOptionTile(
+          isSelected: selectedDeliveryType == 'mosque',
+          title: 'المسجد',
+          subtitle: 'التوصيل للمسجد القريب',
+          icon: Icons.place_rounded,
+          accentColor: const Color(0xFF4CAF50),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => selectedDeliveryType = 'mosque');
+          },
         ),
       ],
     );
   }
 
-  Widget _buildDeliveryOption(
-    String value,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color accentColor,
-  ) {
-    final isSelected = selectedDeliveryType == value;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        setState(() {
-          selectedDeliveryType = value;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? accentColor : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? accentColor.withOpacity(0.2)
-                  : Colors.black.withOpacity(0.04),
-              blurRadius: isSelected ? 20 : 10,
-              offset: const Offset(0, 8),
-              spreadRadius: isSelected ? 0 : -2,
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: 55,
-                height: 55,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? accentColor.withOpacity(0.15)
-                      : AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  icon,
-                  color: isSelected ? accentColor : AppColors.textSecondary,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Rubik',
-                        color: isSelected ? accentColor : AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                        fontFamily: 'Rubik',
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              AnimatedScale(
-                scale: isSelected ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.elasticOut,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: accentColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check, color: Colors.white, size: 16),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // Delivery option extracted to DeliveryOptionTile
 
   Widget _buildAddressInput() {
     return AnimatedContainer(

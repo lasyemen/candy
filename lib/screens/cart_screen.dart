@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
-import '../core/models/cart_item.dart';
+import '../core/services/cart_service.dart';
+import '../core/services/cart_cache_manager.dart';
+// import '../models/cart.dart';
+import '../models/cart_item.dart';
+
 import '../widgets/riyal_icon.dart';
+import '../core/services/customer_session.dart';
 import 'delivery_location_screen.dart';
+import 'guest_user_input_screen.dart';
+import 'signup_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -15,18 +24,32 @@ class CartScreen extends StatefulWidget {
   State<CartScreen> createState() => _CartScreenState();
 }
 
-class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
+class _CartScreenState extends State<CartScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _animationController;
   late AnimationController _listAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late List<Animation<Offset>> _itemAnimations = [];
+  late List<Animation<double>> _itemFadeAnimations = [];
+  late List<Animation<double>> _itemScaleAnimations = [];
+  bool _showSummaryCard = false;
+  List<Map<String, dynamic>> _cartItemsWithProducts = [];
+  bool _animationsInitialized = false;
+  bool _isFirstLoad = true;
+  bool _isLoading = false;
+  bool _hasLoadedOnce = false;
+  Timer? _reloadDebounce;
+
+  // State preservation is now handled by CartCacheManager
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
     _listAnimationController = AnimationController(
@@ -37,86 +60,790 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.4, curve: Curves.easeOutQuart),
       ),
     );
 
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _animationController,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+            curve: const Interval(0.1, 0.6, curve: Curves.easeOutQuart),
           ),
         );
 
     _animationController.forward();
+
+    // Load cart data on init - use cached data if available and valid
+    _loadCartData();
+
+    _animationsInitialized = true;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     _listAnimationController.dispose();
+    _reloadDebounce?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && _animationsInitialized) {
+      // Don't reload cart data when app resumes - preserve state
+    }
+  }
+
+  // Listen to app bloc changes
+  void _onAppBlocChanged(AppBloc appBloc) {
+    // Refresh cart data when cart item count changes
+    if (appBloc.cartItemCount != _cartItemsWithProducts.length) {
+      if (kDebugMode) {
+        print(
+          'CartScreen - App bloc cart count changed: ${appBloc.cartItemCount}',
+        );
+      }
+      _debouncedReload(forceRefresh: true);
+    }
+  }
+
+  void _debouncedReload({bool forceRefresh = false}) {
+    _reloadDebounce?.cancel();
+    _reloadDebounce = Timer(const Duration(milliseconds: 200), () {
+      _loadCartData(forceRefresh: forceRefresh);
+    });
+  }
+
+  // Method to manually refresh cart data
+  Future<void> _refreshCartData() async {
+    if (_isLoading) return;
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      await _loadCartData(forceRefresh: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _triggerItemAnimations() {
+    if (_cartItemsWithProducts.isNotEmpty) {
+      _initializeItemAnimations(_cartItemsWithProducts.length);
+    }
   }
 
   void _initializeItemAnimations(int itemCount) {
     _itemAnimations.clear();
+    _itemFadeAnimations.clear();
+    _itemScaleAnimations.clear();
+
     for (int i = 0; i < itemCount; i++) {
+      // Slide animation
       _itemAnimations.add(
         Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _listAnimationController,
             curve: Interval(
-              i * 0.1,
-              0.5 + (i * 0.1),
+              i * 0.12,
+              0.4 + (i * 0.12),
+              curve: Curves.easeOutCubic,
+            ),
+          ),
+        ),
+      );
+
+      // Fade animation
+      _itemFadeAnimations.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _listAnimationController,
+            curve: Interval(
+              i * 0.12,
+              0.4 + (i * 0.12),
+              curve: Curves.easeOutCubic,
+            ),
+          ),
+        ),
+      );
+
+      // Scale animation
+      _itemScaleAnimations.add(
+        Tween<double>(begin: 0.8, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _listAnimationController,
+            curve: Interval(
+              i * 0.12,
+              0.4 + (i * 0.12),
               curve: Curves.easeOutCubic,
             ),
           ),
         ),
       );
     }
-    _listAnimationController.forward();
-  }
 
-  void _updateQuantity(String productId, int newQuantity) {
-    final appBloc = context.read<AppBloc>();
-    HapticFeedback.lightImpact();
-
-    if (newQuantity <= 0) {
-      appBloc.add(RemoveFromCartEvent(productId));
-    } else {
-      appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+    if (_isFirstLoad || _cartItemsWithProducts.length != itemCount) {
+      _listAnimationController.reset();
+      _listAnimationController.forward();
+      _isFirstLoad = false;
     }
   }
 
-  void _removeItem(String productId) {
+  void _updateQuantity(String itemId, int newQuantity) async {
     final appBloc = context.read<AppBloc>();
-    HapticFeedback.mediumImpact();
-    appBloc.add(RemoveFromCartEvent(productId));
+    HapticFeedback.lightImpact();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
-            const SizedBox(width: 12),
-            Text(
-              'تم حذف المنتج من السلة',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontWeight: FontWeight.w500,
+    print('=== UPDATE QUANTITY DEBUG ===');
+    print(
+      '_updateQuantity called with itemId: $itemId, newQuantity: $newQuantity',
+    );
+    print('Current cart items count: ${_cartItemsWithProducts.length}');
+
+    if (itemId.isEmpty || itemId == 'null') {
+      print('Error: Invalid item ID provided');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: معرف المنتج غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      if (itemId.startsWith('temp_')) {
+        print('Handling temporary item ID: $itemId');
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['product_id']?.toString() == itemId.split('_')[1] ||
+              item['id']?.toString() == itemId,
+        );
+
+        print('Found item at index: $itemIndex');
+
+        if (itemIndex != -1) {
+          final actualItem = _cartItemsWithProducts[itemIndex];
+          final actualItemId =
+              actualItem['id']?.toString() ??
+              actualItem['product_id']?.toString() ??
+              itemId;
+          final productId = actualItem['product_id']?.toString() ?? itemId;
+
+          print('Actual item ID: $actualItemId');
+          print('Product ID: $productId');
+
+          if (newQuantity <= 0) {
+            print('Removing item with quantity <= 0');
+            await CartManager.instance.removeProduct(actualItemId);
+            appBloc.add(RemoveFromCartEvent(productId));
+          } else {
+            print('Updating quantity to: $newQuantity');
+            await CartManager.instance.updateQuantity(
+              actualItemId,
+              newQuantity,
+            );
+            appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+          }
+        } else {
+          throw Exception('Item not found in cart');
+        }
+      } else {
+        print('Handling regular item ID: $itemId');
+
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) => item['id']?.toString() == itemId,
+        );
+
+        print('Found item at index: $itemIndex');
+
+        String productId = itemId;
+        if (itemIndex != -1) {
+          productId =
+              _cartItemsWithProducts[itemIndex]['product_id']?.toString() ??
+              itemId;
+          print('Product ID found: $productId');
+        } else {
+          print('Item not found in cart items, using itemId as productId');
+        }
+
+        await CartManager.instance.updateQuantity(itemId, newQuantity);
+        print('CartManager updateQuantity completed successfully');
+
+        if (newQuantity <= 0) {
+          print('Removing item from app bloc');
+          appBloc.add(RemoveFromCartEvent(productId));
+        } else {
+          print('Updating item quantity in app bloc');
+          appBloc.add(UpdateCartItemQuantityEvent(productId, newQuantity));
+        }
+      }
+
+      // Update local state immediately for better UX
+      _updateLocalCartState(itemId, newQuantity);
+
+      // Schedule a lightweight refresh (do not block UI)
+      _debouncedReload();
+      print('=== UPDATE QUANTITY SUCCESS ===');
+    } catch (e) {
+      print('=== UPDATE QUANTITY ERROR ===');
+      print('Error updating quantity: $e');
+      print('Error type: ${e.runtimeType}');
+      print('Stack trace: ${StackTrace.current}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحديث الكمية: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  // Update local cart state immediately for better UX
+  void _updateLocalCartState(String itemId, int newQuantity) {
+    if (mounted) {
+      setState(() {
+        if (newQuantity <= 0) {
+          // Remove item
+          _cartItemsWithProducts.removeWhere(
+            (item) =>
+                item['id']?.toString() == itemId ||
+                item['product_id']?.toString() == itemId,
+          );
+        } else {
+          // Update quantity
+          final itemIndex = _cartItemsWithProducts.indexWhere(
+            (item) =>
+                item['id']?.toString() == itemId ||
+                item['product_id']?.toString() == itemId,
+          );
+          if (itemIndex != -1) {
+            _cartItemsWithProducts[itemIndex]['quantity'] = newQuantity;
+          }
+        }
+      });
+    }
+
+    // Update cache asynchronously
+    _updateCartCache();
+  }
+
+  // Update cart cache with current state
+  Future<void> _updateCartCache() async {
+    await CartCacheManager.instance.updateCache(_cartItemsWithProducts);
+  }
+
+  // Check if cached data is still valid
+  Future<bool> _isCacheValid() async {
+    return await CartCacheManager.instance.isCacheValid();
+  }
+
+  // Invalidate cache when items are added from other screens
+  static Future<void> invalidateCache() async {
+    await CartCacheManager.instance.invalidateCache();
+  }
+
+  // Clear cache completely
+  static Future<void> clearCache() async {
+    await CartCacheManager.instance.clearCache();
+  }
+
+  Future<void> _loadCartData({bool forceRefresh = false}) async {
+    if (_isLoading && !forceRefresh) return;
+
+    // Use cached data if available and valid, unless force refresh is requested
+    if (!forceRefresh) {
+      final isCacheValid = await _isCacheValid();
+      final cachedItems = await CartCacheManager.instance.getCachedCartItems();
+
+      if (isCacheValid && cachedItems.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _cartItemsWithProducts = cachedItems;
+            _hasLoadedOnce = true;
+            _isLoading = false;
+          });
+
+          if (_cartItemsWithProducts.isNotEmpty) {
+            _triggerItemAnimations();
+          }
+        }
+        return;
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      print('CartScreen - Loading cart data...');
+
+      // Check if still mounted before async operations
+      if (!mounted) return;
+
+      await CartService.initializeCartSession();
+
+      // Check if still mounted after first async operation
+      if (!mounted) return;
+
+      final cartSummary = await CartManager.instance.getCartSummary();
+      print('CartScreen - Cart summary: $cartSummary');
+      print(
+        'CartScreen - Items in summary: ${cartSummary['items']?.length ?? 0}',
+      );
+
+      if (mounted) {
+        final newCartItems = List<Map<String, dynamic>>.from(
+          cartSummary['items'] ?? [],
+        );
+
+        if (_cartItemsWithProducts.length != newCartItems.length ||
+            !_areCartItemsEqual(_cartItemsWithProducts, newCartItems)) {
+          if (mounted) {
+            setState(() {
+              _cartItemsWithProducts = newCartItems;
+              _hasLoadedOnce = true;
+              print(
+                'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items',
+              );
+
+              if (_cartItemsWithProducts.isNotEmpty) {
+                _triggerItemAnimations();
+              }
+
+              for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+                final item = _cartItemsWithProducts[i];
+                print(
+                  'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}',
+                );
+                print('CartScreen - Item $i structure: ${item.keys.toList()}');
+                print('CartScreen - Item $i ID: ${item['id']}');
+                print('CartScreen - Item $i product_id: ${item['product_id']}');
+              }
+            });
+
+            // Update cache with new data
+            if (mounted) {
+              await _updateCartCache();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('CartScreen - Error loading cart data: $e');
+
+      if (!_hasLoadedOnce && mounted) {
+        try {
+          await CartService.initializeCartSession();
+          final cartSummary = await CartManager.instance.getCartSummary();
+          if (mounted) {
+            setState(() {
+              _cartItemsWithProducts = List<Map<String, dynamic>>.from(
+                cartSummary['items'] ?? [],
+              );
+              _hasLoadedOnce = true;
+            });
+
+            // Update cache with fallback data
+            if (mounted) {
+              await _updateCartCache();
+            }
+          }
+        } catch (retryError) {
+          print('CartScreen - Error retrying cart data load: $retryError');
+          if (mounted) {
+            setState(() {
+              _hasLoadedOnce = true;
+            });
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.wifi_off, color: Colors.white, size: 16),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'لا يمكن تحميل السلة حالياً. تحقق من اتصالك بالإنترنت.',
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                margin: const EdgeInsets.all(20),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  bool _areCartItemsEqual(
+    List<Map<String, dynamic>> oldItems,
+    List<Map<String, dynamic>> newItems,
+  ) {
+    if (oldItems.length != newItems.length) return false;
+
+    for (int i = 0; i < oldItems.length; i++) {
+      final oldItem = oldItems[i];
+      final newItem = newItems[i];
+
+      if (oldItem['id'] != newItem['id'] ||
+          oldItem['quantity'] != newItem['quantity'] ||
+          oldItem['product_id'] != newItem['product_id']) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _resetCartState() {
+    if (mounted) {
+      setState(() {
+        _cartItemsWithProducts = [];
+        _hasLoadedOnce = false;
+        _isLoading = false;
+      });
+    }
+    _loadCartData();
+  }
+
+  void _debugCartState() {
+    print('=== CART STATE DEBUG ===');
+    print('Cart items count: ${_cartItemsWithProducts.length}');
+    print('Has loaded once: $_hasLoadedOnce');
+    print('Is loading: $_isLoading');
+    print('Is first load: $_isFirstLoad');
+    print('Animations initialized: $_animationsInitialized');
+    print('Show summary card: $_showSummaryCard');
+
+    for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+      final item = _cartItemsWithProducts[i];
+      print(
+        'Item $i: ID=${item['id']}, ProductID=${item['product_id']}, Quantity=${item['quantity']}',
+      );
+    }
+    print('=== END CART STATE DEBUG ===');
+  }
+
+  void _debugCartItemStructure() {
+    print('CartScreen - Debugging cart item structure:');
+    for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+      final item = _cartItemsWithProducts[i];
+      print('Item $i:');
+      print('  Keys: ${item.keys.toList()}');
+      print('  ID: ${item['id']} (type: ${item['id']?.runtimeType})');
+      print(
+        '  Product ID: ${item['product_id']} (type: ${item['product_id']?.runtimeType})',
+      );
+      print(
+        '  Quantity: ${item['quantity']} (type: ${item['quantity']?.runtimeType})',
+      );
+      if (item['products'] != null) {
+        print('  Product: ${item['products']}');
+      }
+      print('  ---');
+    }
+  }
+
+  void _showCartSummaryFromItems() {
+    if (mounted) {
+      setState(() {
+        _showSummaryCard = !_showSummaryCard;
+      });
+    }
+  }
+
+  void _showCartDetails(List<CartItem> cartItems, double cartTotal) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: DesignSystem.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: DesignSystem.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'تفاصيل السلة',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Items breakdown
+              ...cartItems
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'مياه ${item.productId}',
+                              style: TextStyle(
+                                fontFamily: 'Rubik',
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                '${item.quantity} × 5.00',
+                                style: TextStyle(
+                                  fontFamily: 'Rubik',
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const RiyalIcon(size: 12, color: Colors.grey),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              const Divider(height: 20),
+              // Total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المجموع الكلي',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        cartTotal.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: DesignSystem.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'إغلاق',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
-        ),
-        backgroundColor: const Color(0xFF059669),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        margin: const EdgeInsets.all(20),
-        elevation: 8,
-        duration: const Duration(seconds: 3),
-      ),
+        );
+      },
     );
+  }
+
+  void _removeItem(String itemId) async {
+    final appBloc = context.read<AppBloc>();
+    HapticFeedback.mediumImpact();
+
+    print('_removeItem called with itemId: $itemId');
+
+    if (itemId.isEmpty || itemId == 'null') {
+      print('Error: Invalid item ID provided for removal');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: معرف المنتج غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Update local state immediately for better UX
+      _updateLocalCartState(itemId, 0); // 0 quantity means remove
+
+      if (itemId.startsWith('temp_')) {
+        print('Handling temporary item ID for removal: $itemId');
+        final itemIndex = _cartItemsWithProducts.indexWhere(
+          (item) =>
+              item['product_id']?.toString() == itemId.split('_')[1] ||
+              item['id']?.toString() == itemId,
+        );
+
+        if (itemIndex != -1) {
+          final actualItem = _cartItemsWithProducts[itemIndex];
+          final actualItemId =
+              actualItem['id']?.toString() ??
+              actualItem['product_id']?.toString() ??
+              itemId;
+          final productId = actualItem['product_id']?.toString() ?? itemId;
+
+          await CartManager.instance.removeProduct(actualItemId);
+          appBloc.add(RemoveFromCartEvent(productId));
+        } else {
+          throw Exception('Item not found in cart for removal');
+        }
+      } else {
+        await CartManager.instance.removeProduct(itemId);
+        appBloc.add(RemoveFromCartEvent(itemId));
+      }
+
+      // Schedule a lightweight refresh (do not block UI)
+      _debouncedReload();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
+              const SizedBox(width: 12),
+              Text(
+                'تم حذف المنتج من السلة',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: const EdgeInsets.all(20),
+          elevation: 8,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      print('Error removing item: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في إزالة المنتج: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Load cart items with product details
+  Future<void> _loadCartItemsWithProducts(String cartId) async {
+    try {
+      final cartItemsWithProducts = await CartService.getCartItemsWithProducts(
+        cartId,
+      );
+      // Store the cart items with products for display
+      if (mounted) {
+        setState(() {
+          _cartItemsWithProducts = cartItemsWithProducts;
+        });
+      }
+    } catch (e) {
+      print('Error loading cart items with products: $e');
+    }
+  }
+
+  // Helper method to get product name
+  String _getProductName(String productId) {
+    final item = _cartItemsWithProducts.firstWhere(
+      (item) => item['product_id'] == productId,
+      orElse: () => {
+        'products': {'name': 'مياه كاندي'},
+      },
+    );
+    return item['products']?['name'] ?? 'مياه كاندي';
+  }
+
+  // Helper method to get product price
+  double _getProductPrice(String productId) {
+    final item = _cartItemsWithProducts.firstWhere(
+      (item) => item['product_id'] == productId,
+      orElse: () => {
+        'products': {'price': 5.0},
+      },
+    );
+    return (item['products']?['price'] ?? 5.0).toDouble();
   }
 
   void _clearCart() {
@@ -239,22 +966,27 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Debug cart state when screen is built
+    _debugCartState();
+
+    // Debug cart item structure when screen is built
+    if (_cartItemsWithProducts.isNotEmpty) {
+      _debugCartItemStructure();
+    }
+
     return Consumer<AppBloc>(
       builder: (context, appBloc, child) {
-        final cartItems = appBloc.cartItems;
-        final cartTotal = appBloc.cartTotal;
-
-        if (cartItems.isNotEmpty &&
-            _itemAnimations.length != cartItems.length) {
-          _initializeItemAnimations(cartItems.length);
-        }
+        // Listen to app bloc changes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _onAppBlocChanged(appBloc);
+        });
 
         return Scaffold(
-          backgroundColor: DesignSystem.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(80),
             child: AppBar(
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               elevation: 0,
               automaticallyImplyLeading: false,
               flexibleSpace: SafeArea(
@@ -265,20 +997,6 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          gradient: DesignSystem.getBrandGradient('primary'),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: DesignSystem.getBrandShadow('light'),
-                        ),
-                        child: Icon(
-                          FontAwesomeIcons.cartShopping,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,34 +1005,41 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                             Text(
                               'سلة التسوق',
                               style: DesignSystem.headlineSmall.copyWith(
-                                color: DesignSystem.textPrimary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : DesignSystem.textPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontFamily: 'Rubik',
                               ),
                             ),
-                            if (cartItems.isNotEmpty)
+                            if (_cartItemsWithProducts.isNotEmpty)
                               Text(
-                                '${cartItems.length} منتج',
+                                '${_cartItemsWithProducts.length} منتج',
                                 style: DesignSystem.bodySmall.copyWith(
-                                  color: DesignSystem.textSecondary,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : DesignSystem.textSecondary,
                                   fontFamily: 'Rubik',
                                 ),
                               ),
                           ],
                         ),
                       ),
-                      if (cartItems.isNotEmpty)
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: IconButton(
-                            onPressed: _clearCart,
-                            icon: Icon(
-                              FontAwesomeIcons.trash,
-                              color: Colors.red,
-                              size: 18,
+                      if (_cartItemsWithProducts.isNotEmpty)
+                        IconButton(
+                          onPressed: () => _showCartSummaryFromItems(),
+                          icon: ShaderMask(
+                            shaderCallback: (bounds) => DesignSystem
+                                .primaryGradient
+                                .createShader(bounds),
+                            child: Icon(
+                              Icons.receipt_long,
+                              color: Colors.white,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -324,13 +1049,20 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-          body: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: cartItems.isEmpty
-                  ? _buildEmptyCart()
-                  : _buildCartContent(cartItems, cartTotal),
+          body: RefreshIndicator(
+            onRefresh: () async {
+              await _refreshCartData();
+            },
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: _isLoading && !_hasLoadedOnce
+                    ? _buildLoadingState()
+                    : _cartItemsWithProducts.isEmpty
+                    ? _buildEmptyCart()
+                    : _buildCartContentFromItems(),
+              ),
             ),
           ),
         );
@@ -338,142 +1070,362 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildCartContent(List<CartItem> cartItems, double cartTotal) {
-    return Column(
+  Widget _buildCartContentFromItems() {
+    // Calculate total
+    double cartTotal = 0;
+    for (final item in _cartItemsWithProducts) {
+      final quantity = item['quantity'] as int;
+      final product = item['products'] as Map<String, dynamic>?;
+      if (product != null) {
+        final price = product['price'] as double? ?? 0.0;
+        cartTotal += quantity * price;
+      }
+    }
+
+    return Stack(
       children: [
-        // Cart Items List
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(20),
-            physics: const BouncingScrollPhysics(),
-            itemCount: cartItems.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final cartItem = cartItems[index];
-              return SlideTransition(
-                position:
-                    _itemAnimations.isNotEmpty && index < _itemAnimations.length
-                    ? _itemAnimations[index]
-                    : AlwaysStoppedAnimation(Offset.zero),
-                child: _buildCartItem(cartItem, index),
-              );
-            },
+        ListView.builder(
+          // Changed from ListView.separated for better performance
+          padding: const EdgeInsets.all(20),
+          physics: const BouncingScrollPhysics(),
+          cacheExtent: 800,
+          itemCount: _cartItemsWithProducts.length,
+          itemBuilder: (context, index) {
+            final cartItem = _cartItemsWithProducts[index];
+            return RepaintBoundary(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: index < _cartItemsWithProducts.length - 1 ? 16 : 0,
+                ),
+                child: SlideTransition(
+                  position:
+                      _itemAnimations.isNotEmpty &&
+                          index < _itemAnimations.length
+                      ? _itemAnimations[index]
+                      : AlwaysStoppedAnimation(Offset.zero),
+                  child: FadeTransition(
+                    opacity:
+                        _itemFadeAnimations.isNotEmpty &&
+                            index < _itemFadeAnimations.length
+                        ? _itemFadeAnimations[index]
+                        : AlwaysStoppedAnimation(1.0),
+                    child: ScaleTransition(
+                      scale:
+                          _itemScaleAnimations.isNotEmpty &&
+                              index < _itemScaleAnimations.length
+                          ? _itemScaleAnimations[index]
+                          : AlwaysStoppedAnimation(1.0),
+                      child: _buildCartItemFromMap(cartItem, index),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        // Floating total card with slide-up animation
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 200), // Faster animation
+          curve: Curves.easeOutQuart, // More responsive curve
+          bottom: _showSummaryCard ? 100 : -200, // Slide up from bottom
+          left: 10,
+          right: 10,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200), // Faster opacity
+            opacity: _showSummaryCard ? 1.0 : 0.0,
+            child: _buildSummaryCardContentFromItems(cartTotal),
           ),
         ),
+      ],
+    );
+  }
 
-        // Total Summary Card at Bottom
-        Container(
+  Widget _buildCartContent(List<CartItem> cartItems, double cartTotal) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      itemCount: cartItems.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final cartItem = cartItems[index];
+        return SlideTransition(
+          position: _itemAnimations.isNotEmpty && index < _itemAnimations.length
+              ? _itemAnimations[index]
+              : AlwaysStoppedAnimation(Offset.zero),
+          child: _buildCartItem(cartItem, index),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryCardContent(List<CartItem> cartItems, double cartTotal) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: Text(
+                'المجموع الكلي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${cartItems.length} منتج',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              cartTotal.toStringAsFixed(2),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Rubik',
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const RiyalIcon(size: 24, color: Colors.white),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
           width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            120,
-          ), // رفع عن الناف بار أكثر
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: DesignSystem.getBrandGradient('primary'),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: DesignSystem.primary.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, -4), // ظل للأعلى
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              HapticFeedback.mediumImpact();
+
+              // Check if user is a guest
+              if (CustomerSession.instance.isGuestUser) {
+                // Show guest user input screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const GuestUserInputScreen(deliveryData: {}),
+                  ),
+                );
+              } else {
+                // User is logged in, go directly to delivery location
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DeliveryLocationScreen(),
+                  ),
+                );
+              }
+            },
+            icon: Icon(FontAwesomeIcons.creditCard, size: 18),
+            label: ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: Text(
+                'المتابعة للدفع',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Rubik',
+                  color: Colors.white,
+                ),
               ),
-              BoxShadow(
-                color: DesignSystem.secondary.withOpacity(0.2),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: DesignSystem.primary,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ],
+              elevation: 0,
+              shadowColor: DesignSystem.secondary.withOpacity(0.3),
+            ),
           ),
-          child: Column(
+        ),
+      ],
+    );
+  }
+
+  void _showCartSummary(List<CartItem> cartItems, double cartTotal) {
+    if (_showSummaryCard) {
+      if (mounted) {
+        setState(() {
+          _showSummaryCard = false;
+        });
+      }
+    } else {
+      _showCartSummaryFromItems();
+    }
+  }
+
+  void _showSummaryOverlay(List<CartItem> cartItems, double cartTotal) {
+    final overlay = Overlay.of(context);
+    late final OverlayEntry overlayEntry;
+    bool isVisible = false;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => GestureDetector(
+        onTap: () {
+          // Dismiss when tapping anywhere
+          isVisible = false;
+          overlayEntry.markNeedsBuild();
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (overlayEntry.mounted) {
+              overlayEntry.remove();
+            }
+          });
+        },
+        child: Container(
+          color: Colors.transparent,
+          child: Stack(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'المجموع الكلي',
-                    style: DesignSystem.titleLarge.copyWith(
-                      color: Colors.white.withOpacity(0.9),
-                      fontFamily: 'Rubik',
-                      fontWeight: FontWeight.w500,
+              Positioned(
+                bottom: 120, // Position above the navigation bar
+                left: 20,
+                right: 20,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 0,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    transform: Matrix4.translationValues(
+                      0,
+                      isVisible ? 0 : 200, // Slide up from bottom
+                      0,
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${cartItems.length} منتج',
-                      style: DesignSystem.bodySmall.copyWith(
-                        color: Colors.white,
-                        fontFamily: 'Rubik',
-                        fontWeight: FontWeight.w500,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 250),
+                      opacity: isVisible ? 1.0 : 0.0,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        decoration: BoxDecoration(
+                          gradient: DesignSystem.getBrandGradient('primary'),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: const EdgeInsets.all(24),
+                        child: _buildSummaryCardContent(cartItems, cartTotal),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${cartTotal.toStringAsFixed(2)}',
-                    style: DesignSystem.displaySmall.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const RiyalIcon(size: 24, color: Colors.white),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const DeliveryLocationScreen(),
-                      ),
-                    );
-                  },
-                  icon: Icon(FontAwesomeIcons.creditCard, size: 18),
-                  label: Text(
-                    'المتابعة للدفع',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: DesignSystem.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                    shadowColor: DesignSystem.secondary.withOpacity(0.3),
                   ),
                 ),
               ),
             ],
           ),
         ),
-      ],
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    // Start appearing animation
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (overlayEntry.mounted) {
+        isVisible = true;
+        overlayEntry.markNeedsBuild();
+      }
+    });
+
+    // Auto remove after 5 seconds with disappearing animation
+    Future.delayed(const Duration(seconds: 5), () {
+      if (overlayEntry.mounted) {
+        isVisible = false;
+        overlayEntry.markNeedsBuild();
+
+        // Remove after animation completes
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        });
+      }
+    });
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    DesignSystem.surface,
+                    DesignSystem.surface.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(32),
+                boxShadow: [
+                  BoxShadow(
+                    color: DesignSystem.primary.withOpacity(0.1),
+                    blurRadius: 30,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: 80,
+                height: 80,
+                child: CircularProgressIndicator(
+                  strokeWidth: 4,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    DesignSystem.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'جاري تحميل السلة...',
+              style: DesignSystem.headlineMedium.copyWith(
+                color: DesignSystem.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Rubik',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'يرجى الانتظار بينما نقوم بتحميل محتويات سلة التسوق',
+              style: DesignSystem.bodyLarge.copyWith(
+                color: DesignSystem.textSecondary,
+                fontFamily: 'Rubik',
+                height: 1.6,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -579,12 +1531,391 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildCartItemFromMap(Map<String, dynamic> cartItem, int index) {
+    final product = cartItem['products'] as Map<String, dynamic>?;
+    final productName = product?['name'] ?? 'Product';
+    final productPrice = product?['price'] as double? ?? 0.0;
+    final productImage = product?['image_url'] as String?;
+    final quantity = cartItem['quantity'] as int;
+
+    // Improved item ID extraction with fallback
+    String itemId = '';
+    if (cartItem['id'] != null && cartItem['id'].toString().isNotEmpty) {
+      itemId = cartItem['id'].toString();
+    } else if (cartItem['product_id'] != null) {
+      // Use product_id as fallback for local items
+      itemId = cartItem['product_id'].toString();
+    } else {
+      // Generate a temporary ID if neither exists
+      itemId = 'temp_${index}_${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    print(
+      'Building cart item: itemId=$itemId, quantity=$quantity, productName=$productName',
+    );
+    print('Cart item structure: ${cartItem.keys.toList()}');
+
+    return AnimatedContainer(
+      // Added AnimatedContainer for smooth transitions
+      duration: const Duration(
+        milliseconds: 300,
+      ), // Slightly longer for smoother feel
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF121212)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Dismissible(
+        key: Key(itemId),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Icon(Icons.delete, color: Colors.white, size: 30),
+        ),
+        confirmDismiss: (direction) async {
+          return await showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(
+                  'حذف المنتج',
+                  style: TextStyle(
+                    fontFamily: 'Rubik',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                content: Text(
+                  'هل أنت متأكد من حذف هذا المنتج من السلة؟',
+                  style: TextStyle(fontFamily: 'Rubik'),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text(
+                      'إلغاء',
+                      style: TextStyle(fontFamily: 'Rubik', color: Colors.grey),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: Text(
+                      'حذف',
+                      style: TextStyle(
+                        fontFamily: 'Rubik',
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+        onDismissed: (direction) {
+          _removeItem(itemId);
+        },
+        child: Row(
+          children: [
+            // Product Image (kept in original place)
+            Container(
+              width: 85,
+              height: 85,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: productImage != null && productImage.isNotEmpty
+                    ? Image.network(
+                        productImage,
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              gradient: DesignSystem.getBrandGradient(
+                                'primary',
+                              ),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                FontAwesomeIcons.droplet,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: DesignSystem.getBrandGradient('primary'),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            FontAwesomeIcons.droplet,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+
+            const SizedBox(width: 20),
+
+            // Product Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    productName,
+                    style: DesignSystem.titleMedium.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : DesignSystem.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Rubik',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      ShaderMask(
+                        shaderCallback: (bounds) =>
+                            DesignSystem.primaryGradient.createShader(bounds),
+                        blendMode: BlendMode.srcIn,
+                        child: Text(
+                          productPrice.toStringAsFixed(2),
+                          style: DesignSystem.bodyLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Rubik',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      ShaderMask(
+                        shaderCallback: (bounds) =>
+                            DesignSystem.primaryGradient.createShader(bounds),
+                        blendMode: BlendMode.srcIn,
+                        child: const RiyalIcon(size: 14, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Quantity Controls on the right (which appears as left in RTL)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildQuantityButton(
+                  icon: Icons.remove,
+                  onPressed: () {
+                    print(
+                      'Decrease button pressed for item: $itemId, current quantity: $quantity',
+                    );
+                    print(
+                      'Item ID type: ${itemId.runtimeType}, value: "$itemId"',
+                    );
+                    _updateQuantity(itemId, quantity - 1);
+                  },
+                  isDecrease: true,
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    quantity.toString(),
+                    style: DesignSystem.bodyMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Rubik',
+                    ),
+                  ),
+                ),
+                _buildQuantityButton(
+                  icon: Icons.add,
+                  onPressed: () {
+                    print(
+                      'Increase button pressed for item: $itemId, current quantity: $quantity',
+                    );
+                    print(
+                      'Item ID type: ${itemId.runtimeType}, value: "$itemId"',
+                    );
+                    _updateQuantity(itemId, quantity + 1);
+                  },
+                  isDecrease: false,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCardContentFromItems(double cartTotal) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        gradient: DesignSystem.primaryGradient,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: DesignSystem.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'المجموع الكلي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${_cartItemsWithProducts.length} منتج',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Rubik',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                cartTotal.toStringAsFixed(2),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Rubik',
+                  fontSize: 24,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const RiyalIcon(size: 24, color: Colors.white),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: 160, // Further reduced width
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                HapticFeedback.mediumImpact();
+
+                // Check if user is a guest
+                if (CustomerSession.instance.isGuestUser) {
+                  // Navigate to sign-up screen for account creation
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SignUpScreen(),
+                    ),
+                  );
+                } else {
+                  // User is logged in, go directly to delivery location
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DeliveryLocationScreen(),
+                    ),
+                  );
+                }
+              },
+              icon: Icon(FontAwesomeIcons.creditCard, size: 18),
+              label: ShaderMask(
+                shaderCallback: (bounds) =>
+                    DesignSystem.primaryGradient.createShader(bounds),
+                child: Text(
+                  'المتابعة للدفع',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontFamily: 'Rubik',
+                  ),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: DesignSystem.primary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCartItem(CartItem cartItem, int index) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.06),
@@ -594,32 +1925,41 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Product Image
           Container(
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              gradient: DesignSystem.getBrandGradient('primary'),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: DesignSystem.primary.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: Center(
-              child: Icon(
-                FontAwesomeIcons.droplet,
-                color: Colors.white,
-                size: 28,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: DesignSystem.getBrandGradient('primary'),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Center(
+                  child: Icon(
+                    FontAwesomeIcons.droplet,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
               ),
             ),
           ),
 
-          const SizedBox(width: 20),
+          const SizedBox(width: 16),
 
           // Product Info
           Expanded(
@@ -627,55 +1967,61 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  cartItem.product.name,
+                  _getProductName(cartItem.productId),
                   style: DesignSystem.titleMedium.copyWith(
                     color: DesignSystem.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Rubik',
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text(
-                      '${cartItem.product.price.toStringAsFixed(2)}',
-                      style: DesignSystem.bodyLarge.copyWith(
-                        color: DesignSystem.primary,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Rubik',
+                    ShaderMask(
+                      shaderCallback: (bounds) =>
+                          DesignSystem.primaryGradient.createShader(bounds),
+                      blendMode: BlendMode.srcIn,
+                      child: Text(
+                        _getProductPrice(cartItem.productId).toStringAsFixed(2),
+                        style: DesignSystem.bodyLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Rubik',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const RiyalIcon(size: 14, color: DesignSystem.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      '/ الوحدة',
-                      style: DesignSystem.bodySmall.copyWith(
-                        color: DesignSystem.textSecondary,
-                        fontFamily: 'Rubik',
-                      ),
+                    ShaderMask(
+                      shaderCallback: (bounds) =>
+                          DesignSystem.primaryGradient.createShader(bounds),
+                      blendMode: BlendMode.srcIn,
+                      child: const RiyalIcon(size: 14, color: Colors.white),
                     ),
+                    const SizedBox(width: 8),
                   ],
                 ),
                 const SizedBox(height: 12),
 
                 // Quantity Controls
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildQuantityButton(
                       icon: Icons.remove,
                       onPressed: () => _updateQuantity(
-                        cartItem.product.id,
+                        cartItem.productId,
                         cartItem.quantity - 1,
                       ),
                       isDecrease: true,
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -697,7 +2043,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                     _buildQuantityButton(
                       icon: Icons.add,
                       onPressed: () => _updateQuantity(
-                        cartItem.product.id,
+                        cartItem.productId,
                         cartItem.quantity + 1,
                       ),
                       isDecrease: false,
@@ -708,30 +2054,31 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // Total Price & Remove
+          const SizedBox(width: 8),
+
+          // Total Price & Info
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                onPressed: () => _removeItem(cartItem.product.id),
+                onPressed: () => _showProductInfo(cartItem),
                 icon: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: DesignSystem.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    FontAwesomeIcons.trash,
-                    color: Colors.red,
-                    size: 16,
+                    Icons.info_outline,
+                    color: DesignSystem.primary,
+                    size: 14,
                   ),
                 ),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -739,21 +2086,28 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
                       DesignSystem.primary.withOpacity(0.1),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${cartItem.totalPrice.toStringAsFixed(2)}',
+                      '${(cartItem.quantity * 5.0).toStringAsFixed(2)}',
                       style: DesignSystem.labelLarge.copyWith(
-                        color: DesignSystem.primary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : DesignSystem.primary,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Rubik',
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const RiyalIcon(size: 12, color: DesignSystem.primary),
+                    const SizedBox(width: 2),
+                    RiyalIcon(
+                      size: 10,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : DesignSystem.primary,
+                    ),
                   ],
                 ),
               ),
@@ -769,34 +2123,216 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin {
     required VoidCallback onPressed,
     required bool isDecrease,
   }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          gradient: isDecrease
-              ? LinearGradient(
-                  colors: [
-                    DesignSystem.background,
-                    DesignSystem.background.withOpacity(0.8),
-                  ],
-                )
-              : DesignSystem.getBrandGradient('primary'),
-          borderRadius: BorderRadius.circular(12),
-          border: isDecrease
-              ? Border.all(
-                  color: DesignSystem.textSecondary.withOpacity(0.2),
-                  width: 1,
-                )
-              : null,
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: isDecrease ? DesignSystem.textSecondary : Colors.white,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () {
+            onPressed();
+          },
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: DesignSystem.getBrandGradient('primary'),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: DesignSystem.primary.withOpacity(0.28),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 14, color: Colors.white),
+          ),
         ),
       ),
+    );
+  }
+
+  void _showProductInfo(CartItem cartItem) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: DesignSystem.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: DesignSystem.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'تفاصيل المنتج',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Product Image
+              Center(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: DesignSystem.getBrandGradient('primary'),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DesignSystem.primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      FontAwesomeIcons.droplet,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Product Name
+              Text(
+                'مياه ${cartItem.productId}', // Using productId since we don't have product details
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Price
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'السعر:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        '5.00', // Mock price since we don't have product details
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: DesignSystem.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Quantity
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'الكمية المطلوبة:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Text(
+                    '${cartItem.quantity}',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: DesignSystem.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Total for this item
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المجموع:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        '${(cartItem.quantity * 5.0).toStringAsFixed(2)}', // Calculate total price
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: DesignSystem.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                'إغلاق',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

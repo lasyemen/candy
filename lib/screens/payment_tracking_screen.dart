@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/app_colors.dart';
-import '../core/constants/design_system.dart';
+// import '../core/constants/design_system.dart';
+import '../widgets/payment/payment_header.dart';
+import '../widgets/payment/order_summary_card.dart';
+import '../widgets/payment/payment_method.dart' as pm;
+import '../widgets/payment/payment_method_tile.dart';
 import '../widgets/navigation/navigation_wrapper.dart';
 
 class PaymentTrackingScreen extends StatefulWidget {
@@ -21,43 +25,43 @@ class _PaymentTrackingScreenState extends State<PaymentTrackingScreen>
 
   String? selectedPaymentMethod;
 
-  final List<PaymentMethod> paymentMethods = [
-    PaymentMethod(
+  final List<pm.PaymentMethod> paymentMethods = const [
+    pm.PaymentMethod(
       id: 'visa',
       name: 'فيزا',
       subtitle: 'الدفع بالبطاقة الائتمانية',
       icon: Icons.credit_card,
       color: const Color(0xFF1A1F71),
     ),
-    PaymentMethod(
+    pm.PaymentMethod(
       id: 'mastercard',
       name: 'ماستركارد',
       subtitle: 'الدفع بالبطاقة الائتمانية',
       icon: Icons.credit_card,
       color: const Color(0xFFEB001B),
     ),
-    PaymentMethod(
+    pm.PaymentMethod(
       id: 'mada',
       name: 'مدى',
       subtitle: 'البطاقة السعودية',
       icon: Icons.payment,
       color: const Color(0xFF00B4D8),
     ),
-    PaymentMethod(
+    pm.PaymentMethod(
       id: 'apple_pay',
       name: 'Apple Pay',
       subtitle: 'الدفع السريع والآمن',
       icon: Icons.phone_iphone,
       color: const Color(0xFF000000),
     ),
-    PaymentMethod(
+    pm.PaymentMethod(
       id: 'stc_pay',
       name: 'STC Pay',
       subtitle: 'محفظة إس تي سي الرقمية',
       icon: Icons.account_balance_wallet,
       color: const Color(0xFF663399),
     ),
-    PaymentMethod(
+    pm.PaymentMethod(
       id: 'cash',
       name: 'الدفع عند الاستلام',
       subtitle: 'ادفع نقداً عند التوصيل',
@@ -117,17 +121,12 @@ class _PaymentTrackingScreenState extends State<PaymentTrackingScreen>
           ),
         ),
         child: SafeArea(
-          child: AnimatedBuilder(
-            animation: _animationController,
-            builder: (context, child) {
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: _buildPaymentScreen(),
-                ),
-              );
-            },
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: _buildPaymentScreen(),
+            ),
           ),
         ),
       ),
@@ -151,137 +150,19 @@ class _PaymentTrackingScreenState extends State<PaymentTrackingScreen>
     );
   }
 
-  Widget _buildPaymentHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withOpacity(0.2),
-                  AppColors.secondary.withOpacity(0.2),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(
-              Icons.payment_rounded,
-              color: AppColors.primary,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'اختر طريقة الدفع',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Rubik',
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'اختر الطريقة المناسبة لإتمام عملية الدفع',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                    fontFamily: 'Rubik',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildPaymentHeader() => const GradientHeaderCard(
+    icon: Icons.payment_rounded,
+    title: 'اختر طريقة الدفع',
+    subtitle: 'اختر الطريقة المناسبة لإتمام عملية الدفع',
+  );
 
-  Widget _buildOrderSummary() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'ملخص الطلب',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Rubik',
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildSummaryRow('مكان التوصيل:', _getDeliveryLocationText()),
-          if (widget.deliveryData?['notes'] != null)
-            _buildSummaryRow('ملاحظات:', widget.deliveryData!['notes']),
-          const Divider(color: AppColors.surface, height: 24),
-          _buildSummaryRow('المبلغ الإجمالي:', '45.00 ريال', isTotal: true),
-        ],
-      ),
-    );
-  }
+  Widget _buildOrderSummary() => OrderSummaryCard(
+    deliveryLocationText: _getDeliveryLocationText(),
+    notes: widget.deliveryData?['notes'],
+    totalText: '45.00 ريال',
+  );
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: isTotal ? 16 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: isTotal ? AppColors.textPrimary : AppColors.textSecondary,
-              fontFamily: 'Rubik',
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: FontWeight.bold,
-              color: isTotal ? AppColors.primary : AppColors.textPrimary,
-              fontFamily: 'Rubik',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Summary row moved into OrderSummaryCard
 
   Widget _buildPaymentMethodsList() {
     return ListView.builder(
@@ -292,102 +173,16 @@ class _PaymentTrackingScreenState extends State<PaymentTrackingScreen>
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() {
-                selectedPaymentMethod = method.id;
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? method.color : Colors.transparent,
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isSelected
-                        ? method.color.withOpacity(0.2)
-                        : Colors.black.withOpacity(0.04),
-                    blurRadius: isSelected ? 15 : 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? method.color.withOpacity(0.1)
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        method.icon,
-                        color: isSelected
-                            ? method.color
-                            : AppColors.textSecondary,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            method.name,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Rubik',
-                              color: isSelected
-                                  ? method.color
-                                  : AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            method.subtitle,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontFamily: 'Rubik',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    AnimatedScale(
-                      scale: isSelected ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.elasticOut,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: method.color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          child: RepaintBoundary(
+            child: PaymentMethodTile(
+              method: method,
+              isSelected: isSelected,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  selectedPaymentMethod = method.id;
+                });
+              },
             ),
           ),
         );

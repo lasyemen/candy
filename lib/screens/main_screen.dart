@@ -8,7 +8,9 @@ import '../core/services/app_settings.dart';
 import '../core/constants/design_system.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+
+  const MainScreen({super.key, this.initialIndex = 2});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -16,6 +18,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   late PageController _pageController;
+  final PageStorageBucket _bucket = PageStorageBucket();
 
   final List<Widget> _screens = [
     const UserDashboard(), // My Account (index 0)
@@ -28,7 +31,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 2); // Start at home
+    _pageController = PageController(initialPage: widget.initialIndex);
+    // Ensure bloc index matches the initial page
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AppBloc>().add(SetCurrentIndexEvent(widget.initialIndex));
+      }
+    });
   }
 
   @override
@@ -71,28 +80,29 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         final isDarkMode = appSettings.isDarkMode;
 
         return Scaffold(
-          backgroundColor: isDarkMode
-              ? DesignSystem.darkBackground
-              : DesignSystem.background,
-          body: Stack(
-            children: [
-              // Page view with simplified logic
-              PageView(
-                controller: _pageController,
-                physics: const ClampingScrollPhysics(), // Better swiping feel
-                onPageChanged: (index) {
-                  // Only update bloc if different from current
-                  if (appBloc.currentIndex != index) {
-                    appBloc.add(SetCurrentIndexEvent(index));
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: PageStorage(
+            bucket: _bucket,
+            child: Stack(
+              children: [
+                // Page view with simplified logic
+                PageView(
+                  controller: _pageController,
+                  physics: const ClampingScrollPhysics(), // Better swiping feel
+                  onPageChanged: (index) {
+                    // Only update bloc if different from current
+                    if (appBloc.currentIndex != index) {
+                      appBloc.add(SetCurrentIndexEvent(index));
 
-                    // Add subtle haptic feedback
-                    HapticFeedback.selectionClick();
-                  }
-                },
-                children: _screens,
-              ),
-              CandyNavigationBar(onNavTap: _onNavTap),
-            ],
+                      // Add subtle haptic feedback
+                      HapticFeedback.selectionClick();
+                    }
+                  },
+                  children: _screens,
+                ),
+                CandyNavigationBar(onNavTap: _onNavTap),
+              ],
+            ),
           ),
         );
       },

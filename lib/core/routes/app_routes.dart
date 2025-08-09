@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../screens/index.dart';
+import '../../screens/product_details_screen.dart';
+import '../../models/products.dart';
 
 /// App Routes Configuration
 /// This file contains all the routes for the application
@@ -23,6 +25,7 @@ class AppRoutes {
   static const String healthTracker = '/health-tracker';
   static const String deliveryLocation = '/delivery-location';
   static const String paymentTracking = '/payment-tracking';
+  static const String productDetails = '/product-details';
 
   /// Get all routes for the application
   static Map<String, WidgetBuilder> getRoutes() {
@@ -53,7 +56,14 @@ class AppRoutes {
       },
 
       // Main Application Routes
-      main: (context) => const MainScreen(),
+      main: (context) {
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final initialIndex = (args != null && args['initialIndex'] is int)
+            ? args['initialIndex'] as int
+            : 2;
+        return MainScreen(initialIndex: initialIndex);
+      },
       home: (context) => const HomeScreen(),
       cart: (context) => const CartScreen(),
       orders: (context) => const MyOrdersScreen(),
@@ -66,6 +76,15 @@ class AppRoutes {
         final deliveryData =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         return PaymentTrackingScreen(deliveryData: deliveryData);
+      },
+
+      // Product Routes
+      productDetails: (context) {
+        final product = ModalRoute.of(context)?.settings.arguments as Products?;
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: ProductDetailsScreen(product: product!),
+        );
       },
     };
   }
@@ -110,5 +129,15 @@ class AppRoutes {
   /// Go back to a specific route
   static void goBackTo(BuildContext context, String routeName) {
     Navigator.popUntil(context, ModalRoute.withName(routeName));
+  }
+
+  /// Show product details as a bottom sheet
+  static void showProductDetails(BuildContext context, Products product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductDetailsScreen(product: product),
+    );
   }
 }

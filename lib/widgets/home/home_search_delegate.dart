@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../core/models/water_product.dart';
+import '../../models/index.dart';
 
-class HomeSearchDelegate extends SearchDelegate<WaterProduct?> {
-  final List<WaterProduct> allProducts;
-  final Function(WaterProduct) onProductTap;
+class HomeSearchDelegate extends SearchDelegate<Products?> {
+  final List<Products> allProducts;
+  final Function(Products) onProductTap;
 
   HomeSearchDelegate({required this.allProducts, required this.onProductTap})
     : super(
@@ -26,7 +26,9 @@ class HomeSearchDelegate extends SearchDelegate<WaterProduct?> {
             (p) => ListTile(
               title: Text(p.name),
               subtitle: Text('${p.price} ر.س'),
-              leading: Image.asset(p.image, width: 40),
+              leading: p.imageUrl != null
+                  ? Image.network(p.imageUrl!, width: 40)
+                  : const Icon(Icons.image),
               onTap: () {
                 onProductTap(p);
                 close(context, p);

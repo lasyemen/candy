@@ -8,14 +8,12 @@ class CartItemWidget extends StatelessWidget {
   final Map<String, dynamic> item;
   final int index;
   final Function(int) onQuantityChanged;
-  final VoidCallback onRemove;
 
   const CartItemWidget({
     super.key,
     required this.item,
     required this.index,
     required this.onQuantityChanged,
-    required this.onRemove,
   });
 
   @override
@@ -150,7 +148,7 @@ class CartItemWidget extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  onRemove();
+                  _showProductInfo(context);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -158,24 +156,26 @@ class CartItemWidget extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.red[50],
+                    color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red[200]!),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.delete_outline,
+                        Icons.info_outline,
                         size: 14,
-                        color: Colors.red[600],
+                        color: AppColors.primary,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'حذف',
+                        'تفاصيل',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.red[600],
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -187,6 +187,182 @@ class CartItemWidget extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showProductInfo(BuildContext context) {
+    final name = item['name'] as String;
+    final price = item['price'] as double;
+    final quantity = item['quantity'] as int;
+    final image = item['image'] as String;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'تفاصيل المنتج',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Product Image
+              Center(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    image: DecorationImage(
+                      image: AssetImage(image),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Product Name
+              Text(
+                name,
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Price
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'السعر:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        price.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Quantity
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'الكمية المطلوبة:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Text(
+                    '$quantity',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Total for this item
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المجموع:',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        (price * quantity).toStringAsFixed(2),
+                        style: TextStyle(
+                          fontFamily: 'Rubik',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const RiyalIcon(size: 16, color: Colors.orange),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                'إغلاق',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

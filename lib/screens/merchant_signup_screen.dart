@@ -112,27 +112,46 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              DesignSystem.primaryGradient.createShader(bounds),
-          child: const Text(
-            'تسجيل تاجر جديد',
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+        title: Builder(builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          if (isDark) {
+            return const Text(
+              'تسجيل تاجر جديد',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            );
+          }
+          return ShaderMask(
+            shaderCallback: (bounds) =>
+                DesignSystem.primaryGradient.createShader(bounds),
+            child: const Text(
+              'تسجيل تاجر جديد',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-          ),
-        ),
+          );
+        }),
         centerTitle: true,
       ),
       body: FadeTransition(
@@ -222,7 +241,9 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                         style: TextStyle(
                           fontFamily: 'Rubik',
                           fontSize: 20,
-                          color: Colors.black87,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black87,
                           height: 1.8,
                         ),
                       ),
@@ -242,7 +263,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -256,7 +281,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -276,11 +305,19 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Icon(
                                     Icons.store_outlined,
-                                    color: Colors.grey[600],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white60
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                                   border: InputBorder.none,
@@ -310,7 +347,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -324,7 +365,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -344,11 +389,19 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Icon(
                                     Icons.person_outline,
-                                    color: Colors.grey[600],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white60
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                                   border: InputBorder.none,
@@ -378,7 +431,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -392,7 +449,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -413,7 +474,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -442,7 +507,13 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                               style: TextStyle(
                                                 fontFamily: 'Rubik',
                                                 fontSize: 12,
-                                                color: Colors.grey[600],
+                                                color:
+                                                    Theme.of(
+                                                          context,
+                                                        ).brightness ==
+                                                        Brightness.dark
+                                                    ? Colors.white60
+                                                    : Colors.grey[600],
                                               ),
                                             ),
                                           ],
@@ -450,7 +521,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                       ),
                                       Icon(
                                         Icons.phone_outlined,
-                                        color: Colors.grey[600],
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white60
+                                            : Colors.grey[600],
                                         size: 20,
                                       ),
                                     ],
@@ -482,7 +557,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -496,7 +575,11 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -516,11 +599,19 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Icon(
                                     Icons.location_on_outlined,
-                                    color: Colors.grey[600],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white60
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                                   border: InputBorder.none,

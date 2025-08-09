@@ -4,11 +4,15 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'blocs/app_bloc.dart';
 import 'core/services/app_settings.dart';
+import 'core/services/supabase_service.dart';
+import 'core/services/cart_service.dart';
+import 'core/services/customer_session.dart';
+import 'core/services/guest_user_service.dart';
 import 'screens/index.dart';
-import 'core/constants/design_system.dart';
 import 'core/routes/index.dart';
+import 'core/theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -18,6 +22,16 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+
+  // Initialize Supabase
+  await SupabaseService.instance.initialize();
+
+  // Initialize cart session
+  await CartService.initializeCartSession();
+
+  // Load guest user data if available
+  await CustomerSession.instance.loadGuestUser();
+
   runApp(const MyApp());
 }
 
@@ -44,33 +58,9 @@ class MyApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              fontFamily: 'Rubik',
-              primarySwatch: Colors.purple,
-              scaffoldBackgroundColor: Colors.white,
-              appBarTheme: const AppBarTheme(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                iconTheme: IconThemeData(color: Colors.black87),
-                titleTextStyle: TextStyle(
-                  fontFamily: 'Rubik',
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              textTheme: const TextTheme(
-                bodyLarge: TextStyle(fontFamily: 'Rubik'),
-                bodyMedium: TextStyle(fontFamily: 'Rubik'),
-                bodySmall: TextStyle(fontFamily: 'Rubik'),
-                titleLarge: TextStyle(fontFamily: 'Rubik'),
-                titleMedium: TextStyle(fontFamily: 'Rubik'),
-                titleSmall: TextStyle(fontFamily: 'Rubik'),
-                labelLarge: TextStyle(fontFamily: 'Rubik'),
-                labelMedium: TextStyle(fontFamily: 'Rubik'),
-                labelSmall: TextStyle(fontFamily: 'Rubik'),
-              ),
-            ),
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: appSettings.currentTheme,
             builder: (context, child) {
               return Directionality(
                 textDirection: _getTextDirection(appSettings.currentLanguage),

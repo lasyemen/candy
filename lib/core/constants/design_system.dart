@@ -461,7 +461,7 @@ class DesignSystem {
             gradient: primaryGradient,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF6B46C1).withOpacity(0.1),
+                color: const Color(0xFF6B46C1).withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -646,7 +646,7 @@ class DesignSystem {
     List<BoxShadow>? shadows,
   }) {
     return BoxDecoration(
-      color: backgroundColor ?? surface.withOpacity(0.8),
+      color: backgroundColor ?? surface.withValues(alpha: 0.8),
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(color: borderColor ?? borderPrimary, width: 1.0),
       boxShadow: shadows ?? getBrandShadow('medium'),

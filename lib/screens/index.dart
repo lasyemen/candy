@@ -14,5 +14,7 @@ export 'signup_screen.dart';
 export 'merchant_signup_screen.dart';
 export 'merchant_documents_screen.dart';
 export 'merchant_approval_screen.dart';
+export 'product_details_screen.dart';
+export 'product_reviews_screen.dart';
 
 export 'otp_screen.dart';

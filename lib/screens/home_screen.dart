@@ -1,21 +1,24 @@
+// lib/screens/home_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
-import '../core/models/water_product.dart';
-import '../core/constants/app_colors.dart';
 import '../core/constants/design_system.dart';
-import '../core/constants/translations.dart';
+// import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
 import '../widgets/home/home_product_card_widget.dart';
 import '../widgets/home/home_search_delegate.dart';
-import '../widgets/home/home_components.dart';
+import '../models/index.dart';
+import '../core/services/product_service.dart';
+import '../core/services/ads_service.dart';
+import '../core/services/cart_service.dart'; // Added import for CartService
+import '../core/utils/home_utils.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,39 +27,60 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin<HomeScreen> {
   int _selectedCategory = 0;
-  bool _isGridView = true;
   int _currentBanner = 0;
   late PageController _bannerController;
   Timer? _bannerTimer;
+  Timer? _refreshTimer;
+  List<Products> _products = [];
+  List<Ads> _ads = [];
+  bool _isLoading = true;
+  bool _isLoadingAds = true;
 
-  final List<Map<String, dynamic>> _banners = [
-    {
-      'title': 'عرض خاص!',
-      'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
-      'image': 'assets/icon/iconApp.png',
-      'color': const Color(0xFF6B46C1),
-      'gradient': DesignSystem.primaryGradient, // Purple to Blue
-      'icon': Icons.local_offer,
-    },
-    {
-      'title': 'توصيل مجاني',
-      'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
-      'image': 'assets/icon/iconApp.png',
-      'color': const Color(0xFF6B46C1),
-      'gradient': DesignSystem.primaryGradient, // Purple to Blue
-      'icon': Icons.delivery_dining,
-    },
-    {
-      'title': 'مياه معدنية طبيعية',
-      'subtitle': 'جودة عالية مع معادن طبيعية مفيدة',
-      'image': 'assets/icon/iconApp.png',
-      'color': const Color(0xFF6B46C1),
-      'gradient': DesignSystem.primaryGradient, // Purple to Blue
-      'icon': Icons.water_drop,
-    },
-  ];
+  List<Map<String, dynamic>> get _banners {
+    print('Current ads count: ${_ads.length}'); // Debug log
+    print('Ads list: $_ads'); // Debug: show the actual ads list
+
+    if (_ads.isEmpty) {
+      print('No ads loaded, showing fallback banners');
+      // Fallback banners if no ads are loaded
+      return [
+        {
+          'title': 'عرض خاص!',
+          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+          'image': 'https://picsum.photos/400/200?random=fallback1',
+          'color': const Color(0xFF6B46C1),
+          'gradient': DesignSystem.primaryGradient,
+          'icon': Icons.local_offer,
+        },
+        {
+          'title': 'توصيل مجاني',
+          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
+          'image': 'https://picsum.photos/400/200?random=fallback2',
+          'color': const Color(0xFF6B46C1),
+          'gradient': DesignSystem.primaryGradient,
+          'icon': Icons.delivery_dining,
+        },
+      ];
+    }
+
+    print('Converting ${_ads.length} ads to banners');
+    // Convert ads to banner format
+    return _ads.map((ad) {
+      print('Processing ad: ID=${ad.id}, ImageURL=${ad.imageUrl}');
+      return {
+        'title': 'إعلان كاندي',
+        'subtitle': 'عرض خاص من كاندي',
+        'imageUrl': ad.imageUrl, // Use imageUrl key to match banner widget
+        'color': const Color(0xFF6B46C1),
+        'gradient': DesignSystem.primaryGradient,
+        'icon': Icons.local_offer,
+        'ad_id': ad.id, // Add ad ID for debugging
+      };
+    }).toList();
+  }
 
   final List<String> _categories = [
     'الكل',
@@ -64,8 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
     '200 مل',
     '500 مل',
     '1 لتر',
-    'معدنية',
-    'غازية',
   ];
 
   @override
@@ -78,247 +100,521 @@ class _HomeScreenState extends State<HomeScreen> {
         _bannerController.animateToPage(
           next,
           duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+          curve: Curves.easeInOut,
         );
+        setState(() {
+          _currentBanner = next;
+        });
       }
     });
+
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (mounted) {
+        _loadProducts(showLoading: false);
+        _loadAds();
+      }
+    });
+
+    // Test cart functionality on startup
+    _testCartFunctionality();
+
+    // Test database connection
+    ProductService.checkProductsTable();
+    ProductService.testDatabaseAccess();
+    ProductService.showCurrentProducts();
+
+    // Force populate products
+    ProductService.forcePopulateProducts();
+
+    // Test single product addition
+    ProductService.addSingleTestProduct();
+
+    // Load data with mounted checks
+    if (mounted) {
+      _loadProducts();
+      _loadAds();
+    }
+  }
+
+  // Test cart functionality
+  Future<void> _testCartFunctionality() async {
+    try {
+      print('HomeScreen - Cart functionality is ready');
+    } catch (e) {
+      print('HomeScreen - Cart functionality test failed: $e');
+    }
   }
 
   @override
   void dispose() {
     _bannerController.dispose();
     _bannerTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  List<WaterProduct> _getProducts(String language) {
-    return [
-      WaterProduct(
-        id: '1',
-        name: language == 'ar' ? 'كاندي ٣٣٠ مل' : 'Candy 330ml',
-        price: 21.84,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.5,
-        reviewCount: 120,
-        description: 'مياه نقية مع معادن طبيعية',
-        discount: 15.0,
-      ),
-      WaterProduct(
-        id: '2',
-        name: language == 'ar' ? 'كاندي ٢٠٠ مل' : 'Candy 200ml',
-        price: 21.84,
-        size: 200,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.8,
-        reviewCount: 95,
-        description: 'مياه نقية للاستخدام اليومي',
-      ),
-      WaterProduct(
-        id: '3',
-        name: language == 'ar' ? 'كاندي ٥٠٠ مل' : 'Candy 500ml',
-        price: 25.50,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.2,
-        reviewCount: 78,
-        description: 'مياه معدنية طبيعية',
-        discount: 20.0,
-      ),
-      WaterProduct(
-        id: '4',
-        name: language == 'ar' ? 'كاندي ١ لتر' : 'Candy 1L',
-        price: 30.00,
-        size: 1000,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.7,
-        reviewCount: 45,
-        description: 'مياه نقية للعائلة',
-      ),
-      WaterProduct(
-        id: '5',
-        name: language == 'ar' ? 'كاندي معدنية' : 'Candy Mineral',
-        price: 35.00,
-        size: 500,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.6,
-        reviewCount: 200,
-        description: 'مياه معدنية غنية بالمعادن',
-        discount: 10.0,
-      ),
-      WaterProduct(
-        id: '6',
-        name: language == 'ar' ? 'كاندي غازية' : 'Candy Sparkling',
-        price: 28.00,
-        size: 330,
-        image: 'assets/icon/iconApp.png',
-        rating: 4.9,
-        reviewCount: 67,
-        description: 'مياه غازية منعشة',
-      ),
-    ];
+  @override
+  bool get wantKeepAlive => true;
+
+  // Background refresh method that doesn't show loading
+  // ignore: unused_element
+  Future<void> _refreshDataSilently() async {
+    try {
+      // Refresh products silently
+      final products = await ProductService.fetchProducts();
+      if (mounted && products.length != _products.length) {
+        setState(() {
+          _products = products;
+        });
+        print('Silently refreshed ${products.length} products');
+      }
+
+      // Refresh ads silently
+      final ads = await AdsService.fetchAds();
+      if (mounted && ads.length != _ads.length) {
+        setState(() {
+          _ads = ads;
+        });
+        print('Silently refreshed ${ads.length} ads');
+      }
+    } catch (e) {
+      print('Silent refresh error: $e');
+      // Don't show error messages for background refreshes
+    }
   }
 
-  List<WaterProduct> _getFilteredProducts(String language) {
+  Future<void> _loadProducts({bool showLoading = true}) async {
+    try {
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+
+      print('HomeScreen - Loading products from database...');
+
+      // First, test database connection
+      print('HomeScreen - Testing database connection...');
+      final connectionTest = await ProductService.testConnection();
+      print('HomeScreen - Database connection test result: $connectionTest');
+
+      // Test database permissions
+      print('HomeScreen - Testing database permissions...');
+      final permissionsTest = await ProductService.testDatabasePermissions();
+      print('HomeScreen - Database permissions test result: $permissionsTest');
+
+      // Check if products table has data
+      final hasData = await ProductService.hasProducts();
+      print('HomeScreen - Products table has data: $hasData');
+
+      if (!hasData) {
+        print('HomeScreen - Products table is empty - adding sample products');
+        final added = await ProductService.addSampleProducts();
+        print('HomeScreen - Sample products added successfully: $added');
+        if (!added) {
+          print(
+            'HomeScreen - Regular sample products failed, trying force populate...',
+          );
+          final forceAdded = await ProductService.forcePopulateProducts();
+          print('HomeScreen - Force populate successful: $forceAdded');
+          if (!forceAdded) {
+            print('HomeScreen - Failed to add products');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+
+      final products = await ProductService.fetchProducts();
+
+      print('HomeScreen - Loaded ${products.length} products from database');
+      print(
+        'HomeScreen - Products list: ${products.map((p) => p.name).toList()}',
+      );
+
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _isLoading = false;
+        });
+        print('HomeScreen - Updated state with ${_products.length} products');
+      }
+    } catch (e) {
+      print('Error loading products from database: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        // Show error message only if it's not a background refresh
+        if (showLoading) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطأ في تحميل المنتجات: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+
+    // If no products loaded and no error, show empty state only on initial load
+    if (mounted && _products.isEmpty && !_isLoading && showLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا يوجد منتجات في قاعدة البيانات'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadAds() async {
+    try {
+      print('Loading ads from database...');
+      if (mounted) {
+        setState(() {
+          _isLoadingAds = true;
+        });
+      }
+
+      // First check if table exists
+      final tableExists = await AdsService.tableExists();
+      if (!tableExists) {
+        print('Ads table does not exist or is not accessible');
+        if (mounted) {
+          setState(() {
+            _isLoadingAds = false;
+          });
+        }
+        return;
+      }
+
+      // Check if table has data
+      final hasData = await AdsService.hasAds();
+      if (!hasData) {
+        print('Ads table is empty - adding sample ads');
+        final added = await AdsService.addSampleAds();
+        if (!added) {
+          print('Failed to add sample ads');
+          if (mounted) {
+            setState(() {
+              _isLoadingAds = false;
+            });
+          }
+          return;
+        }
+      }
+
+      final ads = await AdsService.fetchAds();
+      print('Loaded ${ads.length} ads from database');
+
+      if (mounted) {
+        setState(() {
+          _ads = ads;
+          _isLoadingAds = false;
+        });
+      }
+
+      print('Ads state updated, total ads: ${_ads.length}');
+
+      // Display ads information
+      if (_ads.isNotEmpty) {
+        print('=== DATABASE ADS INFORMATION ===');
+        for (int i = 0; i < _ads.length; i++) {
+          final ad = _ads[i];
+          print('Ad ${i + 1}:');
+          print('  ID: ${ad.id}');
+          print('  Image URL: ${ad.imageUrl}');
+          print('  Created: ${ad.createdAt}');
+          print('  Will be displayed as banner');
+          print('---');
+        }
+      } else {
+        print('No ads found in database - showing fallback banners');
+      }
+    } catch (e) {
+      print('Error loading ads from database: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingAds = false;
+        });
+      }
+    }
+  }
+
+  List<Products> _getProducts(String language) {
+    // Return products from Supabase, with fallback to static products
+    if (_products.isNotEmpty) {
+      print(
+        'HomeScreen - Returning ${_products.length} products from database',
+      );
+      return _products;
+    } else {
+      // Fallback to static products if database is empty
+      print('HomeScreen - Using fallback static products');
+      final staticProducts = HomeUtils.getProducts(language);
+      print('HomeScreen - Static products count: ${staticProducts.length}');
+      return staticProducts;
+    }
+  }
+
+  List<Products> _getFilteredProducts(String language) {
     final products = _getProducts(language);
     if (_selectedCategory == 0) return products;
     final cat = _categories[_selectedCategory];
     return products.where((p) => p.name.contains(cat)).toList();
   }
 
-  void _addToCart(WaterProduct product) {
+  void _addToCart(Products product) async {
     final appBloc = context.read<AppBloc>();
 
-    // Add haptic feedback
+    // Add haptic feedback immediately
     HapticFeedback.lightImpact();
 
-    // Add product to cart
+    // Optimistic UI update - show notification immediately
+    if (mounted) {
+      _showCartNotification(product);
+    }
+
+    // Update app bloc immediately for UI responsiveness
     appBloc.add(AddToCartEvent(product));
 
-    // Show success message with enhanced design
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Animate(
-                  effects: const [
-                    ScaleEffect(
-                      duration: Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                    ),
-                    ShakeEffect(duration: Duration(milliseconds: 300), hz: 3),
-                  ],
-                  child: Icon(
-                    FontAwesomeIcons.cartShopping,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'تم إضافة المنتج للسلة',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontFamily: 'Rubik',
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.name,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.9),
-                        fontFamily: 'Rubik',
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${product.price.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontFamily: 'Rubik',
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const RiyalIcon(size: 12, color: Colors.white),
-                  ],
-                ),
-              ),
-            ],
+    // Fire and forget cart addition (non-blocking)
+    _addToCartAsync(product);
+  }
+
+  // Non-blocking cart addition
+  void _addToCartAsync(Products product) async {
+    try {
+      // Add product to cart using CartManager (non-blocking)
+      await CartManager.instance.addProduct(product.id);
+      print('Successfully added ${product.name} to cart');
+    } catch (e) {
+      print('Error adding product to cart: $e');
+      // Show error message to user if there's an issue
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في إضافة المنتج إلى السلة: $e'),
+            backgroundColor: Colors.red,
           ),
-        ),
-        backgroundColor: DesignSystem.primary,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        margin: const EdgeInsets.all(16),
-        action: SnackBarAction(
-          label: 'عرض السلة',
-          textColor: Colors.white,
-          backgroundColor: Colors.white.withOpacity(0.2),
-          onPressed: () {
-            // Navigate to cart tab
-            appBloc.add(SetCurrentIndexEvent(3)); // Cart is index 3
-          },
+        );
+      }
+    }
+  }
+
+  // Show cart notification immediately
+  void _showCartNotification(Products product) {
+    if (!mounted) return;
+
+    print('Showing cart notification for: ${product.name}');
+
+    final overlay = Overlay.of(context);
+    late final OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: DesignSystem.primaryGradient,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Animate(
+                      effects: const [
+                        ScaleEffect(
+                          duration: Duration(milliseconds: 150),
+                          curve: Curves.easeOut,
+                        ),
+                        ShakeEffect(
+                          duration: Duration(milliseconds: 200),
+                          hz: 3,
+                        ),
+                      ],
+                      child: Icon(
+                        FontAwesomeIcons.cartShopping,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'تم إضافة المنتج للسلة',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: 'Rubik',
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          product.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.9),
+                            fontFamily: 'Rubik',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          product.price.toStringAsFixed(2),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: 'Rubik',
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const RiyalIcon(size: 12, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      print('View cart button tapped');
+                      overlayEntry.remove();
+                      context.read<AppBloc>().add(
+                        SetCurrentIndexEvent(3),
+                      ); // Cart is index 3
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        'عرض السلة',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontFamily: 'Rubik',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
-  }
 
-  String _getProductDescription(WaterProduct product) {
-    if (product.size == 330) return '١ كرتون - ٤٠ عبوة بلاستيك';
-    if (product.size == 200) return '١ كرتون - ٤٨ عبوة بلاستيك';
-    if (product.size == 500) return '١ كرتون - ٢٤ عبوة بلاستيك';
-    if (product.size == 1000) return '١ كرتون - ١٢ عبوة بلاستيك';
-    return '١ كرتون - ٢٠ عبوة بلاستيك';
+    overlay.insert(overlayEntry);
+
+    // Auto-remove after 2.5 seconds (faster than before)
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (overlayEntry.mounted) {
+        overlayEntry.remove();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Consumer<AppSettings>(
       builder: (context, appSettings, child) {
         final lang = appSettings.currentLanguage;
         final products = _getFilteredProducts(lang);
 
         return Scaffold(
-          backgroundColor: Colors.grey[50],
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
-            centerTitle: true,
-            title: ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return DesignSystem.getBrandGradient(
-                  'primary',
-                ).createShader(bounds);
+            centerTitle: false,
+            automaticallyImplyLeading: false,
+            title: Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                if (isDark) {
+                  return const Text(
+                    'مياه كاندي',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontFamily: 'Rubik',
+                    ),
+                  );
+                } else {
+                  return ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return DesignSystem.getBrandGradient(
+                        'primary',
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.srcIn,
+                    child: const Text(
+                      'مياه كاندي',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: Colors.white,
+                        fontFamily: 'Rubik',
+                      ),
+                    ),
+                  );
+                }
               },
-              blendMode: BlendMode.srcIn,
-              child: const Text(
-                'مياه كاندي',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Colors.white,
-                  fontFamily: 'Rubik',
-                ),
-              ),
             ),
             actions: [
               IconButton(
@@ -336,29 +632,38 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           body: CustomScrollView(
+            key: const PageStorageKey<String>('home_scroll'),
             physics: const BouncingScrollPhysics(),
             slivers: [
               // Banner carousel
               SliverToBoxAdapter(
                 child: Container(
-                  height: 220,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
+                  height: 230,
+                  margin: const EdgeInsets.only(
+                    left: 8,
+                    right: 8,
+                    top: 8,
+                    bottom: 24,
                   ),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
-                      PageView.builder(
-                        controller: _bannerController,
-                        onPageChanged: (idx) =>
-                            setState(() => _currentBanner = idx),
-                        itemCount: _banners.length,
-                        itemBuilder: (_, idx) =>
-                            _buildBannerItem(_banners[idx]),
-                      ),
+                      _isLoadingAds
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF6B46C1),
+                              ),
+                            )
+                          : PageView.builder(
+                              controller: _bannerController,
+                              onPageChanged: (idx) =>
+                                  setState(() => _currentBanner = idx),
+                              itemCount: _banners.length,
+                              itemBuilder: (_, idx) =>
+                                  _buildBannerItem(_banners[idx]),
+                            ),
                       Positioned(
-                        bottom: 12,
+                        bottom: 20,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -396,7 +701,160 @@ class _HomeScreenState extends State<HomeScreen> {
               // Categories
               SliverToBoxAdapter(
                 child: Container(
-                  height: 36,
+                  height: 0,
+                  margin: EdgeInsets.zero,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (context, idx) {
+                      final isSelected = _selectedCategory == idx;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        child: isSelected
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: DesignSystem.getBrandShadow(
+                                    'medium',
+                                  ),
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () =>
+                                        setState(() => _selectedCategory = idx),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      child: Text(
+                                        _categories[idx],
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1A1A1A)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
+                                      child:
+                                          (Theme.of(context).brightness ==
+                                              Brightness.dark)
+                                          ? Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                _categories[idx],
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            )
+                                          : Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                _categories[idx],
+                                                style: TextStyle(
+                                                  color:
+                                                      Theme.of(
+                                                            context,
+                                                          ).brightness ==
+                                                          Brightness.dark
+                                                      ? Colors.white
+                                                      : DesignSystem.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              // Extra space between categories and title (removed)
+              const SliverToBoxAdapter(child: SizedBox.shrink()),
+              // Toggle view label
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Text(
+                        'المنتجات',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Categories under title
+              SliverToBoxAdapter(
+                child: Container(
+                  height: 32,
                   margin: const EdgeInsets.symmetric(
                     vertical: 8,
                     horizontal: 14,
@@ -415,67 +873,22 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? Container(
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
-                                    colors: [
-                                      Color.fromARGB(
-                                        255,
-                                        179,
-                                        58,
-                                        255,
-                                      ), // Purple
-                                      Color.fromARGB(255, 23, 6, 212), // Blue
-                                    ],
                                   ),
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: DesignSystem.getBrandShadow(
                                     'medium',
                                   ),
                                 ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(20),
-                                    onTap: () =>
-                                        setState(() => _selectedCategory = idx),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      child: Text(
-                                        _categories[idx],
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Color.fromARGB(
-                                        255,
-                                        179,
-                                        58,
-                                        255,
-                                      ), // Purple
-                                      Color.fromARGB(255, 23, 6, 212), // Blue
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
                                 child: Container(
                                   margin: const EdgeInsets.all(1),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: Colors.transparent,
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                   child: Material(
@@ -485,40 +898,68 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onTap: () => setState(
                                         () => _selectedCategory = idx,
                                       ),
-                                      child: Container(
+                                      child: Padding(
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
+                                          horizontal: 10,
+                                          vertical: 4,
                                         ),
-                                        child: ShaderMask(
-                                          shaderCallback: (Rect bounds) {
-                                            return const LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Color.fromARGB(
-                                                  255,
-                                                  179,
-                                                  58,
-                                                  255,
-                                                ), // Purple
-                                                Color.fromARGB(
-                                                  255,
-                                                  23,
-                                                  6,
-                                                  212,
-                                                ), // Blue
-                                              ],
-                                            ).createShader(bounds);
-                                          },
-                                          blendMode: BlendMode.srcIn,
-                                          child: Text(
-                                            _categories[idx],
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
-                                            ),
+                                        child: Text(
+                                          _categories[idx],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1A1A1A)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          _categories[idx],
+                                          style: TextStyle(
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? Colors.white
+                                                : DesignSystem.primary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ),
@@ -528,23 +969,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                       );
                     },
-                  ),
-                ),
-              ),
-              // Toggle view
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'المنتجات',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -561,23 +985,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 179, 58, 255),
+                        Color.fromARGB(255, 23, 6, 212),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color.fromARGB(255, 179, 58, 255), // Purple
-                        Color.fromARGB(255, 23, 6, 212), // Blue
-                      ],
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withOpacity(0.3)),
                   ),
                   child: Row(
-                    children: [
+                    children: const [
                       Icon(Icons.info_outline, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         'الاسعار شاملة ضريبة القيمة المضافة',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
@@ -593,7 +1017,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   horizontal: 14,
                   vertical: 8,
                 ),
-                sliver: products.isEmpty
+                sliver: _isLoading
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(
+                                color: Color(0xFF6B46C1),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'جاري تحميل المنتجات...',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : products.isEmpty
                     ? SliverToBoxAdapter(
                         child: Center(
                           child: Column(
@@ -606,7 +1051,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 14),
                               const Text(
-                                "لا يوجد منتجات في هذا القسم حاليا.",
+                                "لا يوجد منتجات متاحة حالياً.",
                                 style: TextStyle(
                                   color: Color(0xFF6B46C1),
                                   fontSize: 16,
@@ -616,37 +1061,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       )
-                    : _isGridView
-                    ? SliverGrid(
+                    : SliverGrid(
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
-                              childAspectRatio: 0.65,
-                              crossAxisSpacing: 6,
-                              mainAxisSpacing: 8,
+                              childAspectRatio: 0.65, // taller cards
+                              crossAxisSpacing: 4, // reduced gap
+                              mainAxisSpacing: 10,
                             ),
                         delegate: SliverChildBuilderDelegate(
                           (context, idx) => HomeProductCardWidget(
                             product: products[idx],
                             onAddToCart: () => _addToCart(products[idx]),
-                            getProductDescription: _getProductDescription,
-                          ),
-                          childCount: products.length,
-                        ),
-                      )
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, idx) => Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: HomeProductCardWidget(
-                              product: products[idx],
-                              onAddToCart: () => _addToCart(products[idx]),
-                              getProductDescription: _getProductDescription,
-                            ),
                           ),
                           childCount: products.length,
                         ),
                       ),
+              ),
+              // Bottom padding to prevent navigation bar from covering last items
+              SliverToBoxAdapter(
+                child: Container(
+                  height:
+                      100, // Adjust this value based on your navigation bar height
+                ),
               ),
             ],
           ),
@@ -656,106 +1093,174 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBannerItem(Map<String, dynamic> banner) {
+    final imageUrl = banner['imageUrl'] as String?;
+    print('Building banner with image: $imageUrl');
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      print('No image URL found, using fallback');
+      return _buildBannerBackgroundImage('assets/icon/iconApp.png');
+    }
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(35),
-        gradient: banner['gradient'] as LinearGradient,
         boxShadow: [
+          // Main shadow - same as nav bar
           BoxShadow(
-            color: banner['color'].withOpacity(0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
             spreadRadius: 0,
           ),
+          // Border shadows - Top
           BoxShadow(
-            color: banner['color'].withOpacity(0.08),
-            blurRadius: 40,
-            offset: const Offset(0, 16),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, -1),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Bottom
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Left
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(-1, 0),
+            spreadRadius: 0,
+          ),
+          // Border shadows - Right
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(1, 0),
             spreadRadius: 0,
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.05),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          banner['icon'] ?? Icons.star,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          banner['title'] as String,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      banner['subtitle'] as String,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.3),
-                        Colors.white.withOpacity(0.1),
-                      ],
-                      center: Alignment.center,
-                      radius: 0.8,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Image.asset(
-                      banner['image'] as String,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      child: Container(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(35)),
+        clipBehavior: Clip.antiAlias,
+        child: _buildBannerBackgroundImage(imageUrl),
       ),
     );
+  }
+
+  Widget _buildBannerBackgroundImage(String? imageUrl) {
+    print('Building background image with URL: $imageUrl');
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      print('No image URL provided, using fallback');
+      return Image.asset(
+        'assets/icon/iconApp.png',
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, assetError, stackTrace) {
+          print('Error loading fallback asset image: $assetError');
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[300],
+            child: Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 60,
+                color: Colors.grey[600],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Check if it's a network image (starts with http or https)
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      print('Loading network image: $imageUrl');
+      return Image.network(
+        imageUrl,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading network background image: $error');
+          // Fallback to local asset if network fails
+          return Image.asset(
+            'assets/icon/iconApp.png',
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, assetError, stackTrace) {
+              print('Error loading fallback asset image: $assetError');
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.grey[300],
+                child: Center(
+                  child: Icon(
+                    Icons.image_not_supported,
+                    size: 60,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            print('Network image loaded successfully');
+            return child;
+          }
+          print(
+            'Loading network image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}',
+          );
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[200],
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                    : null,
+                strokeWidth: 3,
+                color: Colors.grey[600],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      // Local asset image
+      print('Loading asset image: $imageUrl');
+      return Image.asset(
+        imageUrl,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading asset background image: $error');
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[300],
+            child: Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 60,
+                color: Colors.grey[600],
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 }

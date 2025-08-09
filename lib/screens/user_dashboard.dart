@@ -6,7 +6,7 @@ import '../core/constants/translations.dart';
 import '../core/services/app_settings.dart';
 import '../core/constants/app_colors.dart';
 import '../widgets/candy_brand_components.dart';
-import 'myordrs.dart';
+import '../core/services/customer_session.dart';
 
 class UserDashboard extends StatefulWidget {
   const UserDashboard({super.key});
@@ -128,117 +128,21 @@ class _UserDashboardState extends State<UserDashboard>
     super.dispose();
   }
 
-  PreferredSizeWidget _buildCandyAppBar(String language) {
-    return AppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      title: Text(
-        'ملف كاندي الشخصي',
-        style: DesignSystem.headlineSmall.copyWith(
-          color: DesignSystem.textPrimary,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      centerTitle: true,
-      leading: Navigator.canPop(context)
-          ? IconButton(
-              icon: Icon(Icons.arrow_back_ios, color: AppColors.textPrimary),
-              onPressed: () => Navigator.pop(context),
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: Icon(Icons.edit_outlined, color: AppColors.textPrimary),
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _showEditProfile();
-          },
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<AppSettings>(
-      builder: (context, appSettings, child) {
-        final currentLanguage = appSettings.currentLanguage;
-
-        return Scaffold(
-          backgroundColor: appSettings.isDarkMode
-              ? DesignSystem.darkBackground
-              : DesignSystem.background,
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: appSettings.isDarkMode
-                  ? DesignSystem.getBrandGradient('primary')
-                  : LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.primary.withOpacity(0.1),
-                        AppColors.background,
-                        AppColors.background,
-                      ],
-                      stops: const [0.0, 0.3, 1.0],
-                    ),
-            ),
-            child: AnimatedBuilder(
-              animation: _animation,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(0, 30 * (1 - _animation.value)),
-                  child: Opacity(
-                    opacity: _animation.value,
-                    child: CustomScrollView(
-                      slivers: [
-                        _buildSliverAppBar(currentLanguage),
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                _buildProfileHeader(currentLanguage),
-                                const SizedBox(height: 24),
-                                _buildStatsSection(currentLanguage),
-                                const SizedBox(height: 20),
-                                _buildMenuSection(currentLanguage),
-                                const SizedBox(height: 20),
-                                _buildLogoutButton(currentLanguage),
-                                const SizedBox(height: 20),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildSliverAppBar(String language) {
     return SliverAppBar(
       expandedHeight: 120,
       floating: false,
       pinned: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: BoxDecoration(
-            gradient: DesignSystem.getBrandGradient('primary'),
-          ),
+          color: Theme.of(context).scaffoldBackgroundColor,
           child: Center(
             child: Text(
               AppTranslations.getText('profile_title', language),
               style: DesignSystem.headlineMedium.copyWith(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onBackground,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -247,7 +151,10 @@ class _UserDashboardState extends State<UserDashboard>
       ),
       leading: Navigator.canPop(context)
           ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+              icon: Icon(
+                Icons.arrow_back_ios,
+                color: Theme.of(context).colorScheme.onBackground,
+              ),
               onPressed: () => Navigator.pop(context),
             )
           : null,
@@ -255,6 +162,10 @@ class _UserDashboardState extends State<UserDashboard>
   }
 
   Widget _buildProfileHeader(String language) {
+    final isLoggedIn = CustomerSession.instance.isLoggedIn;
+    final displayName = CustomerSession.instance.customerName;
+    final displayPhone = CustomerSession.instance.currentCustomerPhone ?? '—';
+
     return CandyGlassmorphismCard(
       padding: const EdgeInsets.all(24),
       glassType: 'purple',
@@ -274,77 +185,136 @@ class _UserDashboardState extends State<UserDashboard>
                 height: 90,
                 child: Center(
                   child: Text(
-                    _user['avatar'],
+                    (displayName.isNotEmpty
+                            ? displayName.trim().substring(0, 1).toUpperCase()
+                            : '👤')
+                        .toString(),
                     style: const TextStyle(fontSize: 36),
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          // Name with improved styling
-          Text(
-            _user['name'],
-            style: DesignSystem.headlineMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
+          const SizedBox(height: 16),
+          // Name styled with gradient
+          ShaderMask(
+            shaderCallback: (bounds) =>
+                DesignSystem.primaryGradient.createShader(bounds),
+            blendMode: BlendMode.srcIn,
+            child: Text(
+              displayName,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Rubik',
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                color: Colors.white,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          // Email with icon
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.email_outlined,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _user['email'],
-                style: DesignSystem.bodyLarge.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Phone with icon
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.phone, size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                _user['phone'],
-                style: DesignSystem.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Member since with improved design
+          const SizedBox(height: 10),
+          // Phone as a soft pill
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: DesignSystem.getBrandGlassDecoration(
-              backgroundColor: AppColors.primary.withOpacity(0.1),
-              borderColor: AppColors.primary.withOpacity(0.3),
-              borderRadius: 25,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.textSecondary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.textSecondary.withOpacity(0.12),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.star, size: 16, color: AppColors.primary),
+                const Icon(
+                  Icons.phone,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isLoggedIn
+                      ? displayPhone
+                      : AppTranslations.getText('guest', language),
+                  style: DesignSystem.labelLarge.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Theme toggle
+          Builder(
+            builder: (context) {
+              final appSettings = context.watch<AppSettings>();
+              final isDark = appSettings.isDarkMode;
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(
+                    0.06,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.textSecondary.withOpacity(0.12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isDark ? Icons.dark_mode : Icons.light_mode,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isDark
+                          ? AppTranslations.getText('dark_mode', language)
+                          : AppTranslations.getText('light_mode', language),
+                      style: DesignSystem.labelLarge.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Switch(
+                      value: isDark,
+                      onChanged: (v) => context.read<AppSettings>().setTheme(
+                        v ? ThemeMode.dark : ThemeMode.light,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          // Member since / guest chip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: DesignSystem.getBrandGlassDecoration(
+              backgroundColor: AppColors.primary.withOpacity(0.08),
+              borderColor: AppColors.primary.withOpacity(0.25),
+              borderRadius: 20,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.star, size: 14, color: AppColors.primary),
                 const SizedBox(width: 8),
                 Text(
-                  AppTranslations.getText('member_since', language) +
-                      ' ${_user['joinDate']}',
+                  isLoggedIn
+                      ? AppTranslations.getText('member_since', language)
+                      : AppTranslations.getText('browse_as_guest', language),
                   style: DesignSystem.labelMedium.copyWith(
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -353,17 +323,6 @@ class _UserDashboardState extends State<UserDashboard>
         ],
       ),
     );
-  }
-
-  String _getThemeDisplayName(ThemeMode theme, String language) {
-    switch (theme) {
-      case ThemeMode.light:
-        return AppTranslations.getText('light_mode', language);
-      case ThemeMode.dark:
-        return AppTranslations.getText('dark_mode', language);
-      case ThemeMode.system:
-        return AppTranslations.getText('system', language);
-    }
   }
 
   void _showLanguageDialog(
@@ -923,9 +882,40 @@ class _UserDashboardState extends State<UserDashboard>
     ).showSnackBar(const SnackBar(content: Text('المساعدة والدعم')));
   }
 
-  void _showSettings() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('الإعدادات')));
+  @override
+  Widget build(BuildContext context) {
+    final appSettings = context.watch<AppSettings>();
+    final language = appSettings.currentLanguage;
+
+    return Scaffold(
+      backgroundColor: appSettings.isDarkMode
+          ? DesignSystem.darkBackground
+          : DesignSystem.background,
+      body: FadeTransition(
+        opacity: _animation,
+        child: CustomScrollView(
+          slivers: [
+            _buildSliverAppBar(language),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    _buildProfileHeader(language),
+                    const SizedBox(height: 24),
+                    _buildStatsSection(language),
+                    const SizedBox(height: 20),
+                    _buildMenuSection(language),
+                    const SizedBox(height: 20),
+                    _buildLogoutButton(language),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
