@@ -38,12 +38,10 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -61,7 +59,8 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -264,7 +263,8 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen>
                                 ),
                                 onPressed: () {
                                   setState(() {
-                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                    _obscureConfirmPassword =
+                                        !_obscureConfirmPassword;
                                   });
                                 },
                               ),
@@ -329,8 +329,9 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen>
                               Navigator.pop(context);
                             },
                             child: ShaderMask(
-                              shaderCallback: (bounds) =>
-                                  DesignSystem.primaryGradient.createShader(bounds),
+                              shaderCallback: (bounds) => DesignSystem
+                                  .primaryGradient
+                                  .createShader(bounds),
                               child: const Text(
                                 'تسجيل جديد',
                                 style: TextStyle(
@@ -354,4 +355,4 @@ class _CreatePasswordScreenState extends State<CreatePasswordScreen>
       ),
     );
   }
-} 
+}

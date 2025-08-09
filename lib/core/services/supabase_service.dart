@@ -47,17 +47,58 @@ class SupabaseService {
 
   // Database operations
   Future<List<Map<String, dynamic>>> fetchData(String table) async {
-    final response = await client.from(table).select();
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      print('SupabaseService - Fetching data from table: $table');
+      final response = await client.from(table).select();
+      print(
+        'SupabaseService - Fetched data successfully: ${response.length} records',
+      );
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('SupabaseService - Error fetching data from $table: $e');
+      print('SupabaseService - Error type: ${e.runtimeType}');
+      if (e is PostgrestException) {
+        print('SupabaseService - PostgrestException message: ${e.message}');
+        print('SupabaseService - PostgrestException details: ${e.details}');
+        print('SupabaseService - PostgrestException code: ${e.code}');
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>?> fetchById(String table, String id) async {
-    final response = await client.from(table).select().eq('id', id).single();
-    return response;
+    try {
+      print('SupabaseService - Fetching data from $table with ID: $id');
+      final response = await client.from(table).select().eq('id', id).single();
+      print('SupabaseService - Fetched data: $response');
+      return response;
+    } catch (e) {
+      print('SupabaseService - Error fetching data: $e');
+      print('SupabaseService - Error type: ${e.runtimeType}');
+      if (e is PostgrestException) {
+        print('SupabaseService - PostgrestException message: ${e.message}');
+        print('SupabaseService - PostgrestException details: ${e.details}');
+        print('SupabaseService - PostgrestException code: ${e.code}');
+      }
+      return null;
+    }
   }
 
   Future<void> insertData(String table, Map<String, dynamic> data) async {
-    await client.from(table).insert(data);
+    try {
+      print('SupabaseService - Inserting data into $table: $data');
+      final response = await client.from(table).insert(data).select();
+      print('SupabaseService - Data inserted successfully: $response');
+    } catch (e) {
+      print('SupabaseService - Error inserting data: $e');
+      print('SupabaseService - Error type: ${e.runtimeType}');
+      if (e is PostgrestException) {
+        print('SupabaseService - PostgrestException message: ${e.message}');
+        print('SupabaseService - PostgrestException details: ${e.details}');
+        print('SupabaseService - PostgrestException code: ${e.code}');
+      }
+      rethrow;
+    }
   }
 
   Future<void> updateData(
@@ -71,4 +112,4 @@ class SupabaseService {
   Future<void> deleteData(String table, String id) async {
     await client.from(table).delete().eq('id', id);
   }
-} 
+}

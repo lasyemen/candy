@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
+import '../star_rating.dart';
 
 class HomeProductCard extends StatefulWidget {
   final Products product;
@@ -173,10 +174,10 @@ class _HomeProductCardState extends State<HomeProductCard>
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber[600],
+                            StarRating(
+                              rating: product.rating,
+                              size: 16,
+                              readOnly: true,
                             ),
                             const SizedBox(width: 4),
                             Text(

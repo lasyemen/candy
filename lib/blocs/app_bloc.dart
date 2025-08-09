@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/cart.dart';
 import '../models/products.dart';
 import '../core/services/cart_service.dart';
+import '../core/services/customer_session.dart';
+import '../core/services/cart_cache_manager.dart';
 
 // Events
 abstract class AppEvent {}
@@ -66,7 +67,6 @@ class AppInitialState extends AppState {}
 class AppLoadedState extends AppState {
   final int currentIndex;
   final int cartItemCount;
-  final Cart? cart;
   final bool isLoading;
   final String? errorMessage;
   final bool isInitialized;
@@ -75,7 +75,6 @@ class AppLoadedState extends AppState {
   AppLoadedState({
     required this.currentIndex,
     required this.cartItemCount,
-    this.cart,
     required this.isLoading,
     this.errorMessage,
     required this.isInitialized,
@@ -85,7 +84,6 @@ class AppLoadedState extends AppState {
   AppLoadedState copyWith({
     int? currentIndex,
     int? cartItemCount,
-    Cart? cart,
     bool? isLoading,
     String? errorMessage,
     bool? isInitialized,
@@ -94,7 +92,6 @@ class AppLoadedState extends AppState {
     return AppLoadedState(
       currentIndex: currentIndex ?? this.currentIndex,
       cartItemCount: cartItemCount ?? this.cartItemCount,
-      cart: cart ?? this.cart,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
       isInitialized: isInitialized ?? this.isInitialized,
@@ -108,7 +105,6 @@ class AppBloc extends ChangeNotifier {
   AppState _state = AppLoadedState(
     currentIndex: 2, // Home is default
     cartItemCount: 0,
-    cart: null,
     isLoading: false,
     errorMessage: null,
     isInitialized: false,
@@ -210,49 +206,37 @@ class AppBloc extends ChangeNotifier {
         print('AppBloc - Adding to cart - Product ID: ${product.id}');
         print('AppBloc - Adding to cart - Product Name: ${product.name}');
 
-        // For now, we'll use a simple approach
-        // In a real app, you'd get the customer ID from user session
-        const customerId = 'temp-customer-id';
-
-        // Get or create cart
-        Cart? cart = currentState.cart;
-        if (cart == null) {
-          print('AppBloc - Creating new cart for customer: $customerId');
-          cart = await CartService.createCart(customerId);
-          print('AppBloc - New cart created with ID: ${cart.id}');
-        } else {
-          print('AppBloc - Using existing cart: ${cart.id}');
+        // Create basic guest user if not logged in and no guest user exists
+        if (!CustomerSession.instance.isLoggedIn &&
+            !CustomerSession.instance.isGuestUser) {
+          await CartService.createBasicGuestUser();
         }
 
-        // Add item to cart
-        print('AppBloc - Adding item to cart: ${cart.id}');
-        final cartItem = await CartService.addToCart(cart.id, product.id, 1);
-        print('AppBloc - Cart item added successfully: ${cartItem.id}');
+        // Cart is now managed by CartManager, no need to manually create it
+        print('AppBloc - Using CartManager for cart operations');
+
+        // Add item to cart using CartManager
+        print('AppBloc - Adding item to cart: ${product.id}');
+        await CartManager.instance.addProduct(product.id, quantity: 1);
+        print('AppBloc - Cart item added successfully');
+
+        // Invalidate cart cache to force refresh
+        await CartCacheManager.instance.invalidateCache();
+        print('AppBloc - Cart cache invalidated');
 
         // Refresh cart
         print('AppBloc - Refreshing cart data');
-        cart = await CartService.getCurrentCustomerCart();
+        final cartSummary = await CartManager.instance.getCartSummary();
         print(
-          'AppBloc - Cart items after refresh: ${cart?.items?.length ?? 0}',
+          'AppBloc - Cart items after refresh: ${cartSummary['itemCount'] ?? 0}',
         );
+        print('AppBloc - Cart summary: $cartSummary');
 
-        if (cart != null) {
-          print(
-            'AppBloc - Updating state with cart: ${cart.items?.length ?? 0} items',
-          );
-          _state = currentState.copyWith(
-            cart: cart,
-            cartItemCount: cart.items?.length ?? 0,
-          );
-          notifyListeners();
-          print('AppBloc - Cart updated successfully in state');
-        } else {
-          print('AppBloc - Warning: Cart is null after refresh');
-          _state = currentState.copyWith(
-            errorMessage: 'Failed to refresh cart data',
-          );
-          notifyListeners();
-        }
+        final itemCount = cartSummary['itemCount'] ?? 0;
+        print('AppBloc - Updating state with cart: $itemCount items');
+        _state = currentState.copyWith(cartItemCount: itemCount);
+        notifyListeners();
+        print('AppBloc - Cart updated successfully in state');
       } catch (e) {
         print('AppBloc - Error adding to cart: $e');
         _state = currentState.copyWith(
@@ -270,25 +254,27 @@ class AppBloc extends ChangeNotifier {
       final currentState = _state as AppLoadedState;
 
       try {
-        if (currentState.cart != null) {
-          // Find the cart item with this product ID and remove it
-          final items = currentState.cart!.items ?? [];
-          final itemToRemove = items.firstWhere(
-            (item) => item.productId == productId,
-            orElse: () => throw Exception('Item not found'),
-          );
+        // Get cart summary to find the item ID
+        final cartSummary = await CartManager.instance.getCartSummary();
+        final items = cartSummary['items'] as List<dynamic>? ?? [];
 
-          await CartService.removeFromCart(itemToRemove.id);
+        // Find the item with this product ID
+        final itemToRemove = items.firstWhere(
+          (item) => item['product_id'] == productId,
+          orElse: () => throw Exception('Item not found'),
+        );
 
-          // Refresh cart
-          final cart = await CartService.getCurrentCustomerCart();
+        await CartManager.instance.removeProduct(itemToRemove['id'].toString());
 
-          _state = currentState.copyWith(
-            cart: cart,
-            cartItemCount: cart?.items?.length ?? 0,
-          );
-          notifyListeners();
-        }
+        // Invalidate cart cache to force refresh
+        await CartCacheManager.instance.invalidateCache();
+
+        // Refresh cart
+        final updatedCartSummary = await CartManager.instance.getCartSummary();
+        final itemCount = updatedCartSummary['itemCount'] ?? 0;
+
+        _state = currentState.copyWith(cartItemCount: itemCount);
+        notifyListeners();
       } catch (e) {
         _state = currentState.copyWith(
           errorMessage: 'Error removing from cart: $e',
@@ -303,28 +289,36 @@ class AppBloc extends ChangeNotifier {
       final currentState = _state as AppLoadedState;
 
       try {
-        if (currentState.cart != null) {
-          final items = currentState.cart!.items ?? [];
-          final itemToUpdate = items.firstWhere(
-            (item) => item.productId == productId,
-            orElse: () => throw Exception('Item not found'),
+        // Get cart summary to find the item ID
+        final cartSummary = await CartManager.instance.getCartSummary();
+        final items = cartSummary['items'] as List<dynamic>? ?? [];
+
+        // Find the item with this product ID
+        final itemToUpdate = items.firstWhere(
+          (item) => item['product_id'] == productId,
+          orElse: () => throw Exception('Item not found'),
+        );
+
+        if (quantity <= 0) {
+          await CartManager.instance.removeProduct(
+            itemToUpdate['id'].toString(),
           );
-
-          if (quantity <= 0) {
-            await CartService.removeFromCart(itemToUpdate.id);
-          } else {
-            await CartService.updateCartItem(itemToUpdate.id, quantity);
-          }
-
-          // Refresh cart
-          final cart = await CartService.getCurrentCustomerCart();
-
-          _state = currentState.copyWith(
-            cart: cart,
-            cartItemCount: cart?.items?.length ?? 0,
+        } else {
+          await CartManager.instance.updateQuantity(
+            itemToUpdate['id'].toString(),
+            quantity,
           );
-          notifyListeners();
         }
+
+        // Invalidate cart cache to force refresh
+        await CartCacheManager.instance.invalidateCache();
+
+        // Refresh cart
+        final updatedCartSummary = await CartManager.instance.getCartSummary();
+        final itemCount = updatedCartSummary['itemCount'] ?? 0;
+
+        _state = currentState.copyWith(cartItemCount: itemCount);
+        notifyListeners();
       } catch (e) {
         _state = currentState.copyWith(errorMessage: 'Error updating cart: $e');
         notifyListeners();
@@ -337,12 +331,10 @@ class AppBloc extends ChangeNotifier {
       final currentState = _state as AppLoadedState;
 
       try {
-        if (currentState.cart != null) {
-          await CartService.clearCart(currentState.cart!.id);
+        await CartManager.instance.clearCart();
 
-          _state = currentState.copyWith(cart: null, cartItemCount: 0);
-          notifyListeners();
-        }
+        _state = currentState.copyWith(cartItemCount: 0);
+        notifyListeners();
       } catch (e) {
         _state = currentState.copyWith(errorMessage: 'Error clearing cart: $e');
         notifyListeners();
@@ -357,49 +349,23 @@ class AppBloc extends ChangeNotifier {
   // Convenience getters for backward compatibility
   int get currentIndex => (_state as AppLoadedState).currentIndex;
   int get cartItemCount => (_state as AppLoadedState).cartItemCount;
-  Cart? get cart => (_state as AppLoadedState).cart;
   bool get isLoading => (_state as AppLoadedState).isLoading;
   String? get errorMessage => (_state as AppLoadedState).errorMessage;
   bool get isInitialized => (_state as AppLoadedState).isInitialized;
   String get currentLanguage => (_state as AppLoadedState).currentLanguage;
 
-  // Cart utilities
+  // Cart utilities - These will be updated to use CartManager in the future
   double get cartTotal {
-    final currentCart = cart;
-    if (currentCart?.items == null) return 0;
-
-    double total = 0;
-    for (final item in currentCart!.items!) {
-      // Use a default price of 5.0 for now
-      // In a real app, you'd fetch product details to get the actual price
-      total += item.quantity * 5.0;
-    }
-    return total;
+    // TODO: Implement using CartManager.getCartSummary()
+    return 0.0;
   }
 
-  int get cartItemsCount => cart?.items?.length ?? 0;
+  int get cartItemsCount => cartItemCount;
 
   // Helper method to get cart items with product details for UI
   List<Map<String, dynamic>> get cartItemsWithDetails {
-    final currentCart = cart;
-    if (currentCart?.items == null) return [];
-
-    return currentCart!.items!.map((item) {
-      // Create a mock product for now
-      // In a real app, you'd fetch the actual product details
-      final mockProduct = {
-        'id': item.productId,
-        'name': 'مياه كاندي ${item.productId}', // Mock name
-        'price': 5.0, // Mock price
-      };
-
-      return {
-        'id': item.id,
-        'product': mockProduct,
-        'quantity': item.quantity,
-        'totalPrice': item.quantity * 5.0, // Mock calculation
-      };
-    }).toList();
+    // TODO: Implement using CartManager.getCartSummary()
+    return [];
   }
 
   @override

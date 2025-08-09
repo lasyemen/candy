@@ -71,75 +71,89 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(32),
-                      // Enhanced glassmorphism effect
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: Theme.of(context).brightness == Brightness.dark
-                            ? [
-                                Colors.black.withOpacity(0.6),
-                                Colors.black.withOpacity(0.95),
-                                Colors.black.withOpacity(0.95),
-                                Colors.black.withOpacity(0.6),
-                              ]
-                            : [
-                                Colors.white.withOpacity(0.7),
-                                Colors.white.withOpacity(1.0),
-                                Colors.white.withOpacity(1.0),
-                                Colors.white.withOpacity(0.7),
+                      // Dark: solid same color as cards; Light: soft gradient
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF1A1A1A)
+                          : null,
+                      gradient: Theme.of(context).brightness == Brightness.dark
+                          ? null
+                          : const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Color.fromARGB(179, 255, 255, 255),
+                                Color.fromARGB(255, 255, 255, 255),
                               ],
-                        stops: const [0.0, 0.3, 0.7, 1.0],
-                      ),
-                      boxShadow: [
-                        // Main shadow - reduced
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                          spreadRadius: 0,
-                        ),
-                        // Border shadows - Top - reduced
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 1,
-                          offset: const Offset(0, -1),
-                          spreadRadius: 0,
-                        ),
-                        // Border shadows - Bottom - reduced
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 1,
-                          offset: const Offset(0, 1),
-                          spreadRadius: 0,
-                        ),
-                        // Border shadows - Left - reduced
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 1,
-                          offset: const Offset(-1, 0),
-                          spreadRadius: 0,
-                        ),
-                        // Border shadows - Right - reduced
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 1,
-                          offset: const Offset(1, 0),
-                          spreadRadius: 0,
-                        ),
-                        // Edge highlights - reduced
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(-3, 0),
-                          spreadRadius: 0,
-                        ),
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(3, 0),
-                          spreadRadius: 0,
-                        ),
-                      ],
+                              stops: [0.0, 1.0],
+                            ),
+                      boxShadow: Theme.of(context).brightness == Brightness.dark
+                          ? [
+                              // Very light, subtle shadows in dark mode
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 6),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                                spreadRadius: 0,
+                              ),
+                              // Subtle top highlight for separation
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.02),
+                                blurRadius: 3,
+                                offset: const Offset(0, -2),
+                                spreadRadius: 0,
+                              ),
+                            ]
+                          : [
+                              // Light mode shadows (unchanged)
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 1,
+                                offset: const Offset(0, -1),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 1,
+                                offset: const Offset(0, 1),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 1,
+                                offset: const Offset(-1, 0),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 1,
+                                offset: const Offset(1, 0),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(-3, 0),
+                                spreadRadius: 0,
+                              ),
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(3, 0),
+                                spreadRadius: 0,
+                              ),
+                            ],
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(32),
@@ -258,15 +272,20 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                           scale: isActive ? 1.05 : 1.0,
                           duration: const Duration(milliseconds: 200),
                           curve: Curves.easeOutCubic,
-                          child: ShaderMask(
-                            shaderCallback: (Rect bounds) {
-                              return DesignSystem.primaryGradient.createShader(
-                                bounds,
-                              );
-                            },
-                            blendMode: BlendMode.srcIn,
-                            child: Icon(icon, color: Colors.white, size: 20),
-                          ),
+                          child: Theme.of(context).brightness == Brightness.dark
+                              ? Icon(icon, color: Colors.white, size: 20)
+                              : ShaderMask(
+                                  shaderCallback: (Rect bounds) {
+                                    return DesignSystem.primaryGradient
+                                        .createShader(bounds);
+                                  },
+                                  blendMode: BlendMode.srcIn,
+                                  child: Icon(
+                                    icon,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
                         )
                       : AnimatedScale(
                           scale: isActive ? 1.05 : 1.0,
@@ -276,7 +295,7 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                             icon,
                             color:
                                 Theme.of(context).brightness == Brightness.dark
-                                ? Colors.grey[500]
+                                ? Colors.white
                                 : Colors.grey[600],
                             size: 24,
                           ),
@@ -330,11 +349,9 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                 style: TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 10,
-                  color: isActive
-                      ? DesignSystem.primary
-                      : Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[500]
-                      : Colors.grey[600],
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : (isActive ? DesignSystem.primary : Colors.grey[600]),
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 ),
                 child: Text(label),

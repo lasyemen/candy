@@ -77,27 +77,46 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              DesignSystem.primaryGradient.createShader(bounds),
-          child: const Text(
-            'تسجيل تاجر جديد',
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+        title: Builder(builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          if (isDark) {
+            return const Text(
+              'تسجيل تاجر جديد',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            );
+          }
+          return ShaderMask(
+            shaderCallback: (bounds) =>
+                DesignSystem.primaryGradient.createShader(bounds),
+            child: const Text(
+              'تسجيل تاجر جديد',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-          ),
-        ),
+          );
+        }),
         centerTitle: true,
       ),
       body: FadeTransition(
@@ -149,7 +168,9 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                       style: TextStyle(
                         fontFamily: 'Rubik',
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.grey[600],
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -185,7 +206,9 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                       style: TextStyle(
                         fontFamily: 'Rubik',
                         fontSize: 20,
-                        color: Colors.black87,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black87,
                         height: 1.8,
                       ),
                     ),
@@ -197,7 +220,9 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF121212)
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.grey[200]!),
                       ),
@@ -210,7 +235,11 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                               fontFamily: 'Rubik',
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black87,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -246,7 +275,9 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF121212)
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.grey[200]!),
                       ),
@@ -289,7 +320,11 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                               style: TextStyle(
                                 fontFamily: 'Rubik',
                                 fontSize: 14,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -391,7 +426,9 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
               style: TextStyle(
                 fontFamily: 'Rubik',
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.grey[600],
               ),
             ),
           ),
@@ -405,7 +442,9 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                     style: TextStyle(
                       fontFamily: 'Rubik',
                       fontSize: 14,
-                      color: Colors.black87,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black87,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

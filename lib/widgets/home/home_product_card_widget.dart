@@ -58,258 +58,254 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-          margin: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              // Primary shadow - soft and diffused
-              BoxShadow(
-                color: const Color(0xFF6B46C1).withOpacity(0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-                spreadRadius: 0,
-              ),
-              // Secondary shadow - for depth
-              BoxShadow(
-                color: const Color(0xFF3B82F6).withOpacity(0.06),
-                blurRadius: 40,
-                offset: const Offset(0, 16),
-                spreadRadius: 0,
-              ),
-              // Inner glow effect
-              BoxShadow(
-                color: Colors.white.withOpacity(0.8),
-                blurRadius: 1,
-                offset: const Offset(0, 1),
-                spreadRadius: 0,
-              ),
-            ],
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withOpacity(0.95),
-                    Colors.white.withOpacity(0.85),
-                  ],
-                ),
+        ],
+      ),
+      child:
+          ClipRRect(
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(24),
-                elevation: 0,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    AppRoutes.showProductDetails(context, widget.product);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Product Image with Organic Shape
-                        Expanded(
-                          child: Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  const Color(0xFF6B46C1).withOpacity(0.1),
-                                  const Color(0xFF3B82F6).withOpacity(0.1),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.5),
-                                width: 1,
-                              ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: widget.product.imageUrl != null
-                                  ? Image.network(
-                                      widget.product.imageUrl!,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              width: double.infinity,
-                                              height: double.infinity,
-                                              color: Colors.grey[300],
-                                              child: const Icon(
-                                                Icons.image,
-                                                color: Colors.grey,
-                                              ),
-                                            );
-                                          },
-                                    )
-                                  : Container(
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                      color: Colors.grey[300],
-                                      child: const Icon(
-                                        Icons.image,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-
-                        // Product Info Section
-                        Column(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF121212) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                    elevation: 0,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        AppRoutes.showProductDetails(context, widget.product);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Product Name with Modern Typography
-                            Text(
-                              widget.product.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                                color: Color(0xFF1F2937),
-                                height: 1.3,
+                            // Product Image with Organic Shape
+                            Expanded(
+                              child: Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF1A1A1A)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: widget.product.imageUrl != null
+                                      ? Image.network(
+                                          widget.product.imageUrl!,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return Container(
+                                                  width: double.infinity,
+                                                  height: double.infinity,
+                                                  color: isDark
+                                                      ? const Color(0xFF222222)
+                                                      : Colors.grey[300],
+                                                  child: const Icon(
+                                                    Icons.image,
+                                                    color: Colors.grey,
+                                                  ),
+                                                );
+                                              },
+                                        )
+                                      : Container(
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          color: isDark
+                                              ? const Color(0xFF222222)
+                                              : Colors.grey[300],
+                                          child: const Icon(
+                                            Icons.image,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
 
-                            // Product Rating
-                            Row(
+                            // Product Info Section
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.star,
-                                  size: 14,
-                                  color: Colors.amber[600],
-                                ),
-                                const SizedBox(width: 4),
+                                // Product Name with Modern Typography
                                 Text(
-                                  _isLoadingRating
-                                      ? '...'
-                                      : '${_ratingSummary?.averageRating?.toStringAsFixed(1) ?? widget.product.rating}',
+                                  widget.product.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1F2937),
+                                    height: 1.3,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _isLoadingRating
-                                      ? '(0)'
-                                      : '(${_ratingSummary?.totalRatings ?? 0})',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
+                                const SizedBox(height: 4),
 
-                            // Price and Add to Cart Section
-                            Row(
-                              children: [
-                                // Price with Gradient Text
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      ShaderMask(
-                                        shaderCallback: (Rect bounds) {
-                                          return const LinearGradient(
-                                            colors: [
-                                              Color(0xFF6B46C1),
-                                              Color(0xFF3B82F6),
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ).createShader(bounds);
-                                        },
-                                        blendMode: BlendMode.srcIn,
-                                        child: Text(
-                                          widget.product.price.toStringAsFixed(
-                                            2,
+                                // Product Rating
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.star,
+                                      size: 14,
+                                      color: Colors.amber[600],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _isLoadingRating
+                                          ? '...'
+                                          : '${_ratingSummary?.averageRating?.toStringAsFixed(1) ?? widget.product.rating}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _isLoadingRating
+                                          ? '(0)'
+                                          : '(${_ratingSummary?.totalRatings ?? 0})',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Price and Add to Cart Section
+                                Row(
+                                  children: [
+                                    // Price with Gradient Text
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          ShaderMask(
+                                            shaderCallback: (Rect bounds) {
+                                              return const LinearGradient(
+                                                colors: [
+                                                  Color(0xFF6B46C1),
+                                                  Color(0xFF3B82F6),
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ).createShader(bounds);
+                                            },
+                                            blendMode: BlendMode.srcIn,
+                                            child: isDark
+                                                ? Text(
+                                                    widget.product.price
+                                                        .toStringAsFixed(2),
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 15,
+                                                      letterSpacing: -0.3,
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    widget.product.price
+                                                        .toStringAsFixed(2),
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 15,
+                                                      letterSpacing: -0.3,
+                                                    ),
+                                                  ),
                                           ),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 16,
-                                            letterSpacing: -0.3,
+                                          const SizedBox(width: 4),
+                                          const RiyalIcon(
+                                            size: 16,
+                                            color: Color(0xFF6B46C1),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+
+                                    // Modern Add to Cart Button
+                                    Container(
+                                      width: 48,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        gradient: DesignSystem.getBrandGradient(
+                                          'primary',
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: DesignSystem.getBrandShadow(
+                                          'medium',
+                                        ),
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        borderRadius: BorderRadius.circular(14),
+                                        elevation: 0,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            widget.onAddToCart();
+                                          },
+                                          child: const Center(
+                                            child: FaIcon(
+                                              FontAwesomeIcons.shoppingCart,
+                                              size: 16,
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
-                                      const RiyalIcon(
-                                        size: 16,
-                                        color: Color(0xFF6B46C1),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-
-                                // Modern Add to Cart Button
-                                Container(
-                                  width: 56,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    gradient: DesignSystem.getBrandGradient(
-                                      'primary',
                                     ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: DesignSystem.getBrandShadow(
-                                      'medium',
-                                    ),
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(16),
-                                      onTap: () {
-                                        HapticFeedback.lightImpact();
-                                        widget.onAddToCart();
-                                      },
-                                      child: const Center(
-                                        child: FaIcon(
-                                          FontAwesomeIcons.shoppingCart,
-                                          size: 18,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
+              )
+              .animate()
+              .fadeIn(duration: 600.ms, curve: Curves.easeOutCubic)
+              .slideY(
+                begin: 0.3,
+                end: 0,
+                duration: 600.ms,
+                curve: Curves.easeOutCubic,
               ),
-            ),
-          ),
-        )
-        .animate()
-        .fadeIn(duration: 250.ms, curve: Curves.easeOut)
-        .slideY(begin: 0.2, end: 0, duration: 250.ms, curve: Curves.easeOut);
+    );
   }
 }

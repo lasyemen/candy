@@ -74,7 +74,9 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF121212)
+                : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -99,7 +101,9 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                     fontFamily: 'Rubik',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
                   ),
                 ),
               ],
@@ -109,7 +113,9 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF1A1A1A)
+                        : Colors.grey[50],
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Column(
@@ -138,7 +144,10 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                             fontFamily: 'Rubik',
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black87,
                           ),
                         ),
                         subtitle: Text(
@@ -146,7 +155,10 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                           style: TextStyle(
                             fontFamily: 'Rubik',
                             fontSize: 11,
-                            color: Colors.grey[600],
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white70
+                                : Colors.grey[600],
                           ),
                         ),
                         onTap: () => Navigator.pop(context, 'gallery'),
@@ -176,7 +188,10 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                             fontFamily: 'Rubik',
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black87,
                           ),
                         ),
                         subtitle: Text(
@@ -184,7 +199,10 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                           style: TextStyle(
                             fontFamily: 'Rubik',
                             fontSize: 11,
-                            color: Colors.grey[600],
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white70
+                                : Colors.grey[600],
                           ),
                         ),
                         onTap: () => Navigator.pop(context, 'camera'),
@@ -214,7 +232,10 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                             fontFamily: 'Rubik',
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black87,
                           ),
                         ),
                         subtitle: Text(
@@ -222,7 +243,10 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                           style: TextStyle(
                             fontFamily: 'Rubik',
                             fontSize: 11,
-                            color: Colors.grey[600],
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white70
+                                : Colors.grey[600],
                           ),
                         ),
                         onTap: () => Navigator.pop(context, 'files'),
@@ -239,7 +263,9 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                   'إلغاء',
                   style: TextStyle(
                     fontFamily: 'Rubik',
-                    color: Colors.grey[600],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.grey[600],
                     fontSize: 13,
                   ),
                 ),
@@ -536,27 +562,46 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              DesignSystem.primaryGradient.createShader(bounds),
-          child: const Text(
-            'رفع المستندات',
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+        title: Builder(builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          if (isDark) {
+            return const Text(
+              'رفع المستندات',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            );
+          }
+          return ShaderMask(
+            shaderCallback: (bounds) =>
+                DesignSystem.primaryGradient.createShader(bounds),
+            child: const Text(
+              'رفع المستندات',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-          ),
-        ),
+          );
+        }),
         centerTitle: true,
       ),
       body: FadeTransition(

@@ -148,6 +148,29 @@ class CartService {
     }
   }
 
+  // Create a basic guest user if none exists
+  static Future<void> createBasicGuestUser() async {
+    try {
+      // Check if guest user already exists
+      final existingGuest = await CustomerSession.instance.guestUser;
+      if (existingGuest != null) {
+        print('CartService - Guest user already exists');
+        return;
+      }
+
+      // Create a basic guest user
+      await CustomerSession.instance.setGuestUser(
+        name: 'Guest User',
+        phone: '', // Will be filled in later
+        address: null,
+      );
+
+      print('CartService - Basic guest user created');
+    } catch (e) {
+      print('CartService - Error creating basic guest user: $e');
+    }
+  }
+
   // Merge guest cart into user cart when guest logs in
   static Future<void> mergeGuestCartIntoUserCart(String customerId) async {
     try {

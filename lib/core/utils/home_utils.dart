@@ -32,7 +32,7 @@ class HomeUtils {
 
   // Categories
   static List<String> getCategories() {
-    return ['الكل', '330 مل', '200 مل', '500 مل', '1 لتر', 'معدنية', 'غازية'];
+    return ['الكل', '330 مل', '200 مل', '500 مل', '1 لتر'];
   }
 
   // Product data
@@ -102,38 +102,6 @@ class HomeUtils {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
-      Products(
-        id: '5',
-        name: language == 'ar' ? 'كاندي معدنية' : 'Candy Mineral',
-        description: language == 'ar'
-            ? 'مياه معدنية غنية بالمعادن الطبيعية'
-            : 'Mineral water rich in natural minerals',
-        price: 32.50,
-        category: 'معدنية',
-        imageUrl: 'assets/icon/iconApp.png',
-        stockQuantity: 70,
-        rating: 4.4,
-        totalSold: 95,
-        status: 'active',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Products(
-        id: '6',
-        name: language == 'ar' ? 'كاندي غازية' : 'Candy Sparkling',
-        description: language == 'ar'
-            ? 'مياه غازية منعشة للاستهلاك اليومي'
-            : 'Refreshing sparkling water for daily consumption',
-        price: 18.75,
-        category: 'غازية',
-        imageUrl: 'assets/icon/iconApp.png',
-        stockQuantity: 90,
-        rating: 4.2,
-        totalSold: 75,
-        status: 'active',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
     ];
   }
 
@@ -157,12 +125,7 @@ class HomeUtils {
           return product.name.contains('500') || product.name.contains('٥٠٠');
         case 4: // 1 لتر
           return product.name.contains('1 لتر') || product.name.contains('1L');
-        case 5: // معدنية
-          return product.name.contains('معدنية') ||
-              product.name.contains('Mineral');
-        case 6: // غازية
-          return product.name.contains('غازية') ||
-              product.name.contains('Sparkling');
+        
         default:
           return true;
       }

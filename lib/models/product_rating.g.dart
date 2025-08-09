@@ -27,15 +27,15 @@ Map<String, dynamic> _$ProductRatingToJson(ProductRating instance) =>
     };
 
 ProductRatingSummary _$ProductRatingSummaryFromJson(
-        Map<String, dynamic> json) =>
-    ProductRatingSummary(
-      averageRating: (json['average_rating'] as num).toDouble(),
-      totalRatings: (json['total_ratings'] as num).toInt(),
-    );
+  Map<String, dynamic> json,
+) => ProductRatingSummary(
+  averageRating: (json['average_rating'] as num).toDouble(),
+  totalRatings: (json['total_ratings'] as num).toInt(),
+);
 
 Map<String, dynamic> _$ProductRatingSummaryToJson(
-        ProductRatingSummary instance) =>
-    <String, dynamic>{
-      'average_rating': instance.averageRating,
-      'total_ratings': instance.totalRatings,
-    };
+  ProductRatingSummary instance,
+) => <String, dynamic>{
+  'average_rating': instance.averageRating,
+  'total_ratings': instance.totalRatings,
+};

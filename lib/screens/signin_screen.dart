@@ -134,26 +134,45 @@ class _SignInScreenState extends State<SignInScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Theme.of(context).colorScheme.onBackground,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              DesignSystem.primaryGradient.createShader(bounds),
-          child: const Text(
-            'تسجيل الدخول',
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+        title: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            if (isDark) {
+              return const Text(
+                'تسجيل الدخول',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              );
+            }
+            return ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: const Text(
+                'تسجيل الدخول',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            );
+          },
         ),
         centerTitle: true,
       ),
@@ -201,12 +220,14 @@ class _SignInScreenState extends State<SignInScreen>
                         style: TextStyle(
                           fontFamily: 'Rubik',
                           fontSize: 20,
-                          color: Colors.black87,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black87,
                           height: 1.8,
                         ),
                       ),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 72),
 
                       // Phone Field
                       Column(
@@ -221,7 +242,11 @@ class _SignInScreenState extends State<SignInScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -235,7 +260,11 @@ class _SignInScreenState extends State<SignInScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -256,11 +285,19 @@ class _SignInScreenState extends State<SignInScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Icon(
                                     Icons.phone_outlined,
-                                    color: Colors.grey[600],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white60
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                                   border: InputBorder.none,
@@ -275,7 +312,7 @@ class _SignInScreenState extends State<SignInScreen>
                         ],
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 80),
 
                       // Sign In Button
                       Container(
@@ -335,7 +372,11 @@ class _SignInScreenState extends State<SignInScreen>
                             style: TextStyle(
                               fontFamily: 'Rubik',
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.grey[600],
                             ),
                           ),
                           GestureDetector(

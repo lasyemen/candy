@@ -1,12 +1,9 @@
-import '../../models/cart.dart';
-import '../../models/cart_item.dart';
-import 'supabase_service.dart';
-import 'customer_session.dart';
-import 'storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'dart:convert';
 import 'dart:io';
+import 'supabase_service.dart';
+import 'customer_session.dart';
 
 class CartSessionManager {
   static CartSessionManager? _instance;
@@ -172,57 +169,63 @@ class CartSessionManager {
         'CartSessionManager - Initializing guest session with ID: $sessionId',
       );
 
-      // First, create a guest customer record
-      try {
-        await SupabaseService.instance.client.from('customers').upsert({
-          'id': tempCustomerId,
-          'phone': 'guest_${sessionId.substring(0, 8)}',
-          'name': 'Guest User',
-          'address': 'Guest Address',
-          'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-        print('CartSessionManager - Guest customer created successfully');
-      } catch (e) {
-        print('CartSessionManager - Error creating guest customer: $e');
-        throw Exception('Failed to create guest customer: $e');
-      }
+      // For guest sessions, we'll use a local approach that doesn't require network
+      // Store the guest session data locally
+      await _saveGuestSessionData(tempCustomerId, sessionId);
+      print('CartSessionManager - Guest session data saved locally');
 
       // Try to get existing cart for this temporary customer
-      final existingCart = await SupabaseService.instance.client
-          .from('carts')
-          .select('*')
-          .eq('customer_id', tempCustomerId)
-          .maybeSingle();
+      try {
+        final existingCart = await SupabaseService.instance.client
+            .from('carts')
+            .select('*')
+            .eq('customer_id', tempCustomerId)
+            .maybeSingle();
 
-      if (existingCart != null) {
-        _currentCartId = existingCart['id'];
-        _guestCartId = existingCart['id'];
-        print(
-          'CartSessionManager - Found existing guest cart: ${existingCart['id']}',
-        );
-      } else {
-        // Create new cart for guest
-        try {
-          final response = await SupabaseService.instance.client
-              .from('carts')
-              .insert({
-                'customer_id': tempCustomerId,
-                'created_at': DateTime.now().toIso8601String(),
-                'updated_at': DateTime.now().toIso8601String(),
-              })
-              .select()
-              .single();
-
-          _currentCartId = response['id'];
-          _guestCartId = response['id'];
+        if (existingCart != null) {
+          _currentCartId = existingCart['id'];
+          _guestCartId = existingCart['id'];
           print(
-            'CartSessionManager - Created new guest cart: ${response['id']}',
+            'CartSessionManager - Found existing guest cart: ${existingCart['id']}',
           );
-        } catch (e) {
-          print('CartSessionManager - Error creating guest cart: $e');
-          throw Exception('Failed to create guest cart: $e');
+        } else {
+          // Create new cart for guest (only if network is available)
+          try {
+            final response = await SupabaseService.instance.client
+                .from('carts')
+                .insert({
+                  'customer_id': tempCustomerId,
+                  'created_at': DateTime.now().toIso8601String(),
+                  'updated_at': DateTime.now().toIso8601String(),
+                })
+                .select()
+                .single();
+
+            _currentCartId = response['id'];
+            _guestCartId = response['id'];
+            print(
+              'CartSessionManager - Created new guest cart: $_currentCartId',
+            );
+          } catch (networkError) {
+            print(
+              'CartSessionManager - Network error creating guest cart: $networkError',
+            );
+            // Use a proper UUID for local cart ID instead of string concatenation
+            _currentCartId = tempCustomerId;
+            _guestCartId = tempCustomerId;
+            print(
+              'CartSessionManager - Using local guest cart: $_currentCartId',
+            );
+          }
         }
+      } catch (networkError) {
+        print(
+          'CartSessionManager - Network error accessing guest cart: $networkError',
+        );
+        // Use a proper UUID for local cart ID instead of string concatenation
+        _currentCartId = tempCustomerId;
+        _guestCartId = tempCustomerId;
+        print('CartSessionManager - Using local guest cart: $_currentCartId');
       }
     } catch (e) {
       print('CartSessionManager - Error in _initializeGuestSession: $e');
@@ -297,6 +300,16 @@ class CartSessionManager {
     final isNetworkAvailable = await _isNetworkAvailable();
     if (!isNetworkAvailable) {
       print('CartSessionManager - No network connectivity available');
+
+      // For guest users, we can work offline
+      if (!CustomerSession.instance.isLoggedIn) {
+        print(
+          'CartSessionManager - Guest user in offline mode, using local storage',
+        );
+        await _addItemToLocalCart(productId, quantity);
+        return;
+      }
+
       throw Exception(
         'No network connectivity. Please check your internet connection.',
       );
@@ -315,19 +328,49 @@ class CartSessionManager {
           throw Exception('Failed to initialize cart session');
         }
 
+        // For guest users, check if we need to create the cart first
+        if (!CustomerSession.instance.isLoggedIn &&
+            _currentCartId == _guestCartId) {
+          // Check if the cart exists in the database
+          try {
+            final existingCart = await SupabaseService.instance.client
+                .from('carts')
+                .select('id')
+                .eq('id', _currentCartId!)
+                .maybeSingle();
+
+            if (existingCart == null) {
+              // Cart doesn't exist, create it first
+              final response = await SupabaseService.instance.client
+                  .from('carts')
+                  .insert({
+                    'id': _currentCartId!,
+                    'customer_id':
+                        _currentCartId!, // Use the same UUID for customer_id
+                    'created_at': DateTime.now().toIso8601String(),
+                    'updated_at': DateTime.now().toIso8601String(),
+                  })
+                  .select()
+                  .single();
+
+              print(
+                'CartSessionManager - Created guest cart: ${response['id']}',
+              );
+            }
+          } catch (cartError) {
+            print('CartSessionManager - Error creating guest cart: $cartError');
+            // If we can't create the cart, fall back to local storage
+            await _addItemToLocalCart(productId, quantity);
+            return;
+          }
+        }
+
         // Optimized: Use upsert operation instead of separate check and insert
-        await SupabaseService.instance.client
-            .from('cart_items')
-            .upsert({
-              'cart_id': _currentCartId!,
-              'product_id': productId,
-              'quantity': quantity,
-              'created_at': DateTime.now().toIso8601String(),
-              'updated_at': DateTime.now().toIso8601String(),
-            }, onConflict: 'cart_id,product_id')
-            .timeout(
-              const Duration(seconds: 5),
-            ); // Reduced timeout from 10 to 5 seconds
+        await _upsertCartItemWithoutConstraint(
+          cartId: _currentCartId!,
+          productId: productId,
+          quantity: quantity,
+        );
 
         // If we get here, the operation was successful
         print('CartSessionManager - Successfully added item to cart');
@@ -391,54 +434,114 @@ class CartSessionManager {
           throw Exception('No customer logged in');
         }
 
-        final guestSessionId = await getGuestSessionId();
-        // Get guest cart items using stored cart ID
-        if (_guestCartId == null) {
-          return; // No guest cart to merge
-        }
+        print(
+          'CartSessionManager - Merging guest cart for customer: $customerId',
+        );
 
-        final guestCart = await SupabaseService.instance.client
+        // Get or create user cart
+        final userCart = await SupabaseService.instance.client
             .from('carts')
-            .select('*, cart_items(*)')
-            .eq('id', _guestCartId!)
+            .select('*')
+            .eq('customer_id', customerId)
             .maybeSingle();
 
-        if (guestCart != null && guestCart['cart_items'] != null) {
-          // Get or create user cart
-          final userCart = await SupabaseService.instance.client
+        String userCartId;
+        if (userCart != null) {
+          userCartId = userCart['id'];
+          print('CartSessionManager - Found existing user cart: $userCartId');
+        } else {
+          // Create new user cart
+          final newCart = await SupabaseService.instance.client
               .from('carts')
-              .select('*')
-              .eq('customer_id', customerId)
+              .insert({
+                'customer_id': customerId,
+                'created_at': DateTime.now().toIso8601String(),
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .select()
+              .single();
+          userCartId = newCart['id'];
+          print('CartSessionManager - Created new user cart: $userCartId');
+        }
+
+        // Merge database guest cart items
+        if (_guestCartId != null) {
+          print('CartSessionManager - Checking for guest cart: $_guestCartId');
+          final guestCart = await SupabaseService.instance.client
+              .from('carts')
+              .select('*, cart_items(*)')
+              .eq('id', _guestCartId!)
               .maybeSingle();
 
-          String userCartId;
-          if (userCart != null) {
-            userCartId = userCart['id'];
-          } else {
-            // Create new user cart
-            final newCart = await SupabaseService.instance.client
+          if (guestCart != null && guestCart['cart_items'] != null) {
+            print(
+              'CartSessionManager - Found ${guestCart['cart_items'].length} items in guest cart',
+            );
+
+            // Move items from guest cart to user cart
+            for (final item in guestCart['cart_items']) {
+              print(
+                'CartSessionManager - Merging item: ${item['product_id']} x${item['quantity']}',
+              );
+              // Use upsert to handle existing items properly
+              await _upsertCartItemWithoutConstraint(
+                cartId: userCartId,
+                productId: item['product_id'] as String,
+                quantity: item['quantity'] as int,
+              );
+            }
+
+            // Delete guest cart
+            await SupabaseService.instance.client
                 .from('carts')
-                .insert({
-                  'customer_id': customerId,
-                  'created_at': DateTime.now().toIso8601String(),
-                  'updated_at': DateTime.now().toIso8601String(),
-                })
-                .select()
-                .single();
-            userCartId = newCart['id'];
+                .delete()
+                .eq('id', _guestCartId!);
+            print('CartSessionManager - Deleted guest cart: $_guestCartId');
           }
-
-          // Move items from guest cart to user cart
-          for (final item in guestCart['cart_items']) {
-            await addItem(item['product_id'], quantity: item['quantity']);
-          }
-
-          // Delete guest cart
-          await SupabaseService.instance.client
-              .from('carts')
-              .delete()
-              .eq('id', _guestCartId!);
         }
+
+        // Merge local guest cart items (offline mode)
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final localCartJson = prefs.getString('local_cart_items') ?? '[]';
+          final localCartItems = List<Map<String, dynamic>>.from(
+            jsonDecode(localCartJson),
+          );
+
+          if (localCartItems.isNotEmpty) {
+            print(
+              'CartSessionManager - Found ${localCartItems.length} local cart items',
+            );
+
+            for (final item in localCartItems) {
+              print(
+                'CartSessionManager - Merging local item: ${item['product_id']} x${item['quantity']}',
+              );
+              await SupabaseService.instance.client.from('cart_items').upsert({
+                'cart_id': userCartId,
+                'product_id': item['product_id'],
+                'quantity': item['quantity'],
+                'created_at':
+                    item['created_at'] ?? DateTime.now().toIso8601String(),
+                'updated_at': DateTime.now().toIso8601String(),
+              }, onConflict: 'cart_id,product_id');
+            }
+
+            // Clear local cart items after successful merge
+            await prefs.remove('local_cart_items');
+            print('CartSessionManager - Cleared local cart items');
+          }
+        } catch (e) {
+          print('CartSessionManager - Error merging local cart items: $e');
+        }
+
+        // Update current cart ID to user cart
+        _currentCartId = userCartId;
+        _guestCartId = null; // Clear guest cart ID
+
+        print(
+          'CartSessionManager - Successfully merged guest cart into user cart',
+        );
       }
     } catch (e) {
       print('CartSessionManager - Error merging guest cart: $e');
@@ -573,6 +676,137 @@ class CartSessionManager {
         return {'cartId': null, 'itemCount': 0, 'total': 0.0, 'items': []};
       }
 
+      // Check if this is a local guest cart (offline mode)
+      // Since we now use proper UUIDs, we need to check if the cart exists in the database
+      // If not, it means we're in offline mode
+      try {
+        final cartExists = await SupabaseService.instance.client
+            .from('carts')
+            .select('id')
+            .eq('id', _currentCartId!)
+            .maybeSingle();
+
+        if (cartExists == null) {
+          print(
+            'CartSessionManager - Using local guest cart summary (offline mode)',
+          );
+          // Get local cart items from shared preferences
+          final prefs = await SharedPreferences.getInstance();
+          final localCartJson = prefs.getString('local_cart_items') ?? '[]';
+          final localCartItems = List<Map<String, dynamic>>.from(
+            jsonDecode(localCartJson),
+          );
+
+          // Fetch actual product data for local items
+          final itemsWithProducts = <Map<String, dynamic>>[];
+          int itemCount = 0;
+          double total = 0.0;
+
+          for (final item in localCartItems) {
+            final quantity = item['quantity'] as int;
+            final productId = item['product_id'] as String;
+
+            try {
+              // Fetch product data from database
+              final product = await SupabaseService.instance.client
+                  .from('products')
+                  .select('*')
+                  .eq('id', productId)
+                  .maybeSingle();
+
+              if (product != null) {
+                final itemWithProduct = Map<String, dynamic>.from(item);
+                itemWithProduct['products'] = product;
+                itemsWithProducts.add(itemWithProduct);
+
+                final price = product['price'] as double;
+                itemCount += quantity;
+                total += quantity * price;
+              } else {
+                print('CartSessionManager - Product not found: $productId');
+                // Add item without product data as fallback
+                itemsWithProducts.add(item);
+                itemCount += quantity;
+                total += quantity * 5.0; // Default price
+              }
+            } catch (e) {
+              print(
+                'CartSessionManager - Error fetching product $productId: $e',
+              );
+              // Add item without product data as fallback
+              itemsWithProducts.add(item);
+              itemCount += quantity;
+              total += quantity * 5.0; // Default price
+            }
+          }
+
+          return {
+            'cartId': _currentCartId,
+            'itemCount': itemCount,
+            'total': total,
+            'items': itemsWithProducts,
+          };
+        }
+      } catch (e) {
+        print(
+          'CartSessionManager - Error checking cart existence, using local mode: $e',
+        );
+        // If we can't check the database, assume offline mode
+        final prefs = await SharedPreferences.getInstance();
+        final localCartJson = prefs.getString('local_cart_items') ?? '[]';
+        final localCartItems = List<Map<String, dynamic>>.from(
+          jsonDecode(localCartJson),
+        );
+
+        // Fetch actual product data for local items
+        final itemsWithProducts = <Map<String, dynamic>>[];
+        int itemCount = 0;
+        double total = 0.0;
+
+        for (final item in localCartItems) {
+          final quantity = item['quantity'] as int;
+          final productId = item['product_id'] as String;
+
+          try {
+            // Fetch product data from database
+            final product = await SupabaseService.instance.client
+                .from('products')
+                .select('*')
+                .eq('id', productId)
+                .maybeSingle();
+
+            if (product != null) {
+              final itemWithProduct = Map<String, dynamic>.from(item);
+              itemWithProduct['products'] = product;
+              itemsWithProducts.add(itemWithProduct);
+
+              final price = product['price'] as double;
+              itemCount += quantity;
+              total += quantity * price;
+            } else {
+              print('CartSessionManager - Product not found: $productId');
+              // Add item without product data as fallback
+              itemsWithProducts.add(item);
+              itemCount += quantity;
+              total += quantity * 5.0; // Default price
+            }
+          } catch (e) {
+            print('CartSessionManager - Error fetching product $productId: $e');
+            // Add item without product data as fallback
+            itemsWithProducts.add(item);
+            itemCount += quantity;
+            total += quantity * 5.0; // Default price
+          }
+        }
+
+        return {
+          'cartId': _currentCartId,
+          'itemCount': itemCount,
+          'total': total,
+          'items': itemsWithProducts,
+        };
+      }
+
       final items = await SupabaseService.instance.client
           .from('cart_items')
           .select('*, products(*)')
@@ -599,6 +833,180 @@ class CartSessionManager {
     } catch (e) {
       print('CartSessionManager - Error getting cart summary: $e');
       return {'cartId': null, 'itemCount': 0, 'total': 0.0, 'items': []};
+    }
+  }
+
+  // Save guest session data locally
+  Future<void> _saveGuestSessionData(
+    String customerId,
+    String sessionId,
+  ) async {
+    try {
+      // Store guest session data in shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('guest_customer_id', customerId);
+      await prefs.setString('guest_session_id', sessionId);
+      await prefs.setString(
+        'guest_session_created',
+        DateTime.now().toIso8601String(),
+      );
+      print('CartSessionManager - Guest session data saved locally');
+    } catch (e) {
+      print('CartSessionManager - Error saving guest session data: $e');
+    }
+  }
+
+  // Add item to local cart (offline mode)
+  Future<void> _addItemToLocalCart(String productId, int quantity) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get existing local cart items
+      final localCartJson = prefs.getString('local_cart_items') ?? '[]';
+      final localCartItems = List<Map<String, dynamic>>.from(
+        jsonDecode(localCartJson),
+      );
+
+      // Check if item already exists
+      final existingItemIndex = localCartItems.indexWhere(
+        (item) => item['product_id'] == productId,
+      );
+
+      if (existingItemIndex != -1) {
+        // Update existing item quantity
+        localCartItems[existingItemIndex]['quantity'] =
+            (localCartItems[existingItemIndex]['quantity'] as int) + quantity;
+      } else {
+        // Add new item
+        localCartItems.add({
+          'id': 'local_${DateTime.now().millisecondsSinceEpoch}',
+          'product_id': productId,
+          'quantity': quantity,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      // Save back to shared preferences
+      await prefs.setString('local_cart_items', jsonEncode(localCartItems));
+      print(
+        'CartSessionManager - Added item to local cart: $productId x$quantity',
+      );
+    } catch (e) {
+      print('CartSessionManager - Error adding item to local cart: $e');
+      throw Exception('Error adding item to local cart: $e');
+    }
+  }
+
+  // Sync local cart items to server when network becomes available
+  Future<void> syncLocalCartToServer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localCartJson = prefs.getString('local_cart_items') ?? '[]';
+      final localCartItems = List<Map<String, dynamic>>.from(
+        jsonDecode(localCartJson),
+      );
+
+      if (localCartItems.isEmpty) {
+        print('CartSessionManager - No local cart items to sync');
+        return;
+      }
+
+      // Check if network is available
+      final isNetworkAvailable = await _isNetworkAvailable();
+      if (!isNetworkAvailable) {
+        print('CartSessionManager - Network not available for sync');
+        return;
+      }
+
+      // Ensure we have a valid cart session
+      if (_currentCartId == null) {
+        await initializeSession();
+      }
+
+      // For guest users, ensure the cart exists in the database
+      if (!CustomerSession.instance.isLoggedIn &&
+          _currentCartId == _guestCartId) {
+        try {
+          final existingCart = await SupabaseService.instance.client
+              .from('carts')
+              .select('id')
+              .eq('id', _currentCartId!)
+              .maybeSingle();
+
+          if (existingCart == null) {
+            // Create the cart first
+            await SupabaseService.instance.client.from('carts').insert({
+              'id': _currentCartId!,
+              'customer_id':
+                  _currentCartId!, // Use the same UUID for customer_id
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            });
+            print(
+              'CartSessionManager - Created guest cart for sync: $_currentCartId',
+            );
+          }
+        } catch (cartError) {
+          print(
+            'CartSessionManager - Error creating cart for sync: $cartError',
+          );
+          return; // Can't sync without a valid cart
+        }
+      }
+
+      // Add each local item to the server
+      for (final item in localCartItems) {
+        await _upsertCartItemWithoutConstraint(
+          cartId: _currentCartId!,
+          productId: item['product_id'] as String,
+          quantity: item['quantity'] as int,
+        );
+      }
+
+      // Clear local cart items after successful sync
+      await prefs.remove('local_cart_items');
+      print('CartSessionManager - Successfully synced local cart to server');
+    } catch (e) {
+      print('CartSessionManager - Error syncing local cart to server: $e');
+    }
+  }
+
+  // Helper to upsert cart item without onConflict constraint
+  Future<void> _upsertCartItemWithoutConstraint({
+    required String cartId,
+    required String productId,
+    required int quantity,
+  }) async {
+    try {
+      final existing = await SupabaseService.instance.client
+          .from('cart_items')
+          .select('id, quantity')
+          .eq('cart_id', cartId)
+          .eq('product_id', productId)
+          .maybeSingle();
+
+      if (existing != null) {
+        final currentQty = (existing['quantity'] as int?) ?? 0;
+        await SupabaseService.instance.client
+            .from('cart_items')
+            .update({
+              'quantity': currentQty + quantity,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existing['id']);
+      } else {
+        await SupabaseService.instance.client.from('cart_items').insert({
+          'cart_id': cartId,
+          'product_id': productId,
+          'quantity': quantity,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      print('CartSessionManager - Error upserting cart item: $e');
+      throw Exception('Error upserting cart item: $e');
     }
   }
 }

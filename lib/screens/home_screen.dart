@@ -9,7 +9,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
-import '../core/constants/app_colors.dart';
+// import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
 import '../widgets/home/home_product_card_widget.dart';
@@ -27,7 +27,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin<HomeScreen> {
   int _selectedCategory = 0;
   int _currentBanner = 0;
   late PageController _bannerController;
@@ -87,8 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
     '200 مل',
     '500 مل',
     '1 لتر',
-    'معدنية',
-    'غازية',
   ];
 
   @override
@@ -154,7 +153,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  @override
+  bool get wantKeepAlive => true;
+
   // Background refresh method that doesn't show loading
+  // ignore: unused_element
   Future<void> _refreshDataSilently() async {
     try {
       // Refresh products silently
@@ -566,34 +569,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Consumer<AppSettings>(
       builder: (context, appSettings, child) {
         final lang = appSettings.currentLanguage;
         final products = _getFilteredProducts(lang);
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
             centerTitle: false,
             automaticallyImplyLeading: false,
-            title: ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return DesignSystem.getBrandGradient(
-                  'primary',
-                ).createShader(bounds);
+            title: Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                if (isDark) {
+                  return const Text(
+                    'مياه كاندي',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontFamily: 'Rubik',
+                    ),
+                  );
+                } else {
+                  return ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return DesignSystem.getBrandGradient(
+                        'primary',
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.srcIn,
+                    child: const Text(
+                      'مياه كاندي',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: Colors.white,
+                        fontFamily: 'Rubik',
+                      ),
+                    ),
+                  );
+                }
               },
-              blendMode: BlendMode.srcIn,
-              child: const Text(
-                'مياه كاندي',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Colors.white,
-                  fontFamily: 'Rubik',
-                ),
-              ),
             ),
             actions: [
               IconButton(
@@ -611,6 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           body: CustomScrollView(
+            key: const PageStorageKey<String>('home_scroll'),
             physics: const BouncingScrollPhysics(),
             slivers: [
               // Banner carousel
@@ -621,7 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     left: 8,
                     right: 8,
                     top: 8,
-                    bottom: 8,
+                    bottom: 24,
                   ),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
@@ -679,11 +701,8 @@ class _HomeScreenState extends State<HomeScreen> {
               // Categories
               SliverToBoxAdapter(
                 child: Container(
-                  height: 36,
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 14,
-                  ),
+                  height: 0,
+                  margin: EdgeInsets.zero,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     scrollDirection: Axis.horizontal,
@@ -718,8 +737,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         setState(() => _selectedCategory = idx),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
+                                        horizontal: 10,
+                                        vertical: 4,
                                       ),
                                       child: Text(
                                         _categories[idx],
@@ -748,7 +767,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Container(
                                   margin: const EdgeInsets.all(1),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1A1A1A)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                   child: Material(
@@ -758,38 +781,45 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onTap: () => setState(
                                         () => _selectedCategory = idx,
                                       ),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        child: ShaderMask(
-                                          shaderCallback: (Rect bounds) {
-                                            return const LinearGradient(
-                                              colors: [
-                                                Color.fromARGB(
-                                                  255,
-                                                  179,
-                                                  58,
-                                                  255,
+                                      child:
+                                          (Theme.of(context).brightness ==
+                                              Brightness.dark)
+                                          ? Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                _categories[idx],
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
                                                 ),
-                                                Color.fromARGB(255, 23, 6, 212),
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ).createShader(bounds);
-                                          },
-                                          blendMode: BlendMode.srcIn,
-                                          child: Text(
-                                            _categories[idx],
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
+                                              ),
+                                            )
+                                          : Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                _categories[idx],
+                                                style: TextStyle(
+                                                  color:
+                                                      Theme.of(
+                                                            context,
+                                                          ).brightness ==
+                                                          Brightness.dark
+                                                      ? Colors.white
+                                                      : DesignSystem.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                      ),
                                     ),
                                   ),
                                 ),
@@ -799,20 +829,146 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              // Extra space between categories and title (removed)
+              const SliverToBoxAdapter(child: SizedBox.shrink()),
               // Toggle view label
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
-                    children: const [
+                    children: [
                       Text(
                         'المنتجات',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : null,
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              // Categories under title
+              SliverToBoxAdapter(
+                child: Container(
+                  height: 32,
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 14,
+                  ),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (context, idx) {
+                      final isSelected = _selectedCategory == idx;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        child: isSelected
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: DesignSystem.getBrandShadow(
+                                    'medium',
+                                  ),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          _categories[idx],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1A1A1A)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          _categories[idx],
+                                          style: TextStyle(
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? Colors.white
+                                                : DesignSystem.primary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      );
+                    },
                   ),
                 ),
               ),

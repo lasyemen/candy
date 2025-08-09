@@ -14,7 +14,7 @@ class StarRating extends StatelessWidget {
     Key? key,
     required this.rating,
     this.maxRating = 5,
-    this.size = 24.0,
+    this.size = 32.0,
     this.color,
     this.unratedColor,
     this.allowHalfRating = false,
@@ -44,8 +44,8 @@ class StarRating extends StatelessWidget {
               isFullStar
                   ? Icons.star_rounded
                   : isHalfStar
-                      ? Icons.star_half_rounded
-                      : Icons.star_outline_rounded,
+                  ? Icons.star_half_rounded
+                  : Icons.star_outline_rounded,
               size: size,
               color: isFullStar || isHalfStar
                   ? (color ?? Colors.amber[600])
@@ -70,7 +70,7 @@ class InteractiveStarRating extends StatefulWidget {
     Key? key,
     this.initialRating = 0,
     this.maxRating = 5,
-    this.size = 24.0,
+    this.size = 32.0,
     this.color,
     this.unratedColor,
     required this.onRatingChanged,
@@ -110,12 +110,14 @@ class _InteractiveStarRatingState extends State<InteractiveStarRating> {
           onPanUpdate: (details) {
             // Handle drag to rate
             final RenderBox renderBox = context.findRenderObject() as RenderBox;
-            final localPosition =
-                renderBox.globalToLocal(details.globalPosition);
+            final localPosition = renderBox.globalToLocal(
+              details.globalPosition,
+            );
             final starWidth = widget.size;
             final starIndex = (localPosition.dx / starWidth).floor();
-            final newRating =
-                (starIndex + 1).clamp(1, widget.maxRating).toDouble();
+            final newRating = (starIndex + 1)
+                .clamp(1, widget.maxRating)
+                .toDouble();
 
             setState(() {
               _hoverRating = newRating;

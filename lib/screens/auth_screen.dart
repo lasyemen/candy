@@ -13,7 +13,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -50,31 +50,52 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 32),
 
                     // Welcome Text in One Line with Gradient
-                    ShaderMask(
-                      shaderCallback: (bounds) =>
-                          DesignSystem.primaryGradient.createShader(bounds),
-                      child: Text(
-                        'مرحباً بك في مياه كاندي',
-                        style: TextStyle(
-                          fontFamily: 'Rubik',
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        if (isDark) {
+                          return const Text(
+                            'مرحباً بك في مياه كاندي',
+                            style: TextStyle(
+                              fontFamily: 'Rubik',
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          );
+                        }
+                        return ShaderMask(
+                          shaderCallback: (bounds) =>
+                              DesignSystem.primaryGradient.createShader(bounds),
+                          child: const Text(
+                            'مرحباً بك في مياه كاندي',
+                            style: TextStyle(
+                              fontFamily: 'Rubik',
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 12),
 
                     // Product Description
                     Text(
-                      'تطبيق مياه كاندي يوفر لك أفضل أنواع المياه المعبأة بأسعار\n منافسة وتوصيل سريع إلى باب منزلك',
+                      'تطبيق مياه كاندي يوفر لك أفضل أنواع المياه المعبأة بأسعار منافسة وتوصيل سريع إلى باب منزلك',
                       textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: 'Rubik',
                         fontSize: 12,
-                        color: Colors.grey[600],
-                        height: 1.4,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white70
+                            : Colors.grey[600],
+                        height: 1.5,
                       ),
                     ),
                   ],
@@ -123,7 +144,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // Sign In Button (Outlined with Gradient)
                   Container(
@@ -136,7 +157,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Container(
                       margin: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.black
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: ElevatedButton(
@@ -151,24 +174,35 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        child: ShaderMask(
-                          shaderCallback: (bounds) =>
-                              DesignSystem.primaryGradient.createShader(bounds),
-                          child: const Text(
-                            'تسجيل الدخول',
-                            style: TextStyle(
-                              fontFamily: 'Rubik',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                        child: Theme.of(context).brightness == Brightness.dark
+                            ? const Text(
+                                'تسجيل الدخول',
+                                style: TextStyle(
+                                  fontFamily: 'Rubik',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : ShaderMask(
+                                shaderCallback: (bounds) => DesignSystem
+                                    .primaryGradient
+                                    .createShader(bounds),
+                                child: const Text(
+                                  'تسجيل الدخول',
+                                  style: TextStyle(
+                                    fontFamily: 'Rubik',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // Sign as Merchant Button (Outlined with Gradient)
                   Container(
@@ -181,15 +215,17 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Container(
                       margin: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.black
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          // Navigate to merchant sign in screen
-                          Navigator.pushReplacementNamed(
+                          // Navigate to merchant signup flow
+                          Navigator.pushNamed(
                             context,
-                            AppRoutes.main,
+                            AppRoutes.merchantSignup,
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -199,24 +235,35 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        child: ShaderMask(
-                          shaderCallback: (bounds) =>
-                              DesignSystem.primaryGradient.createShader(bounds),
-                          child: const Text(
-                            'تسجيل كتاجر',
-                            style: TextStyle(
-                              fontFamily: 'Rubik',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                        child: Theme.of(context).brightness == Brightness.dark
+                            ? const Text(
+                                'تسجيل كتاجر',
+                                style: TextStyle(
+                                  fontFamily: 'Rubik',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : ShaderMask(
+                                shaderCallback: (bounds) => DesignSystem
+                                    .primaryGradient
+                                    .createShader(bounds),
+                                child: const Text(
+                                  'تسجيل كتاجر',
+                                  style: TextStyle(
+                                    fontFamily: 'Rubik',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Sign as Guest Button (Grey Text Button)
                   TextButton(
@@ -225,7 +272,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       Navigator.pushReplacementNamed(context, AppRoutes.main);
                     },
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey[600],
+                      foregroundColor:
+                          Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.grey[600],
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),

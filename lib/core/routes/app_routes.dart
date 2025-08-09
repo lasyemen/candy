@@ -56,7 +56,14 @@ class AppRoutes {
       },
 
       // Main Application Routes
-      main: (context) => const MainScreen(),
+      main: (context) {
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final initialIndex = (args != null && args['initialIndex'] is int)
+            ? args['initialIndex'] as int
+            : 2;
+        return MainScreen(initialIndex: initialIndex);
+      },
       home: (context) => const HomeScreen(),
       cart: (context) => const CartScreen(),
       orders: (context) => const MyOrdersScreen(),

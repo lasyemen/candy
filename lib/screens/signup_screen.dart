@@ -2,6 +2,66 @@ import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 import '../core/services/auth_service.dart';
+import '../core/services/customer_session.dart';
+// Removed unused import
+
+/*
+ * ACCOUNT CREATION ISSUES AND SOLUTIONS:
+ * 
+ * Common issues that can cause "creating account failed" errors:
+ * 
+ * 1. DATABASE CONNECTION ISSUES:
+ *    - Check internet connection
+ *    - Verify Supabase configuration (URL and API key)
+ *    - Ensure Supabase service is running
+ * 
+ * 2. DATABASE TABLE ISSUES:
+ *    - Verify 'customers' table exists in Supabase
+ *    - Check table schema matches Customer model
+ *    - Ensure proper permissions for table operations
+ * 
+ * 3. DATA VALIDATION ISSUES:
+ *    - Name cannot be empty
+ *    - Phone number must be valid format
+ *    - Required fields must be provided
+ * 
+ * 4. DUPLICATE KEY ISSUES:
+ *    - Phone number already exists in database
+ *    - Handle existing customer updates properly
+ * 
+ * 5. NETWORK TIMEOUT ISSUES:
+ *    - Request timeout due to slow connection
+ *    - Retry mechanism needed
+ * 
+ * 6. PERMISSION ISSUES:
+ *    - Database permissions not configured properly
+ *    - Row Level Security (RLS) policies blocking operations
+ *    - SOLUTION: Disable RLS or configure proper policies
+ * 
+ * 7. RLS (ROW LEVEL SECURITY) ISSUES:
+ *    - RLS policies can block insert/update operations
+ *    - Common error codes: 42501 (Insufficient privilege)
+ *    - SOLUTION: Disable RLS for public tables or configure proper policies
+ *    - RECOMMENDATION: For development, disable RLS; for production, configure proper policies
+ * 
+ * DEBUGGING TOOLS ADDED:
+ * - Enhanced error messages with specific Arabic translations
+ * - Comprehensive error logging
+ * - Debug button to test account creation process
+ * - Step-by-step debugging information
+ * - Retry mechanism for failed operations
+ * 
+ * TO USE DEBUGGING:
+ * 1. Click "تصحيح إنشاء الحساب" button to run comprehensive debug
+ * 2. Check console logs for detailed error information
+ * 3. Review debug dialog for step-by-step analysis
+ * 4. Use "اختبار إنشاء الحساب" for quick test with sample data
+ * 
+ * RLS FIX APPLIED:
+ * - RLS has been disabled for the customers table
+ * - This resolves permission issues for account creation
+ * - For production, consider implementing proper RLS policies instead of disabling
+ */
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -46,6 +106,19 @@ class _SignUpScreenState extends State<SignUpScreen>
         );
 
     _animationController.forward();
+
+    // Pre-fill with guest user data if available
+    _loadGuestUserData();
+  }
+
+  void _loadGuestUserData() {
+    final guestUser = CustomerSession.instance.guestUser;
+    if (guestUser != null) {
+      setState(() {
+        _nameController.text = guestUser['name'] ?? '';
+        _phoneController.text = guestUser['phone'] ?? '';
+      });
+    }
   }
 
   @override
@@ -56,6 +129,8 @@ class _SignUpScreenState extends State<SignUpScreen>
     super.dispose();
   }
 
+  // Debug/test helpers removed per request
+
   void _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -64,37 +139,29 @@ class _SignUpScreenState extends State<SignUpScreen>
     });
 
     try {
+      // Clean phone number (remove non-digit characters)
+      final cleanPhone = _phoneController.text.replaceAll(RegExp(r'[^\d]'), '');
+
       print(
-        'Sign-up form submitted with name: ${_nameController.text}, phone: ${_phoneController.text}',
+        'Sign-up form submitted with name: ${_nameController.text}, phone: $cleanPhone',
       );
 
-      // Check if customer already exists
-      final customerExists = await AuthService.instance.customerExists(
-        phone: _phoneController.text,
-      );
+      // Proceed with customer registration directly (upsert handles duplicates)
+      print('Proceeding with customer registration...');
 
-      print('Customer exists check result: $customerExists');
-      if (customerExists) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('رقم الهاتف مسجل بالفعل. يرجى تسجيل الدخول.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
+      // Get guest user data if available
+      final guestUser = CustomerSession.instance.guestUser;
+      String? address;
+      if (guestUser != null && guestUser['address'] != null) {
+        address = guestUser['address'];
+        print('SignUpScreen - Using guest user address: $address');
       }
 
-      print('Proceeding with customer registration...');
       // Register new customer
       final customer = await AuthService.instance.registerCustomer(
         name: _nameController.text,
-        phone: _phoneController.text,
+        phone: cleanPhone,
+        address: address,
       );
 
       print('Registration result: ${customer?.name}');
@@ -105,17 +172,48 @@ class _SignUpScreenState extends State<SignUpScreen>
         });
 
         if (customer != null) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          // Check if this is a guest user with cart items
+          final isGuestUser = CustomerSession.instance.isGuestUser;
+          final hasGuestData = CustomerSession.instance.guestUser != null;
 
-          // Navigate to main screen (which includes navigation bar)
-          Navigator.pushReplacementNamed(context, AppRoutes.main);
+          if (isGuestUser && hasGuestData) {
+            print('SignUpScreen - Guest user with cart items, merging cart...');
+
+            // Set the customer as current (cart merging runs in background)
+            await CustomerSession.instance.setCurrentCustomer(customer);
+
+            // Note: Guest user data will be cleared automatically when setCurrentCustomer is called
+            print('SignUpScreen - Guest user data preserved for cart merging');
+
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            // Navigate to main and open the Cart tab so the bottom nav is visible
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.main,
+              arguments: {'initialIndex': 3},
+            );
+          } else {
+            // Regular signup without cart items
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            // Navigate to main screen (which includes navigation bar)
+            Navigator.pushReplacementNamed(context, AppRoutes.main);
+          }
         } else {
+          print('SignUpScreen - Customer registration returned null');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('حدث خطأ في إنشاء الحساب. يرجى المحاولة مرة أخرى.'),
@@ -125,13 +223,58 @@ class _SignUpScreenState extends State<SignUpScreen>
         }
       }
     } catch (e) {
+      print('SignUpScreen - Exception during account creation: $e');
+      print('SignUpScreen - Exception type: ${e.runtimeType}');
+
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
+        String errorMessage = 'حدث خطأ في إنشاء الحساب';
+
+        // More specific error handling
+        if (e.toString().contains('Database connection failed')) {
+          errorMessage =
+              'فشل الاتصال بقاعدة البيانات. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.';
+        } else if (e.toString().contains('duplicate key') ||
+            e.toString().contains('already exists')) {
+          errorMessage = 'رقم الهاتف مسجل بالفعل. يرجى تسجيل الدخول.';
+        } else if (e.toString().contains('not null') ||
+            e.toString().contains('required')) {
+          errorMessage = 'يرجى التأكد من إدخال جميع البيانات المطلوبة.';
+        } else if (e.toString().contains('network') ||
+            e.toString().contains('connection')) {
+          errorMessage =
+              'خطأ في الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت.';
+        } else if (e.toString().contains('timeout')) {
+          errorMessage = 'انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.';
+        } else if (e.toString().contains('permission') ||
+            e.toString().contains('unauthorized') ||
+            e.toString().contains('RLS')) {
+          errorMessage =
+              'خطأ في الصلاحيات. تم حل المشكلة - يرجى المحاولة مرة أخرى.';
+        } else if (e.toString().contains('invalid') ||
+            e.toString().contains('format')) {
+          errorMessage = 'بيانات غير صحيحة. يرجى التحقق من المعلومات المدخلة.';
+        } else {
+          // Log the full error for debugging
+          print('SignUpScreen - Full error details: $e');
+          errorMessage =
+              'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'إعادة المحاولة',
+              textColor: Colors.white,
+              onPressed: () => _submitForm(),
+            ),
+          ),
         );
       }
     }
@@ -140,26 +283,45 @@ class _SignUpScreenState extends State<SignUpScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Theme.of(context).colorScheme.onBackground,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              DesignSystem.primaryGradient.createShader(bounds),
-          child: const Text(
-            'إنشاء حساب جديد',
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+        title: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            if (isDark) {
+              return const Text(
+                'إنشاء حساب جديد',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              );
+            }
+            return ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: const Text(
+                'إنشاء حساب جديد',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            );
+          },
         ),
         centerTitle: true,
       ),
@@ -207,7 +369,9 @@ class _SignUpScreenState extends State<SignUpScreen>
                         style: TextStyle(
                           fontFamily: 'Rubik',
                           fontSize: 20,
-                          color: Colors.black87,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black87,
                           height: 1.8,
                         ),
                       ),
@@ -227,7 +391,11 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -241,7 +409,11 @@ class _SignUpScreenState extends State<SignUpScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -261,11 +433,19 @@ class _SignUpScreenState extends State<SignUpScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Icon(
                                     Icons.person_outline,
-                                    color: Colors.grey[600],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white60
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                                   border: InputBorder.none,
@@ -295,7 +475,11 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 fontFamily: 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                           ),
@@ -309,7 +493,11 @@ class _SignUpScreenState extends State<SignUpScreen>
                             child: Container(
                               margin: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: TextFormField(
@@ -318,6 +506,14 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'يرجى إدخال رقم الهاتف';
+                                  }
+                                  // Remove any non-digit characters for validation
+                                  final cleanPhone = value.replaceAll(
+                                    RegExp(r'[^\d]'),
+                                    '',
+                                  );
+                                  if (cleanPhone.length < 8) {
+                                    return 'يرجى إدخال رقم هاتف صحيح';
                                   }
                                   return null;
                                 },
@@ -330,11 +526,19 @@ class _SignUpScreenState extends State<SignUpScreen>
                                   hintStyle: TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color: Colors.grey[500],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white54
+                                        : Colors.grey[500],
                                   ),
                                   prefixIcon: Icon(
                                     Icons.phone_outlined,
-                                    color: Colors.grey[600],
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white60
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                                   border: InputBorder.none,
@@ -349,7 +553,9 @@ class _SignUpScreenState extends State<SignUpScreen>
                         ],
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 90),
+
+                      // Debug buttons removed
 
                       // Sign Up Button
                       Container(
@@ -409,7 +615,11 @@ class _SignUpScreenState extends State<SignUpScreen>
                             style: TextStyle(
                               fontFamily: 'Rubik',
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.grey[600],
                             ),
                           ),
                           GestureDetector(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
@@ -6,11 +8,14 @@ import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
 import '../core/services/cart_service.dart';
 import '../core/services/cart_cache_manager.dart';
-import '../models/cart.dart';
+// import '../models/cart.dart';
 import '../models/cart_item.dart';
 
 import '../widgets/riyal_icon.dart';
+import '../core/services/customer_session.dart';
 import 'delivery_location_screen.dart';
+import 'guest_user_input_screen.dart';
+import 'signup_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -34,6 +39,7 @@ class _CartScreenState extends State<CartScreen>
   bool _isFirstLoad = true;
   bool _isLoading = false;
   bool _hasLoadedOnce = false;
+  Timer? _reloadDebounce;
 
   // State preservation is now handled by CartCacheManager
 
@@ -79,6 +85,7 @@ class _CartScreenState extends State<CartScreen>
     WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     _listAnimationController.dispose();
+    _reloadDebounce?.cancel();
     super.dispose();
   }
 
@@ -90,13 +97,35 @@ class _CartScreenState extends State<CartScreen>
     }
   }
 
+  // Listen to app bloc changes
+  void _onAppBlocChanged(AppBloc appBloc) {
+    // Refresh cart data when cart item count changes
+    if (appBloc.cartItemCount != _cartItemsWithProducts.length) {
+      if (kDebugMode) {
+        print(
+          'CartScreen - App bloc cart count changed: ${appBloc.cartItemCount}',
+        );
+      }
+      _debouncedReload(forceRefresh: true);
+    }
+  }
+
+  void _debouncedReload({bool forceRefresh = false}) {
+    _reloadDebounce?.cancel();
+    _reloadDebounce = Timer(const Duration(milliseconds: 200), () {
+      _loadCartData(forceRefresh: forceRefresh);
+    });
+  }
+
   // Method to manually refresh cart data
   Future<void> _refreshCartData() async {
     if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       await _loadCartData(forceRefresh: true);
@@ -265,8 +294,8 @@ class _CartScreenState extends State<CartScreen>
       // Update local state immediately for better UX
       _updateLocalCartState(itemId, newQuantity);
 
-      // Reload cart data to reflect changes
-      await _loadCartData();
+      // Schedule a lightweight refresh (do not block UI)
+      _debouncedReload();
       print('=== UPDATE QUANTITY SUCCESS ===');
     } catch (e) {
       print('=== UPDATE QUANTITY ERROR ===');
@@ -288,26 +317,28 @@ class _CartScreenState extends State<CartScreen>
 
   // Update local cart state immediately for better UX
   void _updateLocalCartState(String itemId, int newQuantity) {
-    setState(() {
-      if (newQuantity <= 0) {
-        // Remove item
-        _cartItemsWithProducts.removeWhere(
-          (item) =>
-              item['id']?.toString() == itemId ||
-              item['product_id']?.toString() == itemId,
-        );
-      } else {
-        // Update quantity
-        final itemIndex = _cartItemsWithProducts.indexWhere(
-          (item) =>
-              item['id']?.toString() == itemId ||
-              item['product_id']?.toString() == itemId,
-        );
-        if (itemIndex != -1) {
-          _cartItemsWithProducts[itemIndex]['quantity'] = newQuantity;
+    if (mounted) {
+      setState(() {
+        if (newQuantity <= 0) {
+          // Remove item
+          _cartItemsWithProducts.removeWhere(
+            (item) =>
+                item['id']?.toString() == itemId ||
+                item['product_id']?.toString() == itemId,
+          );
+        } else {
+          // Update quantity
+          final itemIndex = _cartItemsWithProducts.indexWhere(
+            (item) =>
+                item['id']?.toString() == itemId ||
+                item['product_id']?.toString() == itemId,
+          );
+          if (itemIndex != -1) {
+            _cartItemsWithProducts[itemIndex]['quantity'] = newQuantity;
+          }
         }
-      }
-    });
+      });
+    }
 
     // Update cache asynchronously
     _updateCartCache();
@@ -342,27 +373,37 @@ class _CartScreenState extends State<CartScreen>
       final cachedItems = await CartCacheManager.instance.getCachedCartItems();
 
       if (isCacheValid && cachedItems.isNotEmpty) {
-        setState(() {
-          _cartItemsWithProducts = cachedItems;
-          _hasLoadedOnce = true;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _cartItemsWithProducts = cachedItems;
+            _hasLoadedOnce = true;
+            _isLoading = false;
+          });
 
-        if (_cartItemsWithProducts.isNotEmpty) {
-          _triggerItemAnimations();
+          if (_cartItemsWithProducts.isNotEmpty) {
+            _triggerItemAnimations();
+          }
         }
         return;
       }
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       print('CartScreen - Loading cart data...');
 
+      // Check if still mounted before async operations
+      if (!mounted) return;
+
       await CartService.initializeCartSession();
+
+      // Check if still mounted after first async operation
+      if (!mounted) return;
 
       final cartSummary = await CartManager.instance.getCartSummary();
       print('CartScreen - Cart summary: $cartSummary');
@@ -377,36 +418,40 @@ class _CartScreenState extends State<CartScreen>
 
         if (_cartItemsWithProducts.length != newCartItems.length ||
             !_areCartItemsEqual(_cartItemsWithProducts, newCartItems)) {
-          setState(() {
-            _cartItemsWithProducts = newCartItems;
-            _hasLoadedOnce = true;
-            print(
-              'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items',
-            );
-
-            if (_cartItemsWithProducts.isNotEmpty) {
-              _triggerItemAnimations();
-            }
-
-            for (int i = 0; i < _cartItemsWithProducts.length; i++) {
-              final item = _cartItemsWithProducts[i];
+          if (mounted) {
+            setState(() {
+              _cartItemsWithProducts = newCartItems;
+              _hasLoadedOnce = true;
               print(
-                'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}',
+                'CartScreen - Updated cart items: ${_cartItemsWithProducts.length} items',
               );
-              print('CartScreen - Item $i structure: ${item.keys.toList()}');
-              print('CartScreen - Item $i ID: ${item['id']}');
-              print('CartScreen - Item $i product_id: ${item['product_id']}');
-            }
-          });
 
-          // Update cache with new data
-          await _updateCartCache();
+              if (_cartItemsWithProducts.isNotEmpty) {
+                _triggerItemAnimations();
+              }
+
+              for (int i = 0; i < _cartItemsWithProducts.length; i++) {
+                final item = _cartItemsWithProducts[i];
+                print(
+                  'CartScreen - Item $i: ${item['product_id']} x${item['quantity']}',
+                );
+                print('CartScreen - Item $i structure: ${item.keys.toList()}');
+                print('CartScreen - Item $i ID: ${item['id']}');
+                print('CartScreen - Item $i product_id: ${item['product_id']}');
+              }
+            });
+
+            // Update cache with new data
+            if (mounted) {
+              await _updateCartCache();
+            }
+          }
         }
       }
     } catch (e) {
       print('CartScreen - Error loading cart data: $e');
 
-      if (!_hasLoadedOnce) {
+      if (!_hasLoadedOnce && mounted) {
         try {
           await CartService.initializeCartSession();
           final cartSummary = await CartManager.instance.getCartSummary();
@@ -419,7 +464,9 @@ class _CartScreenState extends State<CartScreen>
             });
 
             // Update cache with fallback data
-            await _updateCartCache();
+            if (mounted) {
+              await _updateCartCache();
+            }
           }
         } catch (retryError) {
           print('CartScreen - Error retrying cart data load: $retryError');
@@ -488,11 +535,13 @@ class _CartScreenState extends State<CartScreen>
   }
 
   void _resetCartState() {
-    setState(() {
-      _cartItemsWithProducts = [];
-      _hasLoadedOnce = false;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _cartItemsWithProducts = [];
+        _hasLoadedOnce = false;
+        _isLoading = false;
+      });
+    }
     _loadCartData();
   }
 
@@ -535,9 +584,11 @@ class _CartScreenState extends State<CartScreen>
   }
 
   void _showCartSummaryFromItems() {
-    setState(() {
-      _showSummaryCard = !_showSummaryCard;
-    });
+    if (mounted) {
+      setState(() {
+        _showSummaryCard = !_showSummaryCard;
+      });
+    }
   }
 
   void _showCartDetails(List<CartItem> cartItems, double cartTotal) {
@@ -715,8 +766,8 @@ class _CartScreenState extends State<CartScreen>
         appBloc.add(RemoveFromCartEvent(itemId));
       }
 
-      // Reload cart data to reflect changes
-      await _loadCartData();
+      // Schedule a lightweight refresh (do not block UI)
+      _debouncedReload();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -763,9 +814,11 @@ class _CartScreenState extends State<CartScreen>
         cartId,
       );
       // Store the cart items with products for display
-      setState(() {
-        _cartItemsWithProducts = cartItemsWithProducts;
-      });
+      if (mounted) {
+        setState(() {
+          _cartItemsWithProducts = cartItemsWithProducts;
+        });
+      }
     } catch (e) {
       print('Error loading cart items with products: $e');
     }
@@ -921,78 +974,99 @@ class _CartScreenState extends State<CartScreen>
       _debugCartItemStructure();
     }
 
-    return Scaffold(
-      backgroundColor: DesignSystem.background,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: AppBar(
-          backgroundColor: DesignSystem.background,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          flexibleSpace: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'سلة التسوق',
-                          style: DesignSystem.headlineSmall.copyWith(
-                            color: DesignSystem.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        if (_cartItemsWithProducts.isNotEmpty)
-                          Text(
-                            '${_cartItemsWithProducts.length} منتج',
-                            style: DesignSystem.bodySmall.copyWith(
-                              color: DesignSystem.textSecondary,
-                              fontFamily: 'Rubik',
-                            ),
-                          ),
-                      ],
-                    ),
+    return Consumer<AppBloc>(
+      builder: (context, appBloc, child) {
+        // Listen to app bloc changes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _onAppBlocChanged(appBloc);
+        });
+
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(80),
+            child: AppBar(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              flexibleSpace: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
                   ),
-                  if (_cartItemsWithProducts.isNotEmpty)
-                    IconButton(
-                      onPressed: () => _showCartSummaryFromItems(),
-                      icon: ShaderMask(
-                        shaderCallback: (bounds) =>
-                            DesignSystem.primaryGradient.createShader(bounds),
-                        child: Icon(
-                          Icons.receipt_long,
-                          color: Colors.white,
-                          size: 24,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'سلة التسوق',
+                              style: DesignSystem.headlineSmall.copyWith(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : DesignSystem.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Rubik',
+                              ),
+                            ),
+                            if (_cartItemsWithProducts.isNotEmpty)
+                              Text(
+                                '${_cartItemsWithProducts.length} منتج',
+                                style: DesignSystem.bodySmall.copyWith(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : DesignSystem.textSecondary,
+                                  fontFamily: 'Rubik',
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    ),
-                ],
+                      if (_cartItemsWithProducts.isNotEmpty)
+                        IconButton(
+                          onPressed: () => _showCartSummaryFromItems(),
+                          icon: ShaderMask(
+                            shaderCallback: (bounds) => DesignSystem
+                                .primaryGradient
+                                .createShader(bounds),
+                            child: Icon(
+                              Icons.receipt_long,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _refreshCartData();
-        },
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: _isLoading && !_hasLoadedOnce
-                ? _buildLoadingState()
-                : _cartItemsWithProducts.isEmpty
-                ? _buildEmptyCart()
-                : _buildCartContentFromItems(),
+          body: RefreshIndicator(
+            onRefresh: () async {
+              await _refreshCartData();
+            },
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: _isLoading && !_hasLoadedOnce
+                    ? _buildLoadingState()
+                    : _cartItemsWithProducts.isEmpty
+                    ? _buildEmptyCart()
+                    : _buildCartContentFromItems(),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1014,31 +1088,35 @@ class _CartScreenState extends State<CartScreen>
           // Changed from ListView.separated for better performance
           padding: const EdgeInsets.all(20),
           physics: const BouncingScrollPhysics(),
+          cacheExtent: 800,
           itemCount: _cartItemsWithProducts.length,
           itemBuilder: (context, index) {
             final cartItem = _cartItemsWithProducts[index];
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: index < _cartItemsWithProducts.length - 1 ? 16 : 0,
-              ),
-              child: SlideTransition(
-                position:
-                    _itemAnimations.isNotEmpty && index < _itemAnimations.length
-                    ? _itemAnimations[index]
-                    : AlwaysStoppedAnimation(Offset.zero),
-                child: FadeTransition(
-                  opacity:
-                      _itemFadeAnimations.isNotEmpty &&
-                          index < _itemFadeAnimations.length
-                      ? _itemFadeAnimations[index]
-                      : AlwaysStoppedAnimation(1.0),
-                  child: ScaleTransition(
-                    scale:
-                        _itemScaleAnimations.isNotEmpty &&
-                            index < _itemScaleAnimations.length
-                        ? _itemScaleAnimations[index]
+            return RepaintBoundary(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: index < _cartItemsWithProducts.length - 1 ? 16 : 0,
+                ),
+                child: SlideTransition(
+                  position:
+                      _itemAnimations.isNotEmpty &&
+                          index < _itemAnimations.length
+                      ? _itemAnimations[index]
+                      : AlwaysStoppedAnimation(Offset.zero),
+                  child: FadeTransition(
+                    opacity:
+                        _itemFadeAnimations.isNotEmpty &&
+                            index < _itemFadeAnimations.length
+                        ? _itemFadeAnimations[index]
                         : AlwaysStoppedAnimation(1.0),
-                    child: _buildCartItemFromMap(cartItem, index),
+                    child: ScaleTransition(
+                      scale:
+                          _itemScaleAnimations.isNotEmpty &&
+                              index < _itemScaleAnimations.length
+                          ? _itemScaleAnimations[index]
+                          : AlwaysStoppedAnimation(1.0),
+                      child: _buildCartItemFromMap(cartItem, index),
+                    ),
                   ),
                 ),
               ),
@@ -1138,14 +1216,28 @@ class _CartScreenState extends State<CartScreen>
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () {
+            onPressed: () async {
               HapticFeedback.mediumImpact();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DeliveryLocationScreen(),
-                ),
-              );
+
+              // Check if user is a guest
+              if (CustomerSession.instance.isGuestUser) {
+                // Show guest user input screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const GuestUserInputScreen(deliveryData: {}),
+                  ),
+                );
+              } else {
+                // User is logged in, go directly to delivery location
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DeliveryLocationScreen(),
+                  ),
+                );
+              }
             },
             icon: Icon(FontAwesomeIcons.creditCard, size: 18),
             label: ShaderMask(
@@ -1179,11 +1271,13 @@ class _CartScreenState extends State<CartScreen>
 
   void _showCartSummary(List<CartItem> cartItems, double cartTotal) {
     if (_showSummaryCard) {
-      setState(() {
-        _showSummaryCard = false;
-      });
+      if (mounted) {
+        setState(() {
+          _showSummaryCard = false;
+        });
+      }
     } else {
-      _showSummaryOverlay(cartItems, cartTotal);
+      _showCartSummaryFromItems();
     }
   }
 
@@ -1469,7 +1563,9 @@ class _CartScreenState extends State<CartScreen>
       curve: Curves.easeOutCubic,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF121212)
+            : Colors.white,
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
@@ -1602,7 +1698,9 @@ class _CartScreenState extends State<CartScreen>
                   Text(
                     productName,
                     style: DesignSystem.titleMedium.copyWith(
-                      color: DesignSystem.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : DesignSystem.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'Rubik',
                     ),
@@ -1610,16 +1708,26 @@ class _CartScreenState extends State<CartScreen>
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Text(
-                        productPrice.toStringAsFixed(2),
-                        style: DesignSystem.bodyLarge.copyWith(
-                          color: DesignSystem.primary,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Rubik',
+                      ShaderMask(
+                        shaderCallback: (bounds) =>
+                            DesignSystem.primaryGradient.createShader(bounds),
+                        blendMode: BlendMode.srcIn,
+                        child: Text(
+                          productPrice.toStringAsFixed(2),
+                          style: DesignSystem.bodyLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Rubik',
+                          ),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const RiyalIcon(size: 14, color: DesignSystem.primary),
+                      ShaderMask(
+                        shaderCallback: (bounds) =>
+                            DesignSystem.primaryGradient.createShader(bounds),
+                        blendMode: BlendMode.srcIn,
+                        child: const RiyalIcon(size: 14, color: Colors.white),
+                      ),
                       const SizedBox(width: 8),
                     ],
                   ),
@@ -1750,14 +1858,27 @@ class _CartScreenState extends State<CartScreen>
           SizedBox(
             width: 160, // Further reduced width
             child: ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 HapticFeedback.mediumImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DeliveryLocationScreen(),
-                  ),
-                );
+
+                // Check if user is a guest
+                if (CustomerSession.instance.isGuestUser) {
+                  // Navigate to sign-up screen for account creation
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SignUpScreen(),
+                    ),
+                  );
+                } else {
+                  // User is logged in, go directly to delivery location
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DeliveryLocationScreen(),
+                    ),
+                  );
+                }
               },
               icon: Icon(FontAwesomeIcons.creditCard, size: 18),
               label: ShaderMask(
@@ -1858,16 +1979,26 @@ class _CartScreenState extends State<CartScreen>
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text(
-                      _getProductPrice(cartItem.productId).toStringAsFixed(2),
-                      style: DesignSystem.bodyLarge.copyWith(
-                        color: DesignSystem.primary,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Rubik',
+                    ShaderMask(
+                      shaderCallback: (bounds) =>
+                          DesignSystem.primaryGradient.createShader(bounds),
+                      blendMode: BlendMode.srcIn,
+                      child: Text(
+                        _getProductPrice(cartItem.productId).toStringAsFixed(2),
+                        style: DesignSystem.bodyLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Rubik',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const RiyalIcon(size: 14, color: DesignSystem.primary),
+                    ShaderMask(
+                      shaderCallback: (bounds) =>
+                          DesignSystem.primaryGradient.createShader(bounds),
+                      blendMode: BlendMode.srcIn,
+                      child: const RiyalIcon(size: 14, color: Colors.white),
+                    ),
                     const SizedBox(width: 8),
                   ],
                 ),
@@ -1963,13 +2094,20 @@ class _CartScreenState extends State<CartScreen>
                     Text(
                       '${(cartItem.quantity * 5.0).toStringAsFixed(2)}',
                       style: DesignSystem.labelLarge.copyWith(
-                        color: DesignSystem.primary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : DesignSystem.primary,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Rubik',
                       ),
                     ),
                     const SizedBox(width: 2),
-                    const RiyalIcon(size: 10, color: DesignSystem.primary),
+                    RiyalIcon(
+                      size: 10,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : DesignSystem.primary,
+                    ),
                   ],
                 ),
               ),
@@ -1986,30 +2124,31 @@ class _CartScreenState extends State<CartScreen>
     required bool isDecrease,
   }) {
     return AnimatedContainer(
-      // Added AnimatedContainer for smooth button transitions
-      duration: const Duration(
-        milliseconds: 200,
-      ), // Slightly longer for smoother feel
+      duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
-      child: GestureDetector(
-        onTap: () {
-          print('Button tapped: ${isDecrease ? "decrease" : "increase"}');
-          onPressed();
-        },
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            gradient: DesignSystem.getBrandGradient('primary'),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: DesignSystem.primary.withOpacity(0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () {
+            onPressed();
+          },
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: DesignSystem.getBrandGradient('primary'),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: DesignSystem.primary.withOpacity(0.28),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 14, color: Colors.white),
           ),
-          child: Icon(icon, size: 16, color: Colors.white),
         ),
       ),
     );

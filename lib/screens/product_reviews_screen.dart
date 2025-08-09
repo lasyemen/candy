@@ -9,7 +9,7 @@ class ProductReviewsScreen extends StatefulWidget {
   final Products product;
 
   const ProductReviewsScreen({Key? key, required this.product})
-      : super(key: key);
+    : super(key: key);
 
   @override
   State<ProductReviewsScreen> createState() => _ProductReviewsScreenState();
@@ -49,13 +49,15 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.black87),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.black87,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -71,8 +73,8 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _reviews.isEmpty
-              ? _buildEmptyState()
-              : _buildReviewsList(),
+          ? _buildEmptyState()
+          : _buildReviewsList(),
     );
   }
 
@@ -81,11 +83,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.rate_review_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.rate_review_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'لا توجد تقييمات بعد',
@@ -126,7 +124,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
             children: [
               StarRating(
                 rating: _ratingSummary?.averageRating ?? 0.0,
-                size: 24,
+                size: 32,
                 readOnly: true,
               ),
               const SizedBox(width: 12),
@@ -200,11 +198,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
+                child: Icon(Icons.person, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -233,7 +227,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
               ),
               StarRating(
                 rating: review.rating.toDouble(),
-                size: 16,
+                size: 24,
                 readOnly: true,
               ),
             ],

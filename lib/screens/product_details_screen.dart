@@ -236,7 +236,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         else
           StarRating(
             rating: _ratingSummary?.averageRating ?? widget.product.rating,
-            size: 20,
+            size: 28,
             readOnly: true,
           ),
         const SizedBox(width: 8),
@@ -458,13 +458,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Full screen background image
           Positioned.fill(
             child: Container(
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
               padding: const EdgeInsets.only(bottom: 320),
               child: AnimatedBuilder(
                 animation: _scaleAnimation,
@@ -475,11 +477,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                     fit: BoxFit.contain,
                     height: 50,
                     errorBuilder: (_, __, ___) => Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF121212)
+                          : Colors.grey[300],
+                      child: Icon(
                         Icons.image,
                         size: 80,
-                        color: Colors.grey,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white54
+                            : Colors.grey,
                       ),
                     ),
                   ),
@@ -496,11 +502,17 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.2),
-                    Colors.black.withOpacity(0.1),
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.black.withOpacity(0.6)
+                        : Colors.black.withOpacity(0.2),
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.black.withOpacity(0.4)
+                        : Colors.black.withOpacity(0.1),
                     Colors.transparent,
                     Colors.transparent,
-                    Colors.black.withOpacity(0.3),
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.black.withOpacity(0.6)
+                        : Colors.black.withOpacity(0.3),
                   ],
                 ),
               ),
@@ -529,13 +541,17 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                   maxHeight: MediaQuery.of(context).size.height * 0.65,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF121212)
+                      : Colors.white,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(24),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.black.withOpacity(0.4)
+                          : Colors.black.withOpacity(0.1),
                       blurRadius: 8,
                       offset: const Offset(0, -2),
                     ),
@@ -550,7 +566,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white24
+                            : Colors.grey[300],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -575,10 +593,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                     textAlign: TextAlign.right,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white
+                                          : Colors.black87,
                                       fontFamily: 'Rubik',
                                     ),
                                   ),
@@ -594,12 +616,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             // Description
                             Align(
                               alignment: Alignment.centerRight,
-                              child: const Text(
+                              child: Text(
                                 'الوصف',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : Colors.black87,
                                   fontFamily: 'Rubik',
                                 ),
                               ),
@@ -607,9 +633,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             const SizedBox(height: 8),
                             Text(
                               widget.product.description ?? 'لا يوجد وصف.',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.black54,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black54,
                                 height: 1.6,
                                 fontFamily: 'Rubik',
                               ),
@@ -648,7 +678,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                         shaderCallback: (bounds) => DesignSystem
                                             .primaryGradient
                                             .createShader(bounds),
-                                        child: RiyalIcon(
+                                        blendMode: BlendMode.srcIn,
+                                        child: const RiyalIcon(
                                           size: 20,
                                           color: Colors.white,
                                         ),
