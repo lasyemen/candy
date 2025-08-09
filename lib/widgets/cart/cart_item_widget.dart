@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../riyal_icon.dart';
 
@@ -29,11 +28,11 @@ class CartItemWidget extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF1E293B)
+            ? const Color(0xFF2A2A2A)
             : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

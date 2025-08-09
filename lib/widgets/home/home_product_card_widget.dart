@@ -9,7 +9,6 @@ import '../../models/product_rating.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
-import '../../screens/product_details_screen.dart';
 import '../../core/services/rating_service.dart';
 
 class HomeProductCardWidget extends StatefulWidget {
@@ -76,7 +75,7 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                 borderRadius: BorderRadius.circular(24),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF121212) : Colors.white,
+                    color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Material(
@@ -101,7 +100,7 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                                 margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
                                   color: isDark
-                                      ? const Color(0xFF1A1A1A)
+                                      ? const Color(0xFF333333)
                                       : Colors.white,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
@@ -175,7 +174,7 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                                     Text(
                                       _isLoadingRating
                                           ? '...'
-                                          : '${_ratingSummary?.averageRating?.toStringAsFixed(1) ?? widget.product.rating}',
+                                          : '${(_ratingSummary?.averageRating ?? widget.product.rating).toStringAsFixed(1)}',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: isDark

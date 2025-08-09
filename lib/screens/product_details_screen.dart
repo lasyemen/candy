@@ -236,16 +236,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         else
           StarRating(
             rating: _ratingSummary?.averageRating ?? widget.product.rating,
-            size: 28,
+            size: 22,
             readOnly: true,
           ),
         const SizedBox(width: 8),
         Text(
           '${(_ratingSummary?.averageRating ?? widget.product.rating).toStringAsFixed(1)}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
             fontFamily: 'Rubik',
           ),
         ),
@@ -269,12 +271,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       children: [
         // User rating input (only if logged in)
         if (CustomerSession.instance.isLoggedIn) ...[
-          const Text(
+          Text(
             'تقييمك',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black87,
               fontFamily: 'Rubik',
             ),
           ),
@@ -494,39 +498,30 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             ),
           ),
 
-          // Gradient overlay for better text readability
+          // Transparent overlay to preserve layout without darkening the image
           Positioned.fill(
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Theme.of(context).brightness == Brightness.dark
-                        ? Colors.black.withOpacity(0.6)
-                        : Colors.black.withOpacity(0.2),
-                    Theme.of(context).brightness == Brightness.dark
-                        ? Colors.black.withOpacity(0.4)
-                        : Colors.black.withOpacity(0.1),
                     Colors.transparent,
                     Colors.transparent,
-                    Theme.of(context).brightness == Brightness.dark
-                        ? Colors.black.withOpacity(0.6)
-                        : Colors.black.withOpacity(0.3),
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.transparent,
                   ],
                 ),
               ),
             ),
           ),
 
-          // Close button
+          // Close button removed per request but keep Positioned to preserve layout
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
             right: 16,
-            child: _buildNavButton(
-              icon: Icons.close_rounded,
-              onTap: () => Navigator.pop(context),
-            ),
+            child: const SizedBox.shrink(),
           ),
 
           // Bottom sheet content
@@ -638,8 +633,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                 color:
                                     Theme.of(context).brightness ==
                                         Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black54,
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
                                 height: 1.6,
                                 fontFamily: 'Rubik',
                               ),
@@ -729,10 +724,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Text(
           '$_selectedQuantity',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black87,
             fontFamily: 'Rubik',
           ),
         ),

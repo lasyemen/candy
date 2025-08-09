@@ -91,7 +91,7 @@ class _HomeProductCardState extends State<HomeProductCard>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF1E293B)
+                    ? const Color(0xFF2A2A2A)
                     : Colors.white,
                 boxShadow: [
                   BoxShadow(

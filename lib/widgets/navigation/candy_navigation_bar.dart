@@ -73,7 +73,7 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                       borderRadius: BorderRadius.circular(32),
                       // Dark: solid same color as cards; Light: soft gradient
                       color: Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFF1A1A1A)
+                          ? const Color(0xFF2A2A2A)
                           : null,
                       gradient: Theme.of(context).brightness == Brightness.dark
                           ? null
