@@ -1,12 +1,14 @@
+// lib/screens/health_tracker.dart
+library health_tracker;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:provider/provider.dart';
+// removed unused imports
 import '../core/constants/design_system.dart';
-import '../core/constants/translations.dart';
-import '../core/services/app_settings.dart';
+// removed unused imports
 import '../core/services/storage_service.dart';
-import '../widgets/candy_brand_components.dart';
+// removed unused imports
+part 'functions/health_tracker.functions.dart';
 
 class HealthTracker extends StatefulWidget {
   const HealthTracker({super.key});
@@ -16,10 +18,10 @@ class HealthTracker extends StatefulWidget {
 }
 
 class _HealthTrackerState extends State<HealthTracker>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, HealthTrackerFunctions {
   double _dailyGoal = 3000.0; // ml
   double _currentIntake = 1200.0; // ml
-  bool _showAddWaterDialog = false;
+  // removed unused field
   late AnimationController _animationController;
   late AnimationController _progressController;
   late Animation<double> _fadeAnimation;
@@ -109,19 +111,21 @@ class _HealthTrackerState extends State<HealthTracker>
         _currentIntake = _dailyGoal;
       }
     });
-    
+
     // Save to storage
     await StorageService.saveWaterGoal(newGoal.toInt());
-    
+
     // Update progress animation
     _updateProgress();
-    
+
     // Show success feedback
     HapticFeedback.mediumImpact();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('تم تحديث الهدف اليومي إلى ${(newGoal / 1000).toStringAsFixed(1)} لتر'),
+        content: Text(
+          'تم تحديث الهدف اليومي إلى ${(newGoal / 1000).toStringAsFixed(1)} لتر',
+        ),
         backgroundColor: DesignSystem.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -182,8 +186,10 @@ class _HealthTrackerState extends State<HealthTracker>
 
   void _showDailyGoalDialog() {
     final TextEditingController goalController = TextEditingController();
-    goalController.text = (_dailyGoal / 1000).toStringAsFixed(1); // Convert to liters
-    
+    goalController.text = (_dailyGoal / 1000).toStringAsFixed(
+      1,
+    ); // Convert to liters
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -200,10 +206,7 @@ class _HealthTrackerState extends State<HealthTracker>
           children: [
             Text(
               'حدد كمية الماء التي تريد شربها يومياً',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
             Container(
@@ -211,18 +214,25 @@ class _HealthTrackerState extends State<HealthTracker>
               decoration: BoxDecoration(
                 color: DesignSystem.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: DesignSystem.primary.withOpacity(0.3)),
+                border: Border.all(
+                  color: DesignSystem.primary.withOpacity(0.3),
+                ),
               ),
               child: TextField(
                 controller: goalController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: InputDecoration(
                   labelText: 'الهدف اليومي (لتر)',
                   labelStyle: TextStyle(color: DesignSystem.primary),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
-                  suffixIcon: Icon(Icons.water_drop, color: DesignSystem.primary),
+                  suffixIcon: Icon(
+                    Icons.water_drop,
+                    color: DesignSystem.primary,
+                  ),
                 ),
                 style: TextStyle(
                   fontSize: 18,
@@ -245,10 +255,7 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: Text(
                       'المعدل المُوصى به: 3-4 لتر يومياً',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue[700],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.blue[700]),
                     ),
                   ),
                 ],
@@ -271,7 +278,9 @@ class _HealthTrackerState extends State<HealthTracker>
             ),
             onPressed: () {
               final goalInLiters = double.tryParse(goalController.text);
-              if (goalInLiters != null && goalInLiters > 0 && goalInLiters <= 10) {
+              if (goalInLiters != null &&
+                  goalInLiters > 0 &&
+                  goalInLiters <= 10) {
                 _updateDailyGoal(goalInLiters * 1000); // Convert to ml
                 Navigator.pop(context);
               }

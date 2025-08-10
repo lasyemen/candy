@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/customer.dart';
 import 'cart_service.dart';
 import 'guest_user_service.dart';
@@ -10,6 +12,10 @@ class CustomerSession {
 
   Customer? _currentCustomer;
   Map<String, dynamic>? _guestUser;
+
+  static const String _currentCustomerKey = 'current_customer_data_v1';
+  static const String _isMerchantKey = 'current_customer_is_merchant_v1';
+  bool _isMerchant = false;
 
   // Get current customer
   Customer? get currentCustomer => _currentCustomer;
@@ -28,6 +34,14 @@ class CustomerSession {
     print(
       'CustomerSession - Customer logged in: ${customer.name} (${customer.phone})',
     );
+
+    // Persist current customer locally for auto-login across app restarts
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_currentCustomerKey, jsonEncode(customer.toJson()));
+    } catch (e) {
+      print('CustomerSession - Failed to persist current customer: $e');
+    }
 
     // Merge guest cart into user cart and wait for completion
     try {
@@ -79,6 +93,13 @@ class CustomerSession {
     _currentCustomer = null;
     _guestUser = null;
     print('CustomerSession - Customer logged out');
+
+    // Clear persisted customer
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove(_currentCustomerKey);
+      prefs.remove(_isMerchantKey);
+    });
+    _isMerchant = false;
   }
 
   // Check if customer is logged in
@@ -99,4 +120,34 @@ class CustomerSession {
 
   // Get guest user data
   Map<String, dynamic>? get guestUser => _guestUser;
+
+  bool get isMerchant => _isMerchant;
+  Future<void> setMerchant(bool value) async {
+    _isMerchant = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_isMerchantKey, value);
+    } catch (e) {
+      print('CustomerSession - Failed to persist isMerchant: $e');
+    }
+  }
+
+  // Load current customer from local storage (call on app start)
+  Future<void> loadCurrentCustomer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getString(_currentCustomerKey);
+      if (data != null && data.isNotEmpty) {
+        final Map<String, dynamic> json =
+            jsonDecode(data) as Map<String, dynamic>;
+        _currentCustomer = Customer.fromJson(json);
+        print(
+          'CustomerSession - Restored current customer: ${_currentCustomer!.name}',
+        );
+      }
+      _isMerchant = prefs.getBool(_isMerchantKey) ?? false;
+    } catch (e) {
+      print('CustomerSession - Failed to restore current customer: $e');
+    }
+  }
 }

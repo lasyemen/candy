@@ -1,7 +1,14 @@
+// lib/screens/merchant_approval_screen.dart
+library merchant_approval_screen;
+
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 import '../core/services/merchant_service.dart';
+import '../core/services/auth_service.dart';
+import '../core/services/customer_session.dart';
+import '../widgets/merchant/summary_row.dart';
+part 'functions/merchant_approval_screen.functions.dart';
 
 class MerchantApprovalScreen extends StatefulWidget {
   final Map<String, dynamic> merchantData;
@@ -13,7 +20,7 @@ class MerchantApprovalScreen extends StatefulWidget {
 }
 
 class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, MerchantApprovalScreenFunctions {
   bool _isLoading = false;
   bool _agreedToTerms = false;
 
@@ -67,15 +74,46 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
     setState(() => _isLoading = true);
 
     try {
-      final String merchantId = (widget.merchantData['merchantId'] ?? '').toString();
+      final String merchantId = (widget.merchantData['merchantId'] ?? '')
+          .toString();
       if (merchantId.isEmpty) {
         throw Exception('merchantId is missing');
       }
       await MerchantService.instance.acceptTerms(merchantId: merchantId);
 
+      // Ensure customer session exists for owner (so app doesn't treat as guest)
+      final String ownerName = (widget.merchantData['ownerName'] ?? '')
+          .toString();
+      final String phoneDisplay = (widget.merchantData['phone'] ?? '')
+          .toString();
+      final String phoneNormalized = phoneDisplay.replaceAll(
+        RegExp(r'\s+'),
+        '',
+      );
+
+      // Try login; if not exists, register then login to set session
+      final existing = await AuthService.instance.loginCustomer(
+        phone: phoneNormalized,
+      );
+      if (existing == null) {
+        await AuthService.instance.registerCustomer(
+          name: ownerName.isNotEmpty ? ownerName : 'Merchant',
+          phone: phoneNormalized,
+          address: widget.merchantData['address']?.toString(),
+        );
+        await AuthService.instance.loginCustomer(phone: phoneNormalized);
+      }
+      // Mark session as merchant for future app launches
+      await CustomerSession.instance.setMerchant(true);
+
       if (!mounted) return;
       setState(() => _isLoading = false);
-      Navigator.pushReplacementNamed(context, AppRoutes.main);
+      // Navigate to main with merchant flag to hide Health tab
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.main,
+        arguments: {'isMerchant': true},
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -104,33 +142,35 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Builder(builder: (context) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          if (isDark) {
-            return const Text(
-              'تسجيل تاجر جديد',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+        title: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            if (isDark) {
+              return const Text(
+                'تسجيل تاجر جديد',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              );
+            }
+            return ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: const Text(
+                'تسجيل تاجر جديد',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             );
-          }
-          return ShaderMask(
-            shaderCallback: (bounds) =>
-                DesignSystem.primaryGradient.createShader(bounds),
-            child: const Text(
-              'تسجيل تاجر جديد',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          );
-        }),
+          },
+        ),
         centerTitle: true,
       ),
       body: FadeTransition(
@@ -257,25 +297,25 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildSummaryRow(
-                            'اسم المتجر',
-                            widget.merchantData['storeName'] ?? '',
+                          SummaryRow(
+                            label: 'اسم المتجر',
+                            value: widget.merchantData['storeName'] ?? '',
                           ),
-                          _buildSummaryRow(
-                            'اسم المالك',
-                            widget.merchantData['ownerName'] ?? '',
+                          SummaryRow(
+                            label: 'اسم المالك',
+                            value: widget.merchantData['ownerName'] ?? '',
                           ),
-                          _buildSummaryRow(
-                            'رقم الجوال',
-                            widget.merchantData['phone'] ?? '',
+                          SummaryRow(
+                            label: 'رقم الجوال',
+                            value: widget.merchantData['phone'] ?? '',
                           ),
-                          _buildSummaryRow(
-                            'العنوان',
-                            widget.merchantData['address'] ?? '',
+                          SummaryRow(
+                            label: 'العنوان',
+                            value: widget.merchantData['address'] ?? '',
                           ),
-                          _buildSummaryRow(
-                            'المستندات',
-                            'تم رفع جميع المستندات',
+                          const SummaryRow(
+                            label: 'المستندات',
+                            value: 'تم رفع جميع المستندات',
                             showCheckmark: true,
                           ),
                         ],
@@ -424,56 +464,5 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
     );
   }
 
-  Widget _buildSummaryRow(
-    String label,
-    String value, {
-    bool showCheckmark = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 14,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      fontFamily: 'Rubik',
-                      fontSize: 14,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (showCheckmark)
-                  Icon(
-                    Icons.check_circle,
-                    color: const Color(0xFF6B46C1),
-                    size: 20,
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Summary rows extracted
 }

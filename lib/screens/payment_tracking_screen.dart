@@ -1,3 +1,6 @@
+// lib/screens/payment_tracking_screen.dart
+library payment_tracking_screen;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/app_colors.dart';
@@ -7,6 +10,7 @@ import '../widgets/payment/order_summary_card.dart';
 import '../widgets/payment/payment_method.dart' as pm;
 import '../widgets/payment/payment_method_tile.dart';
 import '../widgets/navigation/navigation_wrapper.dart';
+part 'functions/payment_tracking_screen.functions.dart';
 
 class PaymentTrackingScreen extends StatefulWidget {
   final Map<String, dynamic>? deliveryData;
@@ -18,7 +22,7 @@ class PaymentTrackingScreen extends StatefulWidget {
 }
 
 class _PaymentTrackingScreenState extends State<PaymentTrackingScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, PaymentTrackingScreenFunctions {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;

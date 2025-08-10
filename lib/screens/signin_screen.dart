@@ -1,7 +1,14 @@
+// lib/screens/signin_screen.dart
+library signin_screen;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
-import '../core/services/auth_service.dart';
+import '../core/services/customer_session.dart';
+import '../utils/auth_actions.dart';
+import '../widgets/shared/phone_text_field.dart';
+part 'functions/signin_screen.functions.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -11,7 +18,7 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, SignInScreenFunctions {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _isLoading = false;
@@ -53,83 +60,7 @@ class _SignInScreenState extends State<SignInScreen>
     super.dispose();
   }
 
-  void _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      print('Sign-in form submitted with phone: ${_phoneController.text}');
-
-      // Check if customer exists
-      final customerExists = await AuthService.instance.customerExists(
-        phone: _phoneController.text,
-      );
-
-      print('Customer exists check result: $customerExists');
-      if (!customerExists) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('رقم الهاتف غير مسجل. يرجى إنشاء حساب جديد.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      print('Proceeding with customer login...');
-      // Login customer
-      final customer = await AuthService.instance.loginCustomer(
-        phone: _phoneController.text,
-      );
-
-      print('Login result: ${customer?.name}');
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        if (customer != null) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تم تسجيل الدخول بنجاح! مرحباً ${customer.name}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          // Navigate to main screen (which includes navigation bar)
-          Navigator.pushReplacementNamed(context, AppRoutes.main);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
+  // Implemented in SignInScreenFunctions (see part file)
 
   @override
   Widget build(BuildContext context) {
@@ -267,45 +198,9 @@ class _SignInScreenState extends State<SignInScreen>
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: TextFormField(
+                              child: PhoneTextField(
                                 controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال رقم الهاتف';
-                                  }
-                                  return null;
-                                },
-                                style: const TextStyle(
-                                  fontFamily: 'Rubik',
-                                  fontSize: 12,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'أدخل رقم هاتفك',
-                                  hintStyle: TextStyle(
-                                    fontFamily: 'Rubik',
-                                    fontSize: 12,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white54
-                                        : Colors.grey[500],
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.phone_outlined,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white60
-                                        : Colors.grey[600],
-                                    size: 20,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
-                                  ),
-                                ),
+                                hintText: 'أدخل رقم هاتفك',
                               ),
                             ),
                           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 import '../core/services/auth_service.dart';
@@ -500,51 +501,62 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: TextFormField(
-                                controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال رقم الهاتف';
-                                  }
-                                  // Remove any non-digit characters for validation
-                                  final cleanPhone = value.replaceAll(
-                                    RegExp(r'[^\d]'),
-                                    '',
-                                  );
-                                  if (cleanPhone.length < 8) {
-                                    return 'يرجى إدخال رقم هاتف صحيح';
-                                  }
-                                  return null;
-                                },
-                                style: const TextStyle(
-                                  fontFamily: 'Rubik',
-                                  fontSize: 12,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'أدخل رقم هاتفك',
-                                  hintStyle: TextStyle(
+                              child: Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: TextFormField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  textAlign: TextAlign.left,
+                                  enableSuggestions: false,
+                                  autocorrect: false,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                      RegExp(r'[0-9+ ]'),
+                                    ),
+                                  ],
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'يرجى إدخال رقم الهاتف';
+                                    }
+                                    // Remove any non-digit characters for validation
+                                    final cleanPhone = value.replaceAll(
+                                      RegExp(r'[^\d]'),
+                                      '',
+                                    );
+                                    if (cleanPhone.length < 8) {
+                                      return 'يرجى إدخال رقم هاتف صحيح';
+                                    }
+                                    return null;
+                                  },
+                                  style: const TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white54
-                                        : Colors.grey[500],
                                   ),
-                                  prefixIcon: Icon(
-                                    Icons.phone_outlined,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white60
-                                        : Colors.grey[600],
-                                    size: 20,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
+                                  decoration: InputDecoration(
+                                    hintText: 'أدخل رقم هاتفك',
+                                    hintStyle: TextStyle(
+                                      fontFamily: 'Rubik',
+                                      fontSize: 12,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white54
+                                          : Colors.grey[500],
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.phone_outlined,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white60
+                                          : Colors.grey[600],
+                                      size: 20,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                   ),
                                 ),
                               ),

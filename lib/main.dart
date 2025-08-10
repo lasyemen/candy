@@ -7,7 +7,6 @@ import 'core/services/app_settings.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/cart_service.dart';
 import 'core/services/customer_session.dart';
-import 'core/services/guest_user_service.dart';
 import 'screens/index.dart';
 import 'core/routes/index.dart';
 import 'core/theme/app_theme.dart';
@@ -31,6 +30,8 @@ void main() async {
 
   // Load guest user data if available
   await CustomerSession.instance.loadGuestUser();
+  // Restore logged-in customer if present
+  await CustomerSession.instance.loadCurrentCustomer();
 
   runApp(const MyApp());
 }

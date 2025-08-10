@@ -1,7 +1,12 @@
+// lib/screens/merchant_signup_screen.dart
+library merchant_signup_screen;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/services/merchant_service.dart';
 import 'merchant_documents_screen.dart'; // Added import for MerchantDocumentsScreen
+part 'functions/merchant_signup_screen.functions.dart';
 
 class MerchantSignupScreen extends StatefulWidget {
   const MerchantSignupScreen({super.key});
@@ -11,7 +16,7 @@ class MerchantSignupScreen extends StatefulWidget {
 }
 
 class _MerchantSignupScreenState extends State<MerchantSignupScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, MerchantSignupScreenFunctions {
   final _formKey = GlobalKey<FormState>();
   final _storeNameController = TextEditingController();
   final _ownerNameController = TextEditingController();
@@ -146,33 +151,35 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Builder(builder: (context) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          if (isDark) {
-            return const Text(
-              'تسجيل تاجر جديد',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+        title: Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            if (isDark) {
+              return const Text(
+                'تسجيل تاجر جديد',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              );
+            }
+            return ShaderMask(
+              shaderCallback: (bounds) =>
+                  DesignSystem.primaryGradient.createShader(bounds),
+              child: const Text(
+                'تسجيل تاجر جديد',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             );
-          }
-          return ShaderMask(
-            shaderCallback: (bounds) =>
-                DesignSystem.primaryGradient.createShader(bounds),
-            child: const Text(
-              'تسجيل تاجر جديد',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          );
-        }),
+          },
+        ),
         centerTitle: true,
       ),
       body: FadeTransition(
@@ -477,84 +484,97 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: TextFormField(
-                                controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال رقم الجوال';
-                                  }
-                                  return null;
-                                },
-                                style: const TextStyle(
-                                  fontFamily: 'Rubik',
-                                  fontSize: 12,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: '5X XXX XXXX',
-                                  hintStyle: TextStyle(
+                              child: Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: TextFormField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  textAlign: TextAlign.left,
+                                  enableSuggestions: false,
+                                  autocorrect: false,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                      RegExp(r'[0-9+ ]'),
+                                    ),
+                                  ],
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'يرجى إدخال رقم الجوال';
+                                    }
+                                    return null;
+                                  },
+                                  style: const TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white54
-                                        : Colors.grey[500],
                                   ),
-                                  prefixIcon: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 16),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 20,
-                                              height: 15,
-                                              decoration: BoxDecoration(
-                                                color: Colors.green,
-                                                borderRadius:
-                                                    BorderRadius.circular(2),
+                                  decoration: InputDecoration(
+                                    hintText: '5X XXX XXXX',
+                                    hintStyle: TextStyle(
+                                      fontFamily: 'Rubik',
+                                      fontSize: 12,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white54
+                                          : Colors.grey[500],
+                                    ),
+                                    prefixIcon: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            left: 16,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 20,
+                                                height: 15,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green,
+                                                  borderRadius:
+                                                      BorderRadius.circular(2),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.flag,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
                                               ),
-                                              child: const Icon(
-                                                Icons.flag,
-                                                color: Colors.white,
-                                                size: 12,
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '+966',
+                                                style: TextStyle(
+                                                  fontFamily: 'Rubik',
+                                                  fontSize: 12,
+                                                  color:
+                                                      Theme.of(
+                                                            context,
+                                                          ).brightness ==
+                                                          Brightness.dark
+                                                      ? Colors.white60
+                                                      : Colors.grey[600],
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              '+966',
-                                              style: TextStyle(
-                                                fontFamily: 'Rubik',
-                                                fontSize: 12,
-                                                color:
-                                                    Theme.of(
-                                                          context,
-                                                        ).brightness ==
-                                                        Brightness.dark
-                                                    ? Colors.white60
-                                                    : Colors.grey[600],
-                                              ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      Icon(
-                                        Icons.phone_outlined,
-                                        color:
-                                            Theme.of(context).brightness ==
-                                                Brightness.dark
-                                            ? Colors.white60
-                                            : Colors.grey[600],
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
+                                        Icon(
+                                          Icons.phone_outlined,
+                                          color:
+                                              Theme.of(context).brightness ==
+                                                  Brightness.dark
+                                              ? Colors.white60
+                                              : Colors.grey[600],
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                   ),
                                 ),
                               ),

@@ -5,10 +5,27 @@ import '../../blocs/app_bloc.dart';
 import '../../core/constants/design_system.dart';
 import 'dart:ui'; // Added for ImageFilter
 
+class CandyNavItem {
+  final IconData icon;
+  final String label;
+  final int pageIndex;
+  final bool isHome;
+  final int? badge;
+
+  const CandyNavItem({
+    required this.icon,
+    required this.label,
+    required this.pageIndex,
+    this.isHome = false,
+    this.badge,
+  });
+}
+
 class CandyNavigationBar extends StatefulWidget {
   final Function(int) onNavTap;
+  final List<CandyNavItem>? items;
 
-  const CandyNavigationBar({super.key, required this.onNavTap});
+  const CandyNavigationBar({super.key, required this.onNavTap, this.items});
 
   @override
   State<CandyNavigationBar> createState() => _CandyNavigationBarState();
@@ -63,7 +80,7 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                 opacity: _slideAnimation.value,
                 child: Align(
                   alignment: Alignment.bottomCenter,
-                  child: Container(
+                child: Container(
                     margin: const EdgeInsets.only(
                       bottom: 16,
                       left: 12,
@@ -166,42 +183,26 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.user,
-                                label: 'حسابي',
-                                isActive: appBloc.currentIndex == 0,
-                                onTap: () => _onNavTap(0),
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.heart,
-                                label: 'الصحة',
-                                isActive: appBloc.currentIndex == 1,
-                                onTap: () => _onNavTap(1),
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.home,
-                                label: 'الرئيسية',
-                                isActive: appBloc.currentIndex == 2,
-                                onTap: () => _onNavTap(2),
-                                isHome: true,
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.shoppingCart,
-                                label: 'السلة',
-                                isActive: appBloc.currentIndex == 3,
-                                onTap: () => _onNavTap(3),
-                                badge: appBloc.cartItemCount > 0
-                                    ? appBloc.cartItemCount
-                                    : null,
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.listAlt,
-                                label: 'طلباتي',
-                                isActive: appBloc.currentIndex == 4,
-                                onTap: () => _onNavTap(4),
-                              ),
-                            ],
+                            children: (widget.items ?? const [
+                              CandyNavItem(icon: FontAwesomeIcons.user, label: 'حسابي', pageIndex: 0),
+                              CandyNavItem(icon: FontAwesomeIcons.heart, label: 'الصحة', pageIndex: 1),
+                              CandyNavItem(icon: FontAwesomeIcons.home, label: 'الرئيسية', pageIndex: 2, isHome: true),
+                              CandyNavItem(icon: FontAwesomeIcons.shoppingCart, label: 'السلة', pageIndex: 3),
+                              CandyNavItem(icon: FontAwesomeIcons.listAlt, label: 'طلباتي', pageIndex: 4),
+                            ]).map((item) {
+                              final bool isActive = appBloc.currentIndex == item.pageIndex;
+                              final int? badge = item.badge ?? (item.pageIndex == 3 && appBloc.cartItemCount > 0
+                                  ? appBloc.cartItemCount
+                                  : null);
+                              return _buildModernNavItem(
+                                icon: item.icon,
+                                label: item.label,
+                                isActive: isActive,
+                                onTap: () => _onNavTap(item.pageIndex),
+                                badge: badge,
+                                isHome: item.isHome,
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),

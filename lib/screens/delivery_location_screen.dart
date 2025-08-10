@@ -1,3 +1,6 @@
+// lib/screens/delivery_location_screen.dart
+library delivery_location_screen;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/app_colors.dart';
@@ -6,6 +9,7 @@ import '../widgets/navigation/navigation_wrapper.dart';
 import 'payment_tracking_screen.dart';
 import '../widgets/delivery/delivery_option_tile.dart';
 import '../widgets/delivery/gradient_header_card.dart';
+part 'functions/delivery_location_screen.functions.dart';
 
 class DeliveryLocationScreen extends StatefulWidget {
   const DeliveryLocationScreen({super.key});
@@ -15,7 +19,7 @@ class DeliveryLocationScreen extends StatefulWidget {
 }
 
 class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, DeliveryLocationScreenFunctions {
   String? selectedDeliveryType;
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
