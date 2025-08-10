@@ -5,7 +5,7 @@ class AppSettings extends ChangeNotifier {
   static const String _languageKey = 'selected_language';
   static const String _themeKey = 'selected_theme';
 
-  String _currentLanguage = 'ar';
+  String _currentLanguage = 'en';
   ThemeMode _currentTheme = ThemeMode.light;
 
   String get currentLanguage => _currentLanguage;
@@ -17,6 +17,7 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    // Load saved language; default to Arabic for Arabic-first experience
     _currentLanguage = prefs.getString(_languageKey) ?? 'ar';
     final themeString = prefs.getString(_themeKey) ?? 'light';
     _currentTheme = _getThemeModeFromString(themeString);

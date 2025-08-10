@@ -5,3 +5,5 @@ mixin MainScreenFunctions on State<MainScreen> {
   // mixin is added to standardize structure across screens and to host future
   // extractions if needed (e.g., nav helpers, page setup utilities).
 }
+
+

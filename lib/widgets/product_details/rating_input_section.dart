@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/design_system.dart';
+import '../../core/constants/translations.dart';
+import 'package:provider/provider.dart';
+import '../../core/services/app_settings.dart';
 import '../star_rating.dart';
 
 class RatingInputSection extends StatelessWidget {
@@ -22,6 +25,10 @@ class RatingInputSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String language = Provider.of<AppSettings>(
+      context,
+      listen: false,
+    ).currentLanguage;
     if (!isLoggedIn) {
       return Container(
         padding: const EdgeInsets.all(12),
@@ -36,7 +43,7 @@ class RatingInputSection extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'سجل دخولك لتقييم هذا المنتج',
+                AppTranslations.getText('sign_in_to_rate', language),
                 style: TextStyle(
                   color: Colors.orange[700],
                   fontFamily: 'Rubik',
@@ -52,7 +59,7 @@ class RatingInputSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'تقييمك',
+          AppTranslations.getText('your_rating', language),
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -105,8 +112,8 @@ class RatingInputSection extends StatelessWidget {
                             ),
                           ),
                         )
-                      : const Text(
-                          'إرسال',
+                      : Text(
+                          AppTranslations.getText('submit', language),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Rubik',
@@ -134,9 +141,9 @@ class RatingInputSection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'حذف',
-                    style: TextStyle(fontFamily: 'Rubik', fontSize: 10),
+                  child: Text(
+                    AppTranslations.getText('remove', language),
+                    style: const TextStyle(fontFamily: 'Rubik', fontSize: 10),
                   ),
                 ),
               ),
@@ -147,4 +154,3 @@ class RatingInputSection extends StatelessWidget {
     );
   }
 }
-

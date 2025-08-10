@@ -9,6 +9,7 @@ import '../blocs/app_bloc.dart';
 import '../widgets/index.dart';
 import 'index.dart';
 import '../core/services/app_settings.dart';
+import '../core/constants/translations.dart';
 part 'functions/main_screen.functions.dart';
 
 class MainScreen extends StatefulWidget {
@@ -26,7 +27,6 @@ class _MainScreenState extends State<MainScreen>
   final PageStorageBucket _bucket = PageStorageBucket();
 
   late final List<Widget> _screens;
-  late final List<CandyNavItem> _navItems;
   bool _configured = false;
 
   @override
@@ -46,7 +46,7 @@ class _MainScreenState extends State<MainScreen>
     super.didChangeDependencies();
     if (_configured) return;
 
-    // Build screens and nav items. If the app is in a merchant session, hide Health.
+    // Build screens once. If the app is in a merchant session, hide Health.
     final Object? args = ModalRoute.of(context)?.settings.arguments;
     final bool isMerchant = args is Map && (args['isMerchant'] == true);
 
@@ -57,57 +57,6 @@ class _MainScreenState extends State<MainScreen>
       const CartScreen(),
       const MyOrdersScreen(),
     ];
-
-    final bool isRtl = Directionality.of(context) == TextDirection.rtl;
-
-    if (isMerchant) {
-      final homeItem = CandyNavItem(
-        icon: FontAwesomeIcons.home,
-        label: 'الرئيسية',
-        pageIndex: 1,
-        isHome: true,
-      );
-      final others = [
-        CandyNavItem(icon: FontAwesomeIcons.user, label: 'حسابي', pageIndex: 0),
-        CandyNavItem(
-          icon: FontAwesomeIcons.shoppingCart,
-          label: 'السلة',
-          pageIndex: 2,
-        ),
-        CandyNavItem(
-          icon: FontAwesomeIcons.listAlt,
-          label: 'طلباتي',
-          pageIndex: 3,
-        ),
-      ];
-      // Place home at the visual right edge depending on text direction
-      _navItems = isRtl ? [homeItem, ...others] : [...others, homeItem];
-    } else {
-      _navItems = [
-        CandyNavItem(icon: FontAwesomeIcons.user, label: 'حسابي', pageIndex: 0),
-        CandyNavItem(
-          icon: FontAwesomeIcons.heart,
-          label: 'الصحة',
-          pageIndex: 1,
-        ),
-        CandyNavItem(
-          icon: FontAwesomeIcons.home,
-          label: 'الرئيسية',
-          pageIndex: 2,
-          isHome: true,
-        ),
-        CandyNavItem(
-          icon: FontAwesomeIcons.shoppingCart,
-          label: 'السلة',
-          pageIndex: 3,
-        ),
-        CandyNavItem(
-          icon: FontAwesomeIcons.listAlt,
-          label: 'طلباتي',
-          pageIndex: 4,
-        ),
-      ];
-    }
 
     _configured = true;
   }
@@ -150,6 +99,68 @@ class _MainScreenState extends State<MainScreen>
     return Consumer2<AppSettings, AppBloc>(
       builder: (context, appSettings, appBloc, child) {
         // final isDarkMode = appSettings.isDarkMode; // reserved for theming
+        final String language = appSettings.currentLanguage;
+        final Object? args = ModalRoute.of(context)?.settings.arguments;
+        final bool isMerchant = args is Map && (args['isMerchant'] == true);
+        final bool isRtl = Directionality.of(context) == TextDirection.rtl;
+
+        // Build navigation items dynamically so labels react to language changes
+        late final List<CandyNavItem> navItems;
+        if (isMerchant) {
+          final homeItem = CandyNavItem(
+            icon: FontAwesomeIcons.home,
+            label: AppTranslations.getText('home', language),
+            pageIndex: 1,
+            isHome: true,
+          );
+          final others = [
+            CandyNavItem(
+              icon: FontAwesomeIcons.user,
+              label: AppTranslations.getText('profile', language),
+              pageIndex: 0,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.shoppingCart,
+              label: AppTranslations.getText('cart', language),
+              pageIndex: 2,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.listAlt,
+              label: AppTranslations.getText('orders', language),
+              pageIndex: 3,
+            ),
+          ];
+          navItems = isRtl ? [homeItem, ...others] : [...others, homeItem];
+        } else {
+          navItems = [
+            CandyNavItem(
+              icon: FontAwesomeIcons.user,
+              label: AppTranslations.getText('profile', language),
+              pageIndex: 0,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.heart,
+              label: AppTranslations.getText('water_tracking', language),
+              pageIndex: 1,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.home,
+              label: AppTranslations.getText('home', language),
+              pageIndex: 2,
+              isHome: true,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.shoppingCart,
+              label: AppTranslations.getText('cart', language),
+              pageIndex: 3,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.listAlt,
+              label: AppTranslations.getText('orders', language),
+              pageIndex: 4,
+            ),
+          ];
+        }
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -172,7 +183,7 @@ class _MainScreenState extends State<MainScreen>
                   },
                   children: _screens,
                 ),
-                CandyNavigationBar(onNavTap: _onNavTap, items: _navItems),
+                CandyNavigationBar(onNavTap: _onNavTap, items: navItems),
               ],
             ),
           ),

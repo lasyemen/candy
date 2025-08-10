@@ -4,6 +4,9 @@ library signin_screen;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
+import '../core/constants/translations.dart';
+import '../core/services/app_settings.dart';
+import 'package:provider/provider.dart';
 import '../core/routes/index.dart';
 import '../core/services/customer_session.dart';
 import '../utils/auth_actions.dart';
@@ -64,6 +67,7 @@ class _SignInScreenState extends State<SignInScreen>
 
   @override
   Widget build(BuildContext context) {
+    final language = context.watch<AppSettings>().currentLanguage;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -80,8 +84,11 @@ class _SignInScreenState extends State<SignInScreen>
           builder: (context) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             if (isDark) {
-              return const Text(
-                'تسجيل الدخول',
+              return Text(
+                AppTranslations.getText('create_account', language) ==
+                        'Create Account'
+                    ? 'Sign In'
+                    : 'تسجيل الدخول',
                 style: TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 18,
@@ -93,8 +100,11 @@ class _SignInScreenState extends State<SignInScreen>
             return ShaderMask(
               shaderCallback: (bounds) =>
                   DesignSystem.primaryGradient.createShader(bounds),
-              child: const Text(
-                'تسجيل الدخول',
+              child: Text(
+                AppTranslations.getText('create_account', language) ==
+                        'Create Account'
+                    ? 'Sign In'
+                    : 'تسجيل الدخول',
                 style: TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 18,
@@ -146,10 +156,14 @@ class _SignInScreenState extends State<SignInScreen>
 
                       // Subtitle
                       Text(
-                        'سجل دخولك للوصول\nإلى حسابك',
+                        language == 'en'
+                            ? 'Sign in to access\nyour account'
+                            : 'سجّل الدخول للوصول إلى حسابك',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily: language == 'en'
+                              ? 'SFProDisplay'
+                              : 'Rubik',
                           fontSize: 20,
                           color: Theme.of(context).brightness == Brightness.dark
                               ? Colors.white
@@ -168,9 +182,11 @@ class _SignInScreenState extends State<SignInScreen>
                           Padding(
                             padding: const EdgeInsets.only(left: 16, bottom: 8),
                             child: Text(
-                              'رقم الهاتف',
+                              language == 'en' ? 'Phone number' : 'رقم الهاتف',
                               style: TextStyle(
-                                fontFamily: 'Rubik',
+                                fontFamily: language == 'en'
+                                    ? 'SFProDisplay'
+                                    : 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color:
@@ -200,7 +216,9 @@ class _SignInScreenState extends State<SignInScreen>
                               ),
                               child: PhoneTextField(
                                 controller: _phoneController,
-                                hintText: 'أدخل رقم هاتفك',
+                                hintText: language == 'en'
+                                    ? 'Enter your phone number'
+                                    : 'أدخل رقم هاتفك',
                               ),
                             ),
                           ),
@@ -244,10 +262,12 @@ class _SignInScreenState extends State<SignInScreen>
                                     ),
                                   ),
                                 )
-                              : const Text(
-                                  'تسجيل الدخول',
+                              : Text(
+                                  language == 'en' ? 'Sign In' : 'تسجيل الدخول',
                                   style: TextStyle(
-                                    fontFamily: 'Rubik',
+                                    fontFamily: language == 'en'
+                                        ? 'SFProDisplay'
+                                        : 'Rubik',
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -263,9 +283,13 @@ class _SignInScreenState extends State<SignInScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'ليس لديك حساب؟ ',
+                            language == 'en'
+                                ? "Don't have an account? "
+                                : 'ليس لديك حساب؟ ',
                             style: TextStyle(
-                              fontFamily: 'Rubik',
+                              fontFamily: language == 'en'
+                                  ? 'SFProDisplay'
+                                  : 'Rubik',
                               fontSize: 12,
                               color:
                                   Theme.of(context).brightness ==
@@ -282,10 +306,14 @@ class _SignInScreenState extends State<SignInScreen>
                               shaderCallback: (bounds) => DesignSystem
                                   .primaryGradient
                                   .createShader(bounds),
-                              child: const Text(
-                                'إنشاء حساب',
+                              child: Text(
+                                language == 'en'
+                                    ? 'Create Account'
+                                    : 'إنشاء حساب',
                                 style: TextStyle(
-                                  fontFamily: 'Rubik',
+                                  fontFamily: language == 'en'
+                                      ? 'SFProDisplay'
+                                      : 'Rubik',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,

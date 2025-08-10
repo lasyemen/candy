@@ -1,8 +1,7 @@
-
-
 class AppTranslations {
   static const Map<String, Map<String, String>> _translations = {
     'ar': {
+      'app_name': 'مياه كاندي',
       // Navigation
       'home': 'الرئيسية',
       'products': 'المنتجات',
@@ -73,6 +72,12 @@ class AppTranslations {
       'notifications_subtitle': 'إعدادات الإشعارات',
       'help_support': 'المساعدة والدعم',
       'help_support_subtitle': 'الأسئلة الشائعة والدعم',
+      'create_account': 'إنشاء حساب',
+      'description': 'الوصف',
+      'no_description': 'لا يوجد وصف.',
+      'your_rating': 'تقييمك',
+      'submit': 'إرسال',
+      'sign_in_to_rate': 'سجل دخولك لتقييم هذا المنتج',
       'welcome_to_candy': 'مرحباً بك في كاندي!',
       'stay_hydrated_message': 'حافظ على رطوبة جسمك مع أفضل مياه',
       'water_tracking': 'تتبع الماء',
@@ -94,6 +99,14 @@ class AppTranslations {
       'light_mode': 'الوضع الفاتح',
       'system': 'تلقائي',
       'logout': 'تسجيل الخروج من كاندي',
+      'prices_include_vat': 'الأسعار شاملة ضريبة القيمة المضافة',
+      'no_products': 'لا يوجد منتجات متاحة حالياً.',
+      'special_offer': 'عرض خاص! ',
+      'discount_20_all': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+      'free_delivery': 'توصيل مجاني',
+      'free_delivery_over_50': 'للطلبات التي تزيد عن ٥٠ ريال',
+      'candy_ad': 'إعلان كاندي',
+      'candy_offer': 'عرض خاص من كاندي',
 
       // Water Goal Settings
       'water_goal': 'هدف شرب الماء',
@@ -120,6 +133,7 @@ class AppTranslations {
       'info': 'معلومات',
     },
     'en': {
+      'app_name': 'Candy Water',
       // Navigation
       'home': 'Home',
       'products': 'Products',
@@ -190,9 +204,15 @@ class AppTranslations {
       'notifications_subtitle': 'Notification Settings',
       'help_support': 'Help & Support',
       'help_support_subtitle': 'FAQ & Support',
+      'create_account': 'Create Account',
+      'description': 'Description',
+      'no_description': 'No description.',
+      'your_rating': 'Your rating',
+      'submit': 'Submit',
+      'sign_in_to_rate': 'Sign in to rate this product',
       'welcome_to_candy': 'Welcome to Candy!',
       'stay_hydrated_message': 'Stay hydrated with the best water',
-      'water_tracking': 'Water Tracking',
+      'water_tracking': 'Health',
       'buy_water': 'Buy Water',
       'add_water': 'Add Water',
       'mineral_water_500ml': 'Mineral Water 500ml',
@@ -211,6 +231,14 @@ class AppTranslations {
       'light_mode': 'Light Mode',
       'system': 'System',
       'logout': 'Logout from Candy',
+      'prices_include_vat': 'Prices include VAT',
+      'no_products': 'No products available right now.',
+      'special_offer': 'Special Offer!',
+      'discount_20_all': 'Get 20% off all Candy products',
+      'free_delivery': 'Free Delivery',
+      'free_delivery_over_50': 'For orders over 50 SAR',
+      'candy_ad': 'Candy Ad',
+      'candy_offer': 'Special offer from Candy',
 
       // Water Goal Settings
       'water_goal': 'Water Goal',
@@ -237,6 +265,7 @@ class AppTranslations {
       'info': 'Info',
     },
     'ur': {
+      'app_name': 'کینڈی واٹر',
       // Navigation
       'home': 'ہوم',
       'products': 'پروڈکٹس',
@@ -307,6 +336,12 @@ class AppTranslations {
       'notifications_subtitle': 'اطلاعات کی ترتیبات',
       'help_support': 'مدد اور سپورٹ',
       'help_support_subtitle': 'سوالات اور سپورٹ',
+      'create_account': 'اکاؤنٹ بنائیں',
+      'description': 'تفصیل',
+      'no_description': 'کوئی تفصیل نہیں۔',
+      'your_rating': 'آپ کی درجہ بندی',
+      'submit': 'جمع کریں',
+      'sign_in_to_rate': 'مصنوعہ کی درجہ بندی کے لیے سائن ان کریں',
       'welcome_to_candy': 'کینڈی میں خوش آمدید!',
       'stay_hydrated_message': 'بہترین پانی کے ساتھ ہائیڈریٹ رہیں',
       'water_tracking': 'پانی کی ٹریکنگ',
@@ -333,6 +368,14 @@ class AppTranslations {
       'light_mode': 'لائٹ موڈ',
       'system': 'سسٹم',
       'logout': 'کینڈی سے لاگ آؤٹ',
+      'prices_include_vat': 'قیمتوں میں VAT شامل ہے',
+      'no_products': 'فی الحال کوئی پروڈکٹس دستیاب نہیں۔',
+      'special_offer': 'خصوصی پیشکش!',
+      'discount_20_all': 'تمام کینڈی پروڈکٹس پر 20% رعایت حاصل کریں',
+      'free_delivery': 'مفت ترسیل',
+      'free_delivery_over_50': '50 ریال سے زائد کے آرڈرز پر',
+      'candy_ad': 'کینڈی اشتہار',
+      'candy_offer': 'کینڈی کی خصوصی پیشکش',
 
       // Common
       'sar': 'ریال',
@@ -354,7 +397,8 @@ class AppTranslations {
   };
 
   static String getText(String key, String language) {
-    return _translations[language]?[key] ?? key;
+    // Fallback to English if key is missing for the selected language
+    return _translations[language]?[key] ?? _translations['en']?[key] ?? key;
   }
 
   static List<String> getSupportedLanguages() {

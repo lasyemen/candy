@@ -1,6 +1,10 @@
 // lib/screens/health_tracker.dart
 library health_tracker;
 
+import 'package:provider/provider.dart';
+import '../core/constants/translations.dart';
+import '../core/services/app_settings.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // removed unused imports
@@ -30,13 +34,13 @@ class _HealthTrackerState extends State<HealthTracker>
   // Weekly data
   final List<double> _weeklyIntake = [1800, 2200, 1900, 2400, 2100, 2300, 1200];
   final List<String> _weekDays = [
-    'أحد',
-    'اثنين',
-    'ثلاثاء',
-    'أربعاء',
-    'خميس',
-    'جمعة',
-    'سبت',
+    'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
   ];
 
   @override
@@ -124,7 +128,7 @@ class _HealthTrackerState extends State<HealthTracker>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'تم تحديث الهدف اليومي إلى ${(newGoal / 1000).toStringAsFixed(1)} لتر',
+          'Daily goal updated to ${(newGoal / 1000).toStringAsFixed(1)} L',
         ),
         backgroundColor: DesignSystem.primary,
         behavior: SnackBarBehavior.floating,
@@ -140,7 +144,12 @@ class _HealthTrackerState extends State<HealthTracker>
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('إضافة كمية مخصصة'),
+        title: Text(
+          AppTranslations.getText(
+            'add',
+            context.read<AppSettings>().currentLanguage,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -155,7 +164,7 @@ class _HealthTrackerState extends State<HealthTracker>
                 controller: amountController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'الكمية (مل)',
+                  labelText: 'Amount (ml)',
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -167,7 +176,12 @@ class _HealthTrackerState extends State<HealthTracker>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
+            child: Text(
+              AppTranslations.getText(
+                'cancel',
+                context.read<AppSettings>().currentLanguage,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -177,7 +191,12 @@ class _HealthTrackerState extends State<HealthTracker>
                 Navigator.pop(context);
               }
             },
-            child: const Text('إضافة'),
+            child: Text(
+              AppTranslations.getText(
+                'add',
+                context.read<AppSettings>().currentLanguage,
+              ),
+            ),
           ),
         ],
       ),
@@ -198,14 +217,19 @@ class _HealthTrackerState extends State<HealthTracker>
           children: [
             Icon(Icons.flag_outlined, color: DesignSystem.primary),
             const SizedBox(width: 8),
-            const Text('تحديد الهدف اليومي'),
+            Text(
+              AppTranslations.getText(
+                'set_daily_goal',
+                context.read<AppSettings>().currentLanguage,
+              ),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'حدد كمية الماء التي تريد شربها يومياً',
+              'Set your desired daily water intake',
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
@@ -224,7 +248,7 @@ class _HealthTrackerState extends State<HealthTracker>
                   decimal: true,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'الهدف اليومي (لتر)',
+                  labelText: 'Daily goal (liters)',
                   labelStyle: TextStyle(color: DesignSystem.primary),
                   border: InputBorder.none,
                   isDense: true,
@@ -254,7 +278,7 @@ class _HealthTrackerState extends State<HealthTracker>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'المعدل المُوصى به: 3-4 لتر يومياً',
+                      'Recommended: 3–4 liters daily',
                       style: TextStyle(fontSize: 12, color: Colors.blue[700]),
                     ),
                   ),
@@ -266,7 +290,7 @@ class _HealthTrackerState extends State<HealthTracker>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('إلغاء', style: TextStyle(color: Colors.grey[600])),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -285,7 +309,12 @@ class _HealthTrackerState extends State<HealthTracker>
                 Navigator.pop(context);
               }
             },
-            child: const Text('حفظ'),
+            child: Text(
+              AppTranslations.getText(
+                'save',
+                context.read<AppSettings>().currentLanguage,
+              ),
+            ),
           ),
         ],
       ),
@@ -300,7 +329,7 @@ class _HealthTrackerState extends State<HealthTracker>
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          'تتبع الصحة',
+          'Health Tracker',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -335,7 +364,7 @@ class _HealthTrackerState extends State<HealthTracker>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'تقدم اليوم',
+                          'Today\'s Progress',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -373,7 +402,7 @@ class _HealthTrackerState extends State<HealthTracker>
                                 animation: _progressAnimation,
                                 builder: (context, child) {
                                   return Text(
-                                    '${_currentIntake.toInt()} مل',
+                                    '${_currentIntake.toInt()} ml',
                                     style: const TextStyle(
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,
@@ -383,7 +412,7 @@ class _HealthTrackerState extends State<HealthTracker>
                                 },
                               ),
                               Text(
-                                'من ${(_dailyGoal / 1000).toStringAsFixed(1)} لتر',
+                                'of ${(_dailyGoal / 1000).toStringAsFixed(1)} L',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white.withOpacity(0.8),
@@ -419,7 +448,7 @@ class _HealthTrackerState extends State<HealthTracker>
 
               // Quick Add Buttons
               Text(
-                'إضافة سريعة',
+                'Quick Add',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -432,7 +461,7 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: _buildQuickAddButton(
                       250,
-                      'كوب صغير',
+                      'Small Cup',
                       Icons.local_drink,
                     ),
                   ),
@@ -440,7 +469,7 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: _buildQuickAddButton(
                       500,
-                      'كوب كبير',
+                      'Large Cup',
                       Icons.local_drink,
                     ),
                   ),
@@ -448,7 +477,7 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: _buildQuickAddButton(
                       1000,
-                      'زجاجة',
+                      'Bottle',
                       Icons.water_drop,
                     ),
                   ),
@@ -459,7 +488,7 @@ class _HealthTrackerState extends State<HealthTracker>
                 width: double.infinity,
                 child: _buildQuickAddButton(
                   0,
-                  'كمية مخصصة',
+                  'Custom Amount',
                   Icons.add,
                   isCustom: true,
                 ),
@@ -469,7 +498,7 @@ class _HealthTrackerState extends State<HealthTracker>
 
               // Weekly Progress
               Text(
-                'تقدم الأسبوع',
+                'Weekly Progress',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -546,7 +575,7 @@ class _HealthTrackerState extends State<HealthTracker>
 
               // Health Tips
               Text(
-                'نصائح صحية',
+                'Health Tips',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -555,22 +584,22 @@ class _HealthTrackerState extends State<HealthTracker>
               ),
               const SizedBox(height: 16),
               _buildHealthTip(
-                'اشرب كوب ماء عند الاستيقاظ',
-                'يساعد على تنشيط الجسم وإزالة السموم',
+                'Drink a glass of water after waking up',
+                'Helps activate the body and flush toxins',
                 Icons.wb_sunny_outlined,
                 Colors.orange,
               ),
               const SizedBox(height: 12),
               _buildHealthTip(
-                'اشرب الماء قبل الوجبات',
-                'يساعد على الشعور بالشبع وتحسين الهضم',
+                'Drink water before meals',
+                'Helps you feel full and improves digestion',
                 Icons.restaurant_outlined,
                 Colors.green,
               ),
               const SizedBox(height: 12),
               _buildHealthTip(
-                'تجنب المشروبات الغازية',
-                'استبدلها بالماء أو العصائر الطبيعية',
+                'Avoid soft drinks',
+                'Replace them with water or natural juices',
                 Icons.no_drinks_outlined,
                 Colors.red,
               ),
@@ -579,7 +608,7 @@ class _HealthTrackerState extends State<HealthTracker>
 
               // Achievements
               Text(
-                'الإنجازات',
+                'Achievements',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -591,8 +620,8 @@ class _HealthTrackerState extends State<HealthTracker>
                 children: [
                   Expanded(
                     child: _buildAchievementCard(
-                      'أسبوع مثالي',
-                      '7 أيام متتالية',
+                      'Perfect Week',
+                      '7 consecutive days',
                       Icons.star,
                       Colors.amber,
                       isCompleted: true,
@@ -601,8 +630,8 @@ class _HealthTrackerState extends State<HealthTracker>
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildAchievementCard(
-                      'شهر صحي',
-                      '30 يوم متتالي',
+                      'Healthy Month',
+                      '30 consecutive days',
                       Icons.calendar_today,
                       Colors.blue,
                       isCompleted: false,
@@ -656,7 +685,7 @@ class _HealthTrackerState extends State<HealthTracker>
             ),
             const SizedBox(height: 8),
             Text(
-              isCustom ? label : '$amount مل',
+              isCustom ? label : '$amount ml',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

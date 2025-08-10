@@ -82,7 +82,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
         },
         child: const Center(
           child: Text(
-            'أضف إلى السلة',
+            'Add to Cart',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -99,7 +99,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
     if (!CustomerSession.instance.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('يرجى تسجيل الدخول لتقييم المنتج'),
+          content: Text('Please sign in to rate the product'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -109,7 +109,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
     if ((this as _ProductDetailsScreenState)._selectedRating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('يرجى اختيار تقييم'),
+          content: Text('Please select a rating'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -141,7 +141,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
         await _loadRatingData();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم إرسال تقييمك بنجاح'),
+            content: Text('Your rating has been submitted successfully'),
             backgroundColor: Colors.green,
           ),
         );
@@ -149,7 +149,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'فشل في إرسال التقييم - تحقق من الاتصال بالإنترنت أو حاول مرة أخرى',
+              'Failed to submit rating. Check your connection or try again',
             ),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 4),
@@ -160,7 +160,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
       print('Error submitting rating: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('حدث خطأ في إرسال التقييم'),
+          content: Text('An error occurred submitting the rating'),
           backgroundColor: Colors.red,
         ),
       );
@@ -182,16 +182,16 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف التقييم'),
-        content: const Text('هل أنت متأكد من حذف تقييمك؟'),
+        title: const Text('Warning'),
+        content: const Text('Are you sure?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('إلغاء'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('حذف'),
+            child: const Text('Remove'),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
           ),
         ],
@@ -218,7 +218,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم حذف تقييمك'),
+            content: Text('Your rating has been deleted'),
             backgroundColor: Colors.green,
           ),
         );
@@ -227,7 +227,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
       print('Error deleting rating: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('حدث خطأ في حذف التقييم'),
+          content: Text('An error occurred deleting the rating'),
           backgroundColor: Colors.red,
         ),
       );
@@ -255,7 +255,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
                 ),
                 SizedBox(width: 12),
                 Text(
-                  'خطأ في إضافة المنتج إلى السلة',
+                  'Error adding product to cart',
                   style: TextStyle(
                     fontFamily: 'Rubik',
                     fontWeight: FontWeight.w600,
@@ -394,7 +394,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Text(
-                        'عرض السلة',
+                        'View cart',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

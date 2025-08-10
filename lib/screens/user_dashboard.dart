@@ -9,7 +9,6 @@ import '../core/services/app_settings.dart';
 import '../widgets/profile/profile_header.dart';
 import '../widgets/profile/settings_list.dart';
 import '../widgets/shared/sliver_title_app_bar.dart';
-import '../widgets/shared/logout_button.dart';
 import '../utils/profile_menu.dart';
 import '../core/services/customer_session.dart';
 part 'functions/user_dashboard.functions.dart';
@@ -79,12 +78,7 @@ class _UserDashboardState extends State<UserDashboard>
 
   // Legacy menu section removed (extracted to widget)
 
-  Widget _buildLogoutButton(String language) {
-    return LogoutButton(
-      label: AppTranslations.getText('logout', language),
-      onPressed: _showLogoutDialog,
-    );
-  }
+  // Logout moved into SettingsList items
 
   // Settings items removed
 
@@ -94,12 +88,27 @@ class _UserDashboardState extends State<UserDashboard>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تسجيل الخروج'),
-        content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+        title: Text(
+          AppTranslations.getText(
+            'logout',
+            context.read<AppSettings>().currentLanguage,
+          ),
+        ),
+        content: Text(
+          AppTranslations.getText(
+            'confirm',
+            context.read<AppSettings>().currentLanguage,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
+            child: Text(
+              AppTranslations.getText(
+                'cancel',
+                context.read<AppSettings>().currentLanguage,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -115,16 +124,13 @@ class _UserDashboardState extends State<UserDashboard>
               }
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('تم تسجيل الخروج بنجاح'),
+                  content: Text('Logged out successfully'),
                   backgroundColor: Colors.green,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red[600]),
-            child: const Text(
-              'تسجيل الخروج',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text('Logout', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -149,17 +155,35 @@ class _UserDashboardState extends State<UserDashboard>
             _buildSliverAppBar(language),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 child: Column(
                   children: [
                     ProfileHeader(language: language),
                     const SizedBox(height: 12),
-                    SettingsList(
-                      language: language,
-                      items: getProfileMenuItems(language),
+                    Builder(
+                      builder: (context) {
+                        final items = getProfileMenuItems(language);
+                        if (!CustomerSession.instance.isLoggedIn) {
+                          items.insert(0, {
+                            'icon': Icons.person_add_alt,
+                            'title': AppTranslations.getText(
+                              'create_account',
+                              language,
+                            ),
+                            'color': Theme.of(context).colorScheme.primary,
+                            'onTap': () =>
+                                Navigator.pushNamed(context, AppRoutes.signup),
+                          });
+                        }
+                        items.add({
+                          'icon': Icons.logout,
+                          'title': AppTranslations.getText('logout', language),
+                          'color': Colors.red,
+                          'onTap': _showLogoutDialog,
+                        });
+                        return SettingsList(language: language, items: items);
+                      },
                     ),
-                    const SizedBox(height: 12),
-                    _buildLogoutButton(language),
                     SizedBox(
                       height:
                           kBottomNavigationBarHeight +

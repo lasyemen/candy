@@ -10,6 +10,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
+import '../core/constants/translations.dart';
 // import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
@@ -44,22 +45,26 @@ class _HomeScreenState extends State<HomeScreen>
   List<Map<String, dynamic>> get _banners {
     print('Current ads count: ${_ads.length}'); // Debug log
     print('Ads list: $_ads'); // Debug: show the actual ads list
+    final String lang = Provider.of<AppSettings>(
+      context,
+      listen: false,
+    ).currentLanguage;
 
     if (_ads.isEmpty) {
       print('No ads loaded, showing fallback banners');
       // Fallback banners if no ads are loaded
       return [
         {
-          'title': 'عرض خاص!',
-          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+          'title': AppTranslations.getText('special_offer', lang),
+          'subtitle': AppTranslations.getText('discount_20_all', lang),
           'image': 'https://picsum.photos/400/200?random=fallback1',
           'color': const Color(0xFF6B46C1),
           'gradient': DesignSystem.primaryGradient,
           'icon': Icons.local_offer,
         },
         {
-          'title': 'توصيل مجاني',
-          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
+          'title': AppTranslations.getText('free_delivery', lang),
+          'subtitle': AppTranslations.getText('free_delivery_over_50', lang),
           'image': 'https://picsum.photos/400/200?random=fallback2',
           'color': const Color(0xFF6B46C1),
           'gradient': DesignSystem.primaryGradient,
@@ -73,8 +78,8 @@ class _HomeScreenState extends State<HomeScreen>
     return _ads.map((ad) {
       print('Processing ad: ID=${ad.id}, ImageURL=${ad.imageUrl}');
       return {
-        'title': 'إعلان كاندي',
-        'subtitle': 'عرض خاص من كاندي',
+        'title': AppTranslations.getText('candy_ad', lang),
+        'subtitle': AppTranslations.getText('candy_offer', lang),
         'imageUrl': ad.imageUrl, // Use imageUrl key to match banner widget
         'color': const Color(0xFF6B46C1),
         'gradient': DesignSystem.primaryGradient,
@@ -84,13 +89,7 @@ class _HomeScreenState extends State<HomeScreen>
     }).toList();
   }
 
-  final List<String> _categories = [
-    'الكل',
-    '330 مل',
-    '200 مل',
-    '500 مل',
-    '1 لتر',
-  ];
+  final List<String> _categories = ['All', '330 ml', '200 ml', '500 ml', '1 L'];
 
   @override
   void initState() {
@@ -195,13 +194,15 @@ class _HomeScreenState extends State<HomeScreen>
               builder: (context) {
                 final isDark = Theme.of(context).brightness == Brightness.dark;
                 if (isDark) {
-                  return const Text(
-                    'مياه كاندي',
+                  return Text(
+                    AppTranslations.getText('app_name', lang),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
                       color: Colors.white,
-                      fontFamily: 'Rubik',
+                      fontFamily: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.fontFamily,
                     ),
                   );
                 } else {
@@ -212,13 +213,15 @@ class _HomeScreenState extends State<HomeScreen>
                       ).createShader(bounds);
                     },
                     blendMode: BlendMode.srcIn,
-                    child: const Text(
-                      'مياه كاندي',
+                    child: Text(
+                      AppTranslations.getText('app_name', lang),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 20,
                         color: Colors.white,
-                        fontFamily: 'Rubik',
+                        fontFamily: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.fontFamily,
                       ),
                     ),
                   );
@@ -447,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Row(
                     children: [
                       Text(
-                        'المنتجات',
+                        AppTranslations.getText('products_title', lang),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -605,12 +608,16 @@ class _HomeScreenState extends State<HomeScreen>
                     border: Border.all(color: Colors.white.withOpacity(0.3)),
                   ),
                   child: Row(
-                    children: const [
-                      Icon(Icons.info_outline, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        'الاسعار شاملة ضريبة القيمة المضافة',
-                        style: TextStyle(
+                        AppTranslations.getText('prices_include_vat', lang),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
@@ -637,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'جاري تحميل المنتجات...',
+                                AppTranslations.getText('loading', lang),
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 16,
@@ -659,9 +666,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 size: 40,
                               ),
                               const SizedBox(height: 14),
-                              const Text(
-                                "لا يوجد منتجات متاحة حالياً.",
-                                style: TextStyle(
+                              Text(
+                                AppTranslations.getText('no_products', lang),
+                                style: const TextStyle(
                                   color: Color(0xFF6B46C1),
                                   fontSize: 16,
                                 ),

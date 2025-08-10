@@ -2,6 +2,9 @@
 library product_details_screen;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/services/app_settings.dart';
+import '../core/i18n/product_dictionary.dart';
 import 'package:flutter/services.dart';
 import '../models/products.dart';
 import '../models/product_rating.dart';
@@ -14,6 +17,8 @@ import '../core/services/customer_session.dart';
 import '../widgets/product_details/star_rating_display.dart';
 import '../widgets/product_details/rating_input_section.dart';
 import '../widgets/product_details/quantity_selector.dart';
+import '../core/constants/translations.dart';
+// duplicate imports removed
 part 'functions/product_details_screen.functions.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -96,6 +101,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final language = Provider.of<AppSettings>(context).currentLanguage;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
@@ -228,7 +234,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Text(
-                                    widget.product.name,
+                                    ProductDictionary.translateName(
+                                      widget.product.name,
+                                      language,
+                                    ),
                                     textAlign: TextAlign.right,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -240,7 +249,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                               Brightness.dark
                                           ? Colors.white
                                           : Colors.black87,
-                                      fontFamily: 'Rubik',
+                                      fontFamily: language == 'en'
+                                          ? 'SFProDisplay'
+                                          : 'Rubik',
                                     ),
                                   ),
                                 ),
@@ -262,7 +273,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
-                                'الوصف',
+                                AppTranslations.getText(
+                                  'description',
+                                  Provider.of<AppSettings>(
+                                    context,
+                                    listen: false,
+                                  ).currentLanguage,
+                                ),
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -277,7 +294,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              widget.product.description ?? 'لا يوجد وصف.',
+                              widget.product.description ??
+                                  AppTranslations.getText(
+                                    'no_description',
+                                    Provider.of<AppSettings>(
+                                      context,
+                                      listen: false,
+                                    ).currentLanguage,
+                                  ),
                               style: TextStyle(
                                 fontSize: 12,
                                 color:

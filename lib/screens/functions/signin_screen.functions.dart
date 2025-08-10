@@ -19,7 +19,9 @@ mixin SignInScreenFunctions on State<SignInScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('رقم الهاتف غير مسجل. يرجى إنشاء حساب جديد.'),
+              content: Text(
+                'Phone number not registered. Please create a new account.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -34,8 +36,8 @@ mixin SignInScreenFunctions on State<SignInScreen> {
 
         if (CustomerSession.instance.isLoggedIn) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('تم تسجيل الدخول بنجاح!'),
+            const SnackBar(
+              content: Text('Signed in successfully!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -48,7 +50,7 @@ mixin SignInScreenFunctions on State<SignInScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('حدث خطأ في تسجيل الدخول. يرجى المحاولة مرة أخرى.'),
+              content: Text('Login failed. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -60,7 +62,7 @@ mixin SignInScreenFunctions on State<SignInScreen> {
           (this as _SignInScreenState)._isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }

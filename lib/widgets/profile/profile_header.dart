@@ -15,7 +15,7 @@ class ProfileHeader extends StatelessWidget {
         CustomerSession.instance.currentCustomerPhone ?? '—';
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       color: Colors.transparent,
       child: Column(
         children: [

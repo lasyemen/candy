@@ -152,13 +152,13 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 40),
 
-              // App Title with slide animation (Arabic only)
+              // App Title with slide animation
               SlideTransition(
                 position: _slideAnimation,
                 child: FadeTransition(
                   opacity: _fadeAnimation,
                   child: Text(
-                    'مياه كاندي',
+                    'Candy Water',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,

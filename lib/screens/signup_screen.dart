@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
+import '../core/services/app_settings.dart';
+import 'package:provider/provider.dart';
 import '../core/routes/index.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/customer_session.dart';
@@ -283,6 +285,7 @@ class _SignUpScreenState extends State<SignUpScreen>
 
   @override
   Widget build(BuildContext context) {
+    final language = context.watch<AppSettings>().currentLanguage;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -299,8 +302,8 @@ class _SignUpScreenState extends State<SignUpScreen>
           builder: (context) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             if (isDark) {
-              return const Text(
-                'إنشاء حساب جديد',
+              return Text(
+                language == 'en' ? 'Create Account' : 'إنشاء حساب جديد',
                 style: TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 18,
@@ -365,10 +368,14 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                       // Subtitle with Gradient
                       Text(
-                        'أنشئ حسابك الجديد\nللاستمتاع بخدماتنا',
+                        language == 'en'
+                            ? 'Create your account\nto enjoy our services'
+                            : 'أنشئ حسابك الجديد\nللاستمتاع بخدماتنا',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily: language == 'en'
+                              ? 'SFProDisplay'
+                              : 'Rubik',
                           fontSize: 20,
                           color: Theme.of(context).brightness == Brightness.dark
                               ? Colors.white

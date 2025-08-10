@@ -40,7 +40,10 @@ class LogoutButton extends StatelessWidget {
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red[600]),
-            child: const Text('OK', style: TextStyle(color: Colors.white)),
+            child: Text(
+              AppTranslations.getText('confirm', language),
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
