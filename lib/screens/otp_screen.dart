@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 import 'dart:async';
+import 'dart:math';
+import '../core/services/taqnyat_sms_service.dart';
 part 'functions/otp_screen.functions.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -26,8 +28,14 @@ class _OtpScreenState extends State<OtpScreen>
   );
   final List<FocusNode> _focusNodes = List.generate(4, (index) => FocusNode());
 
-  bool _isLoading = false;
+  // Remove unused state to satisfy lints (wire in when server verification is added)
   int _remainingTime = 60; // 60 seconds countdown
+
+  // Expected OTP value for local verification
+  String _expectedOtp = '';
+  // Read credentials from compile-time environment (set via --dart-define)
+  final String _taqnyatToken = const String.fromEnvironment('TAQNYAT_TOKEN');
+  final String _taqnyatSender = const String.fromEnvironment('TAQNYAT_SENDER');
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -58,6 +66,8 @@ class _OtpScreenState extends State<OtpScreen>
 
     _animationController.forward();
     _startCountdown();
+    // Generate and send OTP on screen load
+    _sendOtp();
   }
 
   @override

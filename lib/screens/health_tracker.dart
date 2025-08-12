@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 // removed unused imports
 import '../core/services/storage_service.dart';
+import '../core/services/rewards_service.dart';
 // removed unused imports
 part 'functions/health_tracker.functions.dart';
 
@@ -94,6 +95,12 @@ class _HealthTrackerState extends State<HealthTracker>
     });
     _updateProgress();
     HapticFeedback.lightImpact();
+
+    // Try award daily goal points once per day when goal met
+    maybeAwardDailyWaterGoalPoints(
+      currentIntakeMl: _currentIntake,
+      dailyGoalMl: _dailyGoal,
+    );
   }
 
   void _updateProgress() {

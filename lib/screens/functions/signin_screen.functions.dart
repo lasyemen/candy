@@ -11,6 +11,19 @@ mixin SignInScreenFunctions on State<SignInScreen> {
     try {
       final String rawPhone = (this as _SignInScreenState)._phoneController.text
           .trim();
+      final String digits = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length != 9 || !digits.startsWith('5')) {
+        (this as _SignInScreenState).setState(() {
+          (this as _SignInScreenState)._isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('أدخل رقم سعودي صحيح (9 أرقام ويبدأ بـ 5)'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       final bool? isMerchant = await AuthActions.signInAndSetSession(rawPhone);
       if (isMerchant == false) {
         if (mounted) {

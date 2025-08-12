@@ -26,6 +26,7 @@ class AppRoutes {
   static const String deliveryLocation = '/delivery-location';
   static const String paymentTracking = '/payment-tracking';
   static const String productDetails = '/product-details';
+  static const String rewardsTest = '/rewards-test';
 
   /// Get all routes for the application
   static Map<String, WidgetBuilder> getRoutes() {
@@ -77,6 +78,9 @@ class AppRoutes {
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         return PaymentTrackingScreen(deliveryData: deliveryData);
       },
+
+      // Rewards testing route
+      rewardsTest: (context) => const RewardsTestScreen(),
 
       // Product Routes
       productDetails: (context) {

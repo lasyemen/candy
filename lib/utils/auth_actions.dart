@@ -1,12 +1,14 @@
 import '../core/services/auth_service.dart';
 import '../core/services/customer_session.dart';
 import '../core/services/merchant_service.dart';
+import 'phone_utils.dart';
 
 class AuthActions {
   /// Logs in customer by phone, sets session, and returns whether the phone belongs to a merchant
   static Future<bool> signInAndSetSession(String rawPhone) async {
-    // Normalize
-    final String phone = rawPhone.trim();
+    final String? normalized = PhoneUtils.normalizeKsaPhone(rawPhone);
+    if (normalized == null) return false;
+    final String phone = normalized;
 
     // Check merchant record to tag session
     final merchantRecord = await MerchantService.instance.findMerchantByPhone(

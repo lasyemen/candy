@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/customer.dart';
 import 'cart_service.dart';
 import 'guest_user_service.dart';
+import 'cart_cache_manager.dart';
+import 'cart_session_manager.dart';
 
 class CustomerSession {
   static CustomerSession? _instance;
@@ -55,6 +57,21 @@ class CustomerSession {
     // Clear guest user data from shared preferences after cart merging
     await GuestUserService.instance.clearGuestUser();
     print('CustomerSession - Guest user data cleared from shared preferences');
+
+    // Invalidate cart cache and re-initialize cart session so UI fetches fresh data
+    try {
+      await CartCacheManager.instance.invalidateCache();
+      print('CustomerSession - Cart cache invalidated after login');
+    } catch (e) {
+      print('CustomerSession - Failed to invalidate cart cache: $e');
+    }
+
+    try {
+      await CartSessionManager.instance.initializeSession();
+      print('CustomerSession - Cart session re-initialized after login');
+    } catch (e) {
+      print('CustomerSession - Failed to re-initialize cart session: $e');
+    }
   }
 
   // Set guest user (called when guest user data is saved)

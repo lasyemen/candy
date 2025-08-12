@@ -75,7 +75,10 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
     try {
       final String rawPhone = _phoneController.text.trim();
       final String digitsOnly = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
-      final String phoneDisplay = '+966 ${digitsOnly}';
+      if (digitsOnly.length != 9 || !digitsOnly.startsWith('5')) {
+        throw Exception('أدخل رقم سعودي صحيح (9 أرقام ويبدأ بـ 5)');
+      }
+      final String phoneDisplay = '+966 $digitsOnly';
       final String phoneE164 = '+966$digitsOnly';
 
       final String merchantId = await MerchantService.instance.createMerchant(
@@ -493,13 +496,20 @@ class _MerchantSignupScreenState extends State<MerchantSignupScreen>
                                   enableSuggestions: false,
                                   autocorrect: false,
                                   inputFormatters: [
-                                    FilteringTextInputFormatter.allow(
-                                      RegExp(r'[0-9+ ]'),
-                                    ),
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(9),
                                   ],
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'يرجى إدخال رقم الجوال';
+                                    }
+                                    final digits = value.replaceAll(
+                                      RegExp(r'[^0-9]'),
+                                      '',
+                                    );
+                                    if (digits.length != 9 ||
+                                        !digits.startsWith('5')) {
+                                      return 'أدخل رقم سعودي صحيح (9 أرقام ويبدأ بـ 5)';
                                     }
                                     return null;
                                   },

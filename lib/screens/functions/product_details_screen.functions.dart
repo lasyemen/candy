@@ -241,6 +241,18 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
         quantity: (this as _ProductDetailsScreenState)._selectedQuantity,
       );
       print('Product added to cart successfully');
+
+      // Update app bloc badge count after add
+      if (mounted) {
+        try {
+          final appBloc = context.read<AppBloc>();
+          final summary = await CartManager.instance.getCartSummary();
+          final count = summary['itemCount'] as int? ?? 0;
+          appBloc.add(SetCartItemCountEvent(count));
+        } catch (e) {
+          // ignore non-fatal UI badge update errors
+        }
+      }
     } catch (e) {
       print('Error adding product to cart: $e');
       if (mounted) {

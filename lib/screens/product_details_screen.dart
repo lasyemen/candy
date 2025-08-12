@@ -18,6 +18,7 @@ import '../widgets/product_details/star_rating_display.dart';
 import '../widgets/product_details/rating_input_section.dart';
 import '../widgets/product_details/quantity_selector.dart';
 import '../core/constants/translations.dart';
+import '../blocs/app_bloc.dart';
 // duplicate imports removed
 part 'functions/product_details_screen.functions.dart';
 

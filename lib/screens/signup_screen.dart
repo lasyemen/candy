@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../core/routes/index.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/customer_session.dart';
+import '../utils/phone_utils.dart';
 // Removed unused import
 
 /*
@@ -142,8 +143,12 @@ class _SignUpScreenState extends State<SignUpScreen>
     });
 
     try {
-      // Clean phone number (remove non-digit characters)
-      final cleanPhone = _phoneController.text.replaceAll(RegExp(r'[^\d]'), '');
+      // Normalize to international format using shared utility
+      final normalized = PhoneUtils.normalizeKsaPhone(_phoneController.text);
+      if (normalized == null) {
+        throw Exception('SA phone validation failed');
+      }
+      final cleanPhone = normalized;
 
       print(
         'Sign-up form submitted with name: ${_nameController.text}, phone: $cleanPhone',
@@ -175,46 +180,26 @@ class _SignUpScreenState extends State<SignUpScreen>
         });
 
         if (customer != null) {
-          // Check if this is a guest user with cart items
+          // For guest users, we still set the session to preserve cart merging
           final isGuestUser = CustomerSession.instance.isGuestUser;
           final hasGuestData = CustomerSession.instance.guestUser != null;
-
           if (isGuestUser && hasGuestData) {
-            print('SignUpScreen - Guest user with cart items, merging cart...');
-
-            // Set the customer as current (cart merging runs in background)
             await CustomerSession.instance.setCurrentCustomer(customer);
-
-            // Note: Guest user data will be cleared automatically when setCurrentCustomer is called
-            print('SignUpScreen - Guest user data preserved for cart merging');
-
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            // Navigate to main and open the Cart tab so the bottom nav is visible
-            Navigator.pushReplacementNamed(
-              context,
-              AppRoutes.main,
-              arguments: {'initialIndex': 3},
-            );
-          } else {
-            // Regular signup without cart items
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            // Navigate to main screen (which includes navigation bar)
-            Navigator.pushReplacementNamed(context, AppRoutes.main);
           }
+
+          // Notify and go to OTP verification
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          Navigator.pushReplacementNamed(
+            context,
+            AppRoutes.otp,
+            arguments: {'userName': customer.name, 'userPhone': cleanPhone},
+          );
         } else {
           print('SignUpScreen - Customer registration returned null');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -520,18 +505,14 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     FilteringTextInputFormatter.allow(
                                       RegExp(r'[0-9+ ]'),
                                     ),
+                                    LengthLimitingTextInputFormatter(14),
                                   ],
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'يرجى إدخال رقم الهاتف';
                                     }
-                                    // Remove any non-digit characters for validation
-                                    final cleanPhone = value.replaceAll(
-                                      RegExp(r'[^\d]'),
-                                      '',
-                                    );
-                                    if (cleanPhone.length < 8) {
-                                      return 'يرجى إدخال رقم هاتف صحيح';
+                                    if (!PhoneUtils.isValidKsaPhone(value)) {
+                                      return 'أدخل رقم سعودي صحيح';
                                     }
                                     return null;
                                   },
@@ -540,7 +521,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     fontSize: 12,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: 'أدخل رقم هاتفك',
+                                    hintText: '5X XXX XXXX',
                                     hintStyle: TextStyle(
                                       fontFamily: 'Rubik',
                                       fontSize: 12,
@@ -550,7 +531,17 @@ class _SignUpScreenState extends State<SignUpScreen>
                                           ? Colors.white54
                                           : Colors.grey[500],
                                     ),
-                                    prefixIcon: Icon(
+                                    prefixText: '+966 ',
+                                    prefixStyle: TextStyle(
+                                      fontFamily: 'Rubik',
+                                      fontSize: 12,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white60
+                                          : Colors.grey[600],
+                                    ),
+                                    suffixIcon: Icon(
                                       Icons.phone_outlined,
                                       color:
                                           Theme.of(context).brightness ==

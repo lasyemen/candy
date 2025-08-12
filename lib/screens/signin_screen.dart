@@ -217,8 +217,8 @@ class _SignInScreenState extends State<SignInScreen>
                               child: PhoneTextField(
                                 controller: _phoneController,
                                 hintText: language == 'en'
-                                    ? 'Enter your phone number'
-                                    : 'أدخل رقم هاتفك',
+                                    ? '5X XXX XXXX'
+                                    : '5X XXX XXXX',
                               ),
                             ),
                           ),
