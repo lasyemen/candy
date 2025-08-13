@@ -23,10 +23,14 @@ class AppRoutes {
   static const String orders = '/orders';
   static const String userDashboard = '/user-dashboard';
   static const String healthTracker = '/health-tracker';
+  static const String rewards = '/rewards';
   static const String deliveryLocation = '/delivery-location';
-  static const String paymentTracking = '/payment-tracking';
   static const String productDetails = '/product-details';
   static const String rewardsTest = '/rewards-test';
+  static const String testCheckout = '/test-checkout';
+  static const String cardPayment = '/card-payment';
+  static const String paymentMethods = '/payment-methods';
+  static const String thankYou = '/thank-you';
 
   /// Get all routes for the application
   static Map<String, WidgetBuilder> getRoutes() {
@@ -69,18 +73,40 @@ class AppRoutes {
       cart: (context) => const CartScreen(),
       orders: (context) => const MyOrdersScreen(),
       userDashboard: (context) => const UserDashboard(),
-      healthTracker: (context) => const HealthTracker(),
+      // Back-compat: health route now shows Rewards
+      healthTracker: (context) => const RewardsScreen(),
+      rewards: (context) => const RewardsScreen(),
 
       // Delivery and Payment Routes
       deliveryLocation: (context) => const DeliveryLocationScreen(),
-      paymentTracking: (context) {
-        final deliveryData =
-            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-        return PaymentTrackingScreen(deliveryData: deliveryData);
-      },
+      // Removed old payment tracking flow
 
       // Rewards testing route
       rewardsTest: (context) => const RewardsTestScreen(),
+      testCheckout: (context) => const TestCheckoutScreen(),
+      cardPayment: (context) {
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final total = (args?['total'] as num?)?.toDouble();
+        return CardPaymentScreen(orderTotal: total);
+      },
+      paymentMethods: (context) {
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final total = (args?['total'] as num?)?.toDouble();
+        final deliveryData = args?['deliveryData'] as Map<String, dynamic>?;
+        return PaymentMethodSelectionScreen(
+          orderTotal: total,
+          deliveryData: deliveryData,
+        );
+      },
+      thankYou: (context) {
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final total = (args?['total'] as num?)?.toDouble();
+        final earned = (args?['earned'] as num?)?.toInt();
+        return ThankYouScreen(total: total, earned: earned);
+      },
 
       // Product Routes
       productDetails: (context) {

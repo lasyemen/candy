@@ -126,6 +126,18 @@ class AppTranslations {
       'amount_ml': 'الكمية (مل)',
       'set_daily_goal_desc': 'اضبط هدفك اليومي لشرب الماء',
       'rewards': 'المكافآت',
+      'how_to_earn': 'كيفية جمع النقاط',
+      'daily_spin': 'الدولاب اليومي',
+      'voucher_threshold_rule':
+          'تحصل على قسيمة بقيمة {amount} ريال عند كل {points} نقطة',
+      'points_per_sar_rule': 'تحصل على {rate} نقطة لكل 1 ريال من مشترياتك',
+      'daily_check_in_points_rule':
+          'تسجيل دخول يومي: +{points} نقطة مرة واحدة يوميًا',
+      'daily_spin_range_rule':
+          'الدولاب اليومي: اربح بين {min} و {max} نقطة يوميًا',
+      'referral_share_points_rule':
+          'شارك رابط الإحالة مرة واحدة: +{points} نقطة',
+      'points_expiry_rule': 'تنتهي صلاحية النقاط بعد {days} يومًا',
       'challenges': 'التحديات',
       'streak_7': 'سلسلة ٧ أيام من الترطيب',
       'join': 'انضم',
@@ -292,6 +304,17 @@ class AppTranslations {
       'amount_ml': 'Amount (ml)',
       'set_daily_goal_desc': 'Set your desired daily water intake',
       'rewards': 'Rewards',
+      'how_to_earn': 'How to earn points',
+      'daily_spin': 'Daily Spin',
+      'voucher_threshold_rule':
+          'Get a {amount} SAR voucher every {points} points',
+      'points_per_sar_rule': 'Earn {rate} point per 1 SAR spent',
+      'daily_check_in_points_rule':
+          'Daily check-in: +{points} points once per day',
+      'daily_spin_range_rule':
+          'Daily spin: win between {min}-{max} points per day',
+      'referral_share_points_rule': 'Share referral once: +{points} points',
+      'points_expiry_rule': 'Points expire after {days} days',
       'challenges': 'Challenges',
       'streak_7': '7-Day Hydration Streak',
       'join': 'Join',
@@ -431,6 +454,17 @@ class AppTranslations {
       'amount_ml': 'مقدار (ملی لیٹر)',
       'set_daily_goal_desc': 'اپنی روزانہ پانی پینے کی مقدار مقرر کریں',
       'rewards': 'انعامات',
+      'how_to_earn': 'پوائنٹس حاصل کرنے کا طریقہ',
+      'daily_spin': 'روزانہ گھمائیں',
+      'voucher_threshold_rule':
+          'ہر {points} پوائنٹس پر {amount} ریال کا وؤچر حاصل کریں',
+      'points_per_sar_rule': 'خرچ کیے گئے ہر 1 ریال پر {rate} پوائنٹ حاصل کریں',
+      'daily_check_in_points_rule':
+          'روزانہ چیک ان: روز میں ایک بار +{points} پوائنٹس',
+      'daily_spin_range_rule': 'روزانہ گھمائیں: روز {min}-{max} پوائنٹس جیتیں',
+      'referral_share_points_rule':
+          'ریفerral ایک بار شیئر کریں: +{points} پوائنٹس',
+      'points_expiry_rule': 'پوائنٹس {days} دن بعد ختم ہو جاتے ہیں',
       'challenges': 'چیلنجز',
       'streak_7': '7 دن کی ہائیڈریشن اسٹرِیک',
       'join': 'شامل ہوں',

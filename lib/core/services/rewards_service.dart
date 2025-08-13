@@ -14,8 +14,8 @@ class RewardsService {
   static const int pointsRequiredForVoucher = 900; // 900 pts => 50 SAR
   static const double voucherValueSar = 50.0; // 50 SAR voucher value
   static const int voucherValidityDays = 60; // must be used within 60 days
-  static const int pointsPerSar = 1; // purchase accrual rate
-  static const int dailyWaterGoalPoints = 20; // award for meeting daily goal
+  static const double defaultPointsPerSar = 1.0; // default accrual rate per SAR
+  static const int dailyWaterGoalPoints = 0; // disabled: no health points
   static const int healthyChangePoints =
       30; // award for a verified healthy change
   static const int dailyCheckInPoints = 15; // daily check-in
@@ -27,11 +27,11 @@ class RewardsService {
   static const int bodyStatusDailyPoints = 10; // daily body status log
   static const int comboBonusPoints = 30; // steps + hydration combo in a day
   static const int weeklyChallengeRewardPoints = 300; // weekly challenge reward
-  static const int perLogPoints = 5; // +5 points per water log
-  static const int streakBonus7Points = 50; // +50 for 7-day streak
-  static const int streakBonus30Points = 150; // +150 for 30-day streak
-  static const int earlyBirdPoints = 10; // before 9 AM
-  static const int healthyMealChoicePoints = 10; // healthy meal pairing
+  static const int perLogPoints = 0; // disabled: no health points
+  static const int streakBonus7Points = 0; // disabled
+  static const int streakBonus30Points = 0; // disabled
+  static const int earlyBirdPoints = 0; // disabled
+  static const int healthyMealChoicePoints = 0; // disabled
   static const int pointsExpiryDays = 60; // seasonal points expiry
 
   // Storage keys (namespaced by profile key)
@@ -47,10 +47,9 @@ class RewardsService {
   String get _awardFlagsKey => 'rewards_award_flags_${_profileKey}_v1';
   String get _streakCurrentKey => 'hydration_streak_current_${_profileKey}_v1';
   String get _streakBestKey => 'hydration_streak_best_${_profileKey}_v1';
-  String get _streakLastDayKey => 'hydration_streak_last_${_profileKey}_v1';
-  String get _lastReminderKey => 'hydration_last_reminder_${_profileKey}_v1';
+  // removed: _streakLastDayKey (unused)
   String get _ledgerKey => 'rewards_points_ledger_${_profileKey}_v1';
-  String _championKey(String ym) => 'champion_claimed_${_profileKey}_$ym';
+  String get _pointsRateKey => 'rewards_points_rate_${_profileKey}_v1';
 
   Future<int> getPointsBalance() async {
     final prefs = await SharedPreferences.getInstance();
@@ -209,8 +208,49 @@ class RewardsService {
 
   // Purchase accrual (pointsPerSar)
   Future<int> addPointsFromPurchase(double orderTotalSar) async {
-    final pts = (orderTotalSar * pointsPerSar).floor();
+    final rate = await getPointsRatePerSar();
+    final pts = (orderTotalSar * rate).floor();
     return addPoints(pts, reason: 'purchase');
+  }
+
+  // Orders-only model configuration
+  // Set a fixed points rate per SAR (e.g., 1.5 pts per SAR)
+  Future<void> setPointsRatePerSar(double rate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_pointsRateKey, rate.clamp(0.0, 1000.0));
+  }
+
+  // Compute and set rate from expected total spend in 60 days: 900 / totalSpend
+  Future<void> setRateByExpectedTotalSpend60Days(
+    double expectedTotalSpendSar,
+  ) async {
+    if (expectedTotalSpendSar <= 0) {
+      await setPointsRatePerSar(defaultPointsPerSar);
+      return;
+    }
+    final rate = pointsRequiredForVoucher / expectedTotalSpendSar;
+    await setPointsRatePerSar(rate);
+  }
+
+  // Convenience: compute from expected orders and average order amount
+  // rate = (900 / (orders * avgOrderSar))
+  Future<void> setRateByExpectedOrders(
+    int expectedOrdersIn60Days,
+    double avgOrderSar,
+  ) async {
+    if (expectedOrdersIn60Days <= 0 || avgOrderSar <= 0) {
+      await setPointsRatePerSar(defaultPointsPerSar);
+      return;
+    }
+    final totalSpend = expectedOrdersIn60Days * avgOrderSar;
+    final rate = pointsRequiredForVoucher / totalSpend;
+    await setPointsRatePerSar(rate);
+  }
+
+  // Read the current points rate (per SAR), fallback to default
+  Future<double> getPointsRatePerSar() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_pointsRateKey) ?? defaultPointsPerSar;
   }
 
   // Healthy change accrual (idempotent per changeId)
@@ -232,93 +272,26 @@ class RewardsService {
     required double currentIntakeMl,
     required double dailyGoalMl,
   }) async {
-    if (dailyGoalMl <= 0) return false;
-    if (currentIntakeMl + 0.001 < dailyGoalMl) return false; // not yet met
-
-    final prefs = await SharedPreferences.getInstance();
-    final flags = _loadAwardFlags(prefs);
-    final today = DateTime.now();
-    final dayKey = _formatDayKey(today);
-    final awardKey = 'water_goal_$dayKey';
-
-    if (flags[awardKey] == true) return false; // already awarded today
-    // Update streak and compute multiplier (5% per day up to 50%)
-    final currentStreak = await _updateStreakAndGetCount(prefs, today);
-    final bonusPercent = (currentStreak - 1) * 0.05;
-    final clamped = bonusPercent.clamp(0.0, 0.5);
-    int daily = dailyWaterGoalPoints;
-    // Weekend double
-    if (today.weekday == DateTime.saturday ||
-        today.weekday == DateTime.sunday) {
-      daily *= 2;
-    }
-    final pointsToAdd = (daily * (1.0 + clamped)).round();
-    await addPoints(pointsToAdd, reason: 'daily_water_goal');
-
-    // Milestone bonuses (once on the day they are hit)
-    final streak7Key = 'streak7_$dayKey';
-    final streak30Key = 'streak30_$dayKey';
-    if (currentStreak == 7 && flags[streak7Key] != true) {
-      await addPoints(streakBonus7Points, reason: 'streak_7');
-      flags[streak7Key] = true;
-    }
-    if (currentStreak == 30 && flags[streak30Key] != true) {
-      await addPoints(streakBonus30Points, reason: 'streak_30');
-      flags[streak30Key] = true;
-      // Issue Hydration Champion voucher once per month
-      final ym = _formatYearMonth(today);
-      if (prefs.getBool(_championKey(ym)) != true) {
-        final vouchers = await _loadVouchers();
-        vouchers.add(_createVoucher());
-        await _saveVouchers(vouchers);
-        await prefs.setBool(_championKey(ym), true);
-      }
-    }
-    flags[awardKey] = true;
-    await _saveAwardFlags(prefs, flags);
-    return true;
+    // disabled: no health-based points
+    return false;
   }
 
   // Daily check-in (once per calendar day). Returns points awarded (0 if already claimed)
   Future<int> awardDailyCheckInIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    final flags = _loadAwardFlags(prefs);
-    final dayKey = _formatDayKey(DateTime.now());
-    final key = 'checkin_$dayKey';
-    if (flags[key] == true) return 0;
-    await addPoints(dailyCheckInPoints, reason: 'daily_check_in');
-    flags[key] = true;
-    await _saveAwardFlags(prefs, flags);
-    return dailyCheckInPoints;
+    // Disabled: orders-only points model
+    return 0;
   }
 
   // Daily spin (once per calendar day). Returns points won (0 if already spun)
   Future<int> dailySpinIfAvailable() async {
-    final prefs = await SharedPreferences.getInstance();
-    final flags = _loadAwardFlags(prefs);
-    final dayKey = _formatDayKey(DateTime.now());
-    final key = 'spin_$dayKey';
-    if (flags[key] == true) return 0;
-    final rand = Random();
-    final points =
-        dailySpinMinPoints +
-        rand.nextInt(dailySpinMaxPoints - dailySpinMinPoints + 1);
-    await addPoints(points, reason: 'daily_spin');
-    flags[key] = true;
-    await _saveAwardFlags(prefs, flags);
-    return points;
+    // Disabled: orders-only points model
+    return 0;
   }
 
   // Referral share (once per profile). Returns true if awarded now
   Future<bool> awardReferralShareOnce() async {
-    final prefs = await SharedPreferences.getInstance();
-    final flags = _loadAwardFlags(prefs);
-    const key = 'referral_shared';
-    if (flags[key] == true) return false;
-    await addPoints(referralSharePoints, reason: 'referral_share');
-    flags[key] = true;
-    await _saveAwardFlags(prefs, flags);
-    return true;
+    // Disabled: orders-only points model
+    return false;
   }
 
   // Redeem a voucher by ID (marks as used). Returns discount amount if success.
@@ -362,47 +335,10 @@ class RewardsService {
     return '$y$m$d';
   }
 
-  String _formatYearMonth(DateTime dt) {
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    return '$y$m';
-  }
+  // Removed year-month format helper (unused after disabling health points)
 
   // Streak management: returns current streak length
-  Future<int> _updateStreakAndGetCount(
-    SharedPreferences prefs,
-    DateTime today,
-  ) async {
-    final lastDay = prefs.getString(_streakLastDayKey);
-    int current = prefs.getInt(_streakCurrentKey) ?? 0;
-    int best = prefs.getInt(_streakBestKey) ?? 0;
-
-    if (lastDay == null) {
-      current = 1;
-    } else {
-      final last = DateTime(
-        int.parse(lastDay.substring(0, 4)),
-        int.parse(lastDay.substring(4, 6)),
-        int.parse(lastDay.substring(6, 8)),
-      );
-      final diff = today.difference(last).inDays;
-      if (diff == 0) {
-        // already awarded today; keep streak unchanged
-      } else if (diff == 1) {
-        current += 1;
-      } else {
-        current = 1; // streak broken
-      }
-    }
-
-    if (current > best) best = current;
-
-    await prefs.setString(_streakLastDayKey, _formatDayKey(today));
-    await prefs.setInt(_streakCurrentKey, current);
-    await prefs.setInt(_streakBestKey, best);
-
-    return current;
-  }
+  // Removed streak update helper (unused after disabling health points)
 
   Future<Map<String, int>> getStreakSummary() async {
     final prefs = await SharedPreferences.getInstance();
@@ -413,79 +349,35 @@ class RewardsService {
 
   // Quick Tap Bonus: call when a notification fires
   Future<void> recordHydrationReminderFired() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastReminderKey, DateTime.now().toIso8601String());
+    // disabled: no health-based points
   }
 
   // +5 points per water log
   Future<void> addPointsForWaterLog() async {
-    await addPoints(perLogPoints, reason: 'water_log');
+    // disabled: no health-based points
   }
 
   // Record a water log (amount with timestamp)
   Future<void> recordWaterLog(int amountMl) async {
-    final prefs = await SharedPreferences.getInstance();
-    final dayKey = _formatDayKey(DateTime.now());
-    final raw = prefs.getString('water_logs_${_profileKey}_$dayKey');
-    List<Map<String, dynamic>> logs = [];
-    if (raw != null && raw.isNotEmpty) {
-      logs = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-    }
-    logs.add({'ts': DateTime.now().toIso8601String(), 'ml': amountMl});
-    await prefs.setString(
-      'water_logs_${_profileKey}_$dayKey',
-      jsonEncode(logs),
-    );
+    // disabled: no health-based points
   }
 
   // Early bird bonus before 9 AM (once per day)
   Future<bool> awardEarlyBirdIfEligible() async {
-    final now = DateTime.now();
-    if (now.hour >= 9) return false;
-    final prefs = await SharedPreferences.getInstance();
-    final flags = _loadAwardFlags(prefs);
-    final dayKey = _formatDayKey(now);
-    final key = 'early_bird_$dayKey';
-    if (flags[key] == true) return false;
-    await addPoints(earlyBirdPoints, reason: 'early_bird');
-    flags[key] = true;
-    await _saveAwardFlags(prefs, flags);
-    return true;
+    // disabled: no health-based points
+    return false;
   }
 
   // Award bonus if logging within 5 minutes of last reminder and not yet claimed
   Future<bool> awardQuickTapBonusIfEligible() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_lastReminderKey);
-    if (raw == null) return false;
-    final lastReminder = DateTime.tryParse(raw);
-    if (lastReminder == null) return false;
-    final now = DateTime.now();
-    final within5 = now.difference(lastReminder).inMinutes <= 5;
-    if (!within5) return false;
-
-    final flags = _loadAwardFlags(prefs);
-    final dayKey = _formatDayKey(now);
-    final key = 'quick_tap_$dayKey';
-    if (flags[key] == true) return false;
-
-    await addPoints(quickTapBonusPoints, reason: 'quick_tap_bonus');
-    flags[key] = true;
-    await _saveAwardFlags(prefs, flags);
-    return true;
+    // disabled: no health-based points
+    return false;
   }
 
   // Body status daily points (once per day)
   Future<bool> awardBodyStatusDailyIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    final flags = _loadAwardFlags(prefs);
-    final dayKey = _formatDayKey(DateTime.now());
-    final key = 'body_status_$dayKey';
-    if (flags[key] == true) return false;
-    await addPoints(bodyStatusDailyPoints, reason: 'body_status');
-    flags[key] = true;
-    await _saveAwardFlags(prefs, flags);
-    return true;
+    // disabled: no health-based points
+    return false;
   }
 
   // Weekly challenge utilities (simple current week id)

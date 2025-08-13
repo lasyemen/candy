@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/design_system.dart';
 import '../star_rating.dart';
 
 class StarRatingDisplay extends StatelessWidget {
@@ -25,11 +24,7 @@ class StarRatingDisplay extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           )
         else
-          StarRating(
-            rating: rating,
-            size: 22,
-            readOnly: true,
-          ),
+          StarRating(rating: rating, size: 22, readOnly: true),
         const SizedBox(width: 8),
         Text(
           rating.toStringAsFixed(1),
@@ -57,11 +52,3 @@ class StarRatingDisplay extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-

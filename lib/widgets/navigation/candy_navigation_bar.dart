@@ -81,8 +81,8 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
             pageIndex: 0,
           ),
           CandyNavItem(
-            icon: FontAwesomeIcons.heart,
-            label: AppTranslations.getText('health', language),
+            icon: FontAwesomeIcons.gift,
+            label: AppTranslations.getText('rewards', language),
             pageIndex: 1,
           ),
           CandyNavItem(

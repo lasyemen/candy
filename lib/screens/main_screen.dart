@@ -52,7 +52,7 @@ class _MainScreenState extends State<MainScreen>
 
     _screens = [
       const UserDashboard(),
-      if (!isMerchant) const HealthTracker(),
+      if (!isMerchant) const RewardsScreen(),
       const HomeScreen(),
       const CartScreen(),
       const MyOrdersScreen(),
@@ -139,8 +139,8 @@ class _MainScreenState extends State<MainScreen>
               pageIndex: 0,
             ),
             CandyNavItem(
-              icon: FontAwesomeIcons.heart,
-              label: AppTranslations.getText('health', language),
+              icon: FontAwesomeIcons.gift,
+              label: AppTranslations.getText('rewards', language),
               pageIndex: 1,
             ),
             CandyNavItem(
