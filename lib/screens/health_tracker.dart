@@ -12,6 +12,7 @@ import '../core/constants/design_system.dart';
 // removed unused imports
 import '../core/services/storage_service.dart';
 import '../core/services/rewards_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // removed unused imports
 part 'functions/health_tracker.functions.dart';
 
@@ -32,17 +33,13 @@ class _HealthTrackerState extends State<HealthTracker>
   late Animation<double> _fadeAnimation;
   late Animation<double> _progressAnimation;
 
-  // Weekly data
-  final List<double> _weeklyIntake = [1800, 2200, 1900, 2400, 2100, 2300, 1200];
-  final List<String> _weekDays = [
-    'Sun',
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-  ];
+  // Rewards & streak state
+  int _pointsBalance = 0;
+  int _currentStreak = 0;
+  int _bestStreak = 0;
+  double _voucherProgress = 0.0; // 0..1 toward next voucher
+
+  // Weekly data removed in rewards-first redesign
 
   @override
   void initState() {
@@ -69,12 +66,18 @@ class _HealthTrackerState extends State<HealthTracker>
     _animationController.forward();
     _progressController.forward();
     _loadDailyGoal();
+    _loadRewardsAndStreak();
   }
 
   Future<void> _loadDailyGoal() async {
-    final goal = await StorageService.getWaterGoal();
+    // Prefer recommended goal; fall back to stored if available and reasonable
+    final recommended = await calculateRecommendedDailyGoalMl();
+    final stored = await StorageService.getWaterGoal();
+    final effective = (stored >= 1500 && stored <= 5000)
+        ? stored.toDouble()
+        : recommended;
     setState(() {
-      _dailyGoal = goal.toDouble();
+      _dailyGoal = effective;
     });
     _updateProgress();
   }
@@ -96,11 +99,39 @@ class _HealthTrackerState extends State<HealthTracker>
     _updateProgress();
     HapticFeedback.lightImpact();
 
+    // Record a plausible log entry for anti-cheat and challenges
+    RewardsService.instance.recordWaterLog(amount.toInt());
+
+    // +5 points per water log
+    RewardsService.instance.addPointsForWaterLog();
+
+    // Early bird bonus before 9 AM
+    RewardsService.instance.awardEarlyBirdIfEligible();
+
+    // Quick Tap Bonus if within 5 minutes of a reminder
+    RewardsService.instance.awardQuickTapBonusIfEligible().then((awarded) {
+      if (!mounted) return;
+      if (awarded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('+5 points (Quick Tap Bonus)')),
+        );
+        _loadRewardsAndStreak();
+      }
+    });
+
     // Try award daily goal points once per day when goal met
-    maybeAwardDailyWaterGoalPoints(
+    _maybeHandleGoalAwardAndStreak();
+  }
+
+  Future<void> _maybeHandleGoalAwardAndStreak() async {
+    final awarded = await maybeAwardDailyWaterGoalPoints(
       currentIntakeMl: _currentIntake,
       dailyGoalMl: _dailyGoal,
     );
+    if (awarded) {
+      await updateStreakOnGoalAwarded();
+      await _loadRewardsAndStreak();
+    }
   }
 
   void _updateProgress() {
@@ -114,35 +145,24 @@ class _HealthTrackerState extends State<HealthTracker>
     _progressController.forward(from: 0.0);
   }
 
-  void _updateDailyGoal(double newGoal) async {
-    setState(() {
-      _dailyGoal = newGoal;
-      // Reset current intake if it exceeds new goal
-      if (_currentIntake > _dailyGoal) {
-        _currentIntake = _dailyGoal;
-      }
-    });
-
-    // Save to storage
-    await StorageService.saveWaterGoal(newGoal.toInt());
-
-    // Update progress animation
-    _updateProgress();
-
-    // Show success feedback
-    HapticFeedback.mediumImpact();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Daily goal updated to ${(newGoal / 1000).toStringAsFixed(1)} L',
-        ),
-        backgroundColor: DesignSystem.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  Future<void> _loadRewardsAndStreak() async {
+    try {
+      final points = await RewardsService.instance.getPointsBalance();
+      await RewardsService.instance.getActiveVouchers();
+      final progress =
+          (points % RewardsService.pointsRequiredForVoucher) /
+          RewardsService.pointsRequiredForVoucher;
+      final streak = await loadStreak();
+      if (!mounted) return;
+      setState(() {
+        _pointsBalance = points;
+        _voucherProgress = progress.clamp(0.0, 1.0);
+        _currentStreak = streak.current;
+        _bestStreak = streak.best;
+      });
+    } catch (_) {
+      // ignore
+    }
   }
 
   void _showCustomAmountDialog() {
@@ -170,8 +190,11 @@ class _HealthTrackerState extends State<HealthTracker>
               child: TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount (ml)',
+                decoration: InputDecoration(
+                  labelText: AppTranslations.getText(
+                    'amount_ml',
+                    context.read<AppSettings>().currentLanguage,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -210,148 +233,118 @@ class _HealthTrackerState extends State<HealthTracker>
     );
   }
 
-  void _showDailyGoalDialog() {
-    final TextEditingController goalController = TextEditingController();
-    goalController.text = (_dailyGoal / 1000).toStringAsFixed(
-      1,
-    ); // Convert to liters
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.flag_outlined, color: DesignSystem.primary),
-            const SizedBox(width: 8),
-            Text(
-              AppTranslations.getText(
-                'set_daily_goal',
-                context.read<AppSettings>().currentLanguage,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Set your desired daily water intake',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: DesignSystem.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: DesignSystem.primary.withOpacity(0.3),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final appSettings = context.watch<AppSettings>();
+    final isEnglish = appSettings.currentLanguage == 'en';
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        elevation: 0,
+        leadingWidth: 140,
+        leading: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: GestureDetector(
+            onTap: () async {
+              final vouchers = await RewardsService.instance
+                  .getActiveVouchers();
+              if (!mounted) return;
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: theme.cardColor,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-              ),
-              child: TextField(
-                controller: goalController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'Daily goal (liters)',
-                  labelStyle: TextStyle(color: DesignSystem.primary),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  suffixIcon: Icon(
-                    Icons.water_drop,
-                    color: DesignSystem.primary,
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: DesignSystem.primary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Recommended: 3–4 liters daily',
-                      style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                builder: (_) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppTranslations.getText(
+                            'rewards',
+                            context.read<AppSettings>().currentLanguage,
+                          ),
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        if (vouchers.isEmpty)
+                          Text(
+                            AppTranslations.getText(
+                              'no_vouchers',
+                              context.read<AppSettings>().currentLanguage,
+                            ),
+                            style: theme.textTheme.bodyMedium,
+                          )
+                        else
+                          ...vouchers.map(
+                            (v) => ListTile(
+                              leading: const Icon(
+                                Icons.confirmation_number_outlined,
+                              ),
+                              title: Text(
+                                '${AppTranslations.getText('voucher', context.read<AppSettings>().currentLanguage)} ${v['amount']} ${AppTranslations.getText('sar', context.read<AppSettings>().currentLanguage)}',
+                              ),
+                              subtitle: Text(
+                                '${AppTranslations.getText('expires', context.read<AppSettings>().currentLanguage)}: ${v['expires_at']}',
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                  );
+                },
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: DesignSystem.getBrandShadow('light'),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.stars, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${AppTranslations.getText('points', context.read<AppSettings>().currentLanguage)}: $_pointsBalance',
+                    style: theme.textTheme.labelLarge,
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: DesignSystem.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              final goalInLiters = double.tryParse(goalController.text);
-              if (goalInLiters != null &&
-                  goalInLiters > 0 &&
-                  goalInLiters <= 10) {
-                _updateDailyGoal(goalInLiters * 1000); // Convert to ml
-                Navigator.pop(context);
-              }
-            },
-            child: Text(
-              AppTranslations.getText(
-                'save',
-                context.read<AppSettings>().currentLanguage,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         title: Text(
-          'Health Tracker',
+          AppTranslations.getText('health', appSettings.currentLanguage),
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[900],
+            color:
+                theme.appBarTheme.titleTextStyle?.color ??
+                theme.colorScheme.onBackground,
+            fontFamily: isEnglish
+                ? 'PublicSans'
+                : theme.textTheme.titleLarge?.fontFamily,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.tune_outlined, color: Colors.grey[700]),
-            onPressed: _showDailyGoalDialog,
-          ),
-        ],
+        actions: const [],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(context).viewPadding.bottom +
+              kBottomNavigationBarHeight +
+              16,
+        ),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
@@ -359,10 +352,13 @@ class _HealthTrackerState extends State<HealthTracker>
             children: [
               // Today's Progress
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 40,
+                ),
                 decoration: BoxDecoration(
                   gradient: DesignSystem.getBrandGradient('primary'),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: DesignSystem.getBrandShadow('heavy'),
                 ),
                 child: Column(
@@ -371,8 +367,11 @@ class _HealthTrackerState extends State<HealthTracker>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Today\'s Progress',
-                          style: TextStyle(
+                          AppTranslations.getText(
+                            'today_progress',
+                            appSettings.currentLanguage,
+                          ),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -387,12 +386,18 @@ class _HealthTrackerState extends State<HealthTracker>
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(
-                            '${((_currentIntake / _dailyGoal) * 100).toInt()}%',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, anim) =>
+                                FadeTransition(opacity: anim, child: child),
+                            child: Text(
+                              '${((_currentIntake / _dailyGoal) * 100).toInt()}%',
+                              key: ValueKey(_currentIntake.toInt()),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -419,7 +424,7 @@ class _HealthTrackerState extends State<HealthTracker>
                                 },
                               ),
                               Text(
-                                'of ${(_dailyGoal / 1000).toStringAsFixed(1)} L',
+                                '${AppTranslations.getText('daily_goal', appSettings.currentLanguage)}: ${(_dailyGoal / 1000).toStringAsFixed(1)} L',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white.withOpacity(0.8),
@@ -451,15 +456,29 @@ class _HealthTrackerState extends State<HealthTracker>
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 16),
+              // Rewards & Streak header under Today's Progress
+              _buildRewardsHeader(context, isEnglish: isEnglish),
+              const SizedBox(height: 16),
+              _buildWeeklyChallengeInline(context, isEnglish: isEnglish),
+              const SizedBox(height: 12),
+              _buildChampionInline(context, isEnglish: isEnglish),
+              const SizedBox(height: 12),
+              _buildDailySpinInline(context),
+              const SizedBox(height: 12),
+              _buildPointsExpiryInfo(context),
+              const SizedBox(height: 24),
 
               // Quick Add Buttons
               Text(
-                'Quick Add',
+                AppTranslations.getText(
+                  'quick_add',
+                  appSettings.currentLanguage,
+                ),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[900],
+                  color: theme.textTheme.titleLarge?.color,
                 ),
               ),
               const SizedBox(height: 16),
@@ -468,7 +487,10 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: _buildQuickAddButton(
                       250,
-                      'Small Cup',
+                      AppTranslations.getText(
+                        'small_cup',
+                        appSettings.currentLanguage,
+                      ),
                       Icons.local_drink,
                     ),
                   ),
@@ -476,7 +498,10 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: _buildQuickAddButton(
                       500,
-                      'Large Cup',
+                      AppTranslations.getText(
+                        'large_cup',
+                        appSettings.currentLanguage,
+                      ),
                       Icons.local_drink,
                     ),
                   ),
@@ -484,7 +509,10 @@ class _HealthTrackerState extends State<HealthTracker>
                   Expanded(
                     child: _buildQuickAddButton(
                       1000,
-                      'Bottle',
+                      AppTranslations.getText(
+                        'bottle',
+                        appSettings.currentLanguage,
+                      ),
                       Icons.water_drop,
                     ),
                   ),
@@ -495,7 +523,10 @@ class _HealthTrackerState extends State<HealthTracker>
                 width: double.infinity,
                 child: _buildQuickAddButton(
                   0,
-                  'Custom Amount',
+                  AppTranslations.getText(
+                    'custom_amount',
+                    appSettings.currentLanguage,
+                  ),
                   Icons.add,
                   isCustom: true,
                 ),
@@ -503,155 +534,399 @@ class _HealthTrackerState extends State<HealthTracker>
 
               const SizedBox(height: 30),
 
-              // Weekly Progress
-              Text(
-                'Weekly Progress',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[900],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 120,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: List.generate(7, (index) {
-                          final percentage = _weeklyIntake[index] / _dailyGoal;
-                          final isToday = index == 6; // Saturday
-                          return Column(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  width: 30,
-                                  decoration: BoxDecoration(
-                                    color: isToday
-                                        ? const Color(0xFF6B46C1)
-                                        : Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  child: FractionallySizedBox(
-                                    alignment: Alignment.bottomCenter,
-                                    heightFactor: percentage,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: isToday
-                                            ? const Color(0xFF6B46C1)
-                                            : Colors.grey[400],
-                                        borderRadius: BorderRadius.circular(15),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _weekDays[index],
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          );
-                        }),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // Health Tips
-              Text(
-                'Health Tips',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[900],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildHealthTip(
-                'Drink a glass of water after waking up',
-                'Helps activate the body and flush toxins',
-                Icons.wb_sunny_outlined,
-                Colors.orange,
-              ),
               const SizedBox(height: 12),
-              _buildHealthTip(
-                'Drink water before meals',
-                'Helps you feel full and improves digestion',
-                Icons.restaurant_outlined,
-                Colors.green,
-              ),
-              const SizedBox(height: 12),
-              _buildHealthTip(
-                'Avoid soft drinks',
-                'Replace them with water or natural juices',
-                Icons.no_drinks_outlined,
-                Colors.red,
-              ),
-
-              const SizedBox(height: 30),
-
-              // Achievements
-              Text(
-                'Achievements',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[900],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildAchievementCard(
-                      'Perfect Week',
-                      '7 consecutive days',
-                      Icons.star,
-                      Colors.amber,
-                      isCompleted: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildAchievementCard(
-                      'Healthy Month',
-                      '30 consecutive days',
-                      Icons.calendar_today,
-                      Colors.blue,
-                      isCompleted: false,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildRewardsHeader(BuildContext context, {required bool isEnglish}) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: DesignSystem.getBrandShadow('light'),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 48,
+            width: 48,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: DesignSystem.primaryGradient,
+            ),
+            child: const Icon(Icons.local_fire_department, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Streak: $_currentStreak days',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: theme.textTheme.titleMedium?.color,
+                        fontFamily: isEnglish
+                            ? 'PublicSans'
+                            : theme.textTheme.titleMedium?.fontFamily,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Best $_bestStreak',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: isEnglish
+                              ? 'PublicSans'
+                              : theme.textTheme.bodySmall?.fontFamily,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.card_giftcard,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Points: $_pointsBalance',
+                      style: TextStyle(
+                        color: theme.textTheme.bodyMedium?.color,
+                        fontFamily: isEnglish
+                            ? 'PublicSans'
+                            : theme.textTheme.bodyMedium?.fontFamily,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    minHeight: 8,
+                    value: _voucherProgress,
+                    backgroundColor: theme.brightness == Brightness.dark
+                        ? Colors.white10
+                        : Colors.black12,
+                    valueColor: AlwaysStoppedAnimation(
+                      theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${(_voucherProgress * 100).toStringAsFixed(0)}% to next voucher',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final vouchers = await RewardsService.instance
+                  .getActiveVouchers();
+              if (!mounted) return;
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: theme.cardColor,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (_) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppTranslations.getText(
+                            'rewards',
+                            context.read<AppSettings>().currentLanguage,
+                          ),
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        if (vouchers.isEmpty)
+                          Text(
+                            AppTranslations.getText(
+                              'no_vouchers',
+                              context.read<AppSettings>().currentLanguage,
+                            ),
+                            style: theme.textTheme.bodyMedium,
+                          )
+                        else
+                          ...vouchers.map(
+                            (v) => ListTile(
+                              leading: const Icon(
+                                Icons.confirmation_number_outlined,
+                              ),
+                              title: Text(
+                                '${AppTranslations.getText('voucher', context.read<AppSettings>().currentLanguage)} ${v['amount']} ${AppTranslations.getText('sar', context.read<AppSettings>().currentLanguage)}',
+                              ),
+                              subtitle: Text(
+                                '${AppTranslations.getText('expires', context.read<AppSettings>().currentLanguage)}: ${v['expires_at']}',
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+            icon: const Icon(Icons.redeem),
+            label: Text(
+              AppTranslations.getText(
+                'rewards',
+                context.read<AppSettings>().currentLanguage,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyChallengeInline(
+    BuildContext context, {
+    required bool isEnglish,
+  }) {
+    final theme = Theme.of(context);
+    final weekId = RewardsService.instance.getCurrentWeekId();
+    return FutureBuilder<Map<String, int>>(
+      future: RewardsService.instance.getStreakSummary(),
+      builder: (context, snapshot) {
+        final currentStreak = snapshot.data?['current'] ?? 0;
+        return FutureBuilder<bool>(
+          future: RewardsService.instance.canClaimChallenge(
+            weekId,
+            currentStreak,
+          ),
+          builder: (context, snap2) {
+            final canClaim = snap2.data == true;
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: DesignSystem.getBrandShadow('light'),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.local_fire_department,
+                    color: Color(0xFF6B46C1),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${AppTranslations.getText('streak_7', context.read<AppSettings>().currentLanguage)}: $currentStreak/7',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final active = await RewardsService.instance
+                          .isChallengeActive(weekId);
+                      if (!active) {
+                        await RewardsService.instance.joinChallenge(weekId);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Joined challenge')),
+                        );
+                      } else if (canClaim) {
+                        final ok = await RewardsService.instance.claimChallenge(
+                          weekId,
+                        );
+                        if (!mounted) return;
+                        if (ok) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Challenge claimed! +100 pts'),
+                            ),
+                          );
+                          await _loadRewardsAndStreak();
+                          setState(() {});
+                        }
+                      }
+                    },
+                    child: Text(
+                      isEnglish
+                          ? (canClaim ? 'Claim' : 'In Progress')
+                          : (canClaim
+                                ? AppTranslations.getText(
+                                    'claim',
+                                    context.read<AppSettings>().currentLanguage,
+                                  )
+                                : AppTranslations.getText(
+                                    'in_progress',
+                                    context.read<AppSettings>().currentLanguage,
+                                  )),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildChampionInline(BuildContext context, {required bool isEnglish}) {
+    final theme = Theme.of(context);
+    return FutureBuilder<Map<String, int>>(
+      future: RewardsService.instance.getStreakSummary(),
+      builder: (context, snapshot) {
+        final current = snapshot.data?['current'] ?? 0;
+        final unlocked = current >= 30;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: DesignSystem.getBrandShadow('light'),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.emoji_events, color: Color(0xFF6B46C1)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '30-Day Hydration Champion: $current/30',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: unlocked
+                      ? Colors.green.withOpacity(0.15)
+                      : Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  unlocked ? 'Unlocked' : 'Keep going',
+                  style: theme.textTheme.labelMedium,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDailySpinInline(BuildContext context) {
+    final theme = Theme.of(context);
+    return FutureBuilder<bool>(
+      future: RewardsService.instance.isDailySpinAvailable(),
+      builder: (context, snapshot) {
+        final available = snapshot.data ?? true;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: DesignSystem.getBrandShadow('light'),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.casino, color: Color(0xFF6B46C1)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Daily Spin: 1 free spin for bonus rewards',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              ElevatedButton(
+                onPressed: available
+                    ? () async {
+                        final pts = await RewardsService.instance
+                            .dailySpinIfAvailable();
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              pts > 0 ? '+$pts points' : 'Try again tomorrow',
+                            ),
+                          ),
+                        );
+                        await _loadRewardsAndStreak();
+                        setState(() {});
+                      }
+                    : null,
+                child: Text(available ? 'Spin' : 'Used'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPointsExpiryInfo(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: DesignSystem.getBrandShadow('light'),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.schedule, color: Color(0xFF6B46C1), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Points expire after 60 days. Use them before they expire.',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Removed previously added engagement cards
 
   Widget _buildQuickAddButton(
     double amount,
@@ -670,11 +945,13 @@ class _HealthTrackerState extends State<HealthTracker>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(
+                Theme.of(context).brightness == Brightness.dark ? 0.4 : 0.05,
+              ),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -685,10 +962,18 @@ class _HealthTrackerState extends State<HealthTracker>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.purple[50],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white10
+                    : Colors.purple[50],
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: Colors.purple[600], size: 24),
+              child: Icon(
+                icon,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFBFA4FF)
+                    : Colors.purple[600],
+                size: 24,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -696,114 +981,21 @@ class _HealthTrackerState extends State<HealthTracker>
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
             if (!isCustom)
               Text(
                 label,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.color?.withOpacity(0.7),
+                ),
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHealthTip(
-    String title,
-    String description,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAchievementCard(
-    String title,
-    String description,
-    IconData icon,
-    Color color, {
-    required bool isCompleted,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isCompleted ? color.withOpacity(0.1) : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCompleted ? color : Colors.grey[300]!,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: isCompleted ? color : Colors.grey[400], size: 32),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isCompleted ? color : Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 12,
-              color: isCompleted ? color : Colors.grey[500],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }

@@ -32,3 +32,5 @@ class PhoneUtils {
 
   static bool isValidKsaPhone(String raw) => normalizeKsaPhone(raw) != null;
 }
+
+

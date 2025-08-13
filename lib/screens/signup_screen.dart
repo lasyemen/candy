@@ -180,14 +180,10 @@ class _SignUpScreenState extends State<SignUpScreen>
         });
 
         if (customer != null) {
-          // For guest users, we still set the session to preserve cart merging
-          final isGuestUser = CustomerSession.instance.isGuestUser;
-          final hasGuestData = CustomerSession.instance.guestUser != null;
-          if (isGuestUser && hasGuestData) {
-            await CustomerSession.instance.setCurrentCustomer(customer);
-          }
+          // Set logged-in customer session so profile is not guest
+          await CustomerSession.instance.setCurrentCustomer(customer);
 
-          // Notify and go to OTP verification
+          // Notify
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
@@ -195,11 +191,8 @@ class _SignUpScreenState extends State<SignUpScreen>
             ),
           );
 
-          Navigator.pushReplacementNamed(
-            context,
-            AppRoutes.otp,
-            arguments: {'userName': customer.name, 'userPhone': cleanPhone},
-          );
+          // Temporarily skip OTP flow and go straight to Home
+          Navigator.pushReplacementNamed(context, AppRoutes.main);
         } else {
           print('SignUpScreen - Customer registration returned null');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -634,7 +627,10 @@ class _SignUpScreenState extends State<SignUpScreen>
                           ),
                           GestureDetector(
                             onTap: () {
-                              Navigator.pop(context);
+                              Navigator.pushReplacementNamed(
+                                context,
+                                AppRoutes.signin,
+                              );
                             },
                             child: ShaderMask(
                               shaderCallback: (bounds) => DesignSystem

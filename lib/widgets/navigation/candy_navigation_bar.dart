@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../blocs/app_bloc.dart';
 import '../../core/constants/design_system.dart';
 import 'dart:ui'; // Added for ImageFilter
+import '../../core/services/app_settings.dart';
+import '../../core/constants/translations.dart';
 
 class CandyNavItem {
   final IconData icon;
@@ -71,6 +73,36 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
   Widget build(BuildContext context) {
     return Consumer<AppBloc>(
       builder: (context, appBloc, child) {
+        final language = context.watch<AppSettings>().currentLanguage;
+        final defaultItems = [
+          CandyNavItem(
+            icon: FontAwesomeIcons.user,
+            label: AppTranslations.getText('profile', language),
+            pageIndex: 0,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.heart,
+            label: AppTranslations.getText('health', language),
+            pageIndex: 1,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.home,
+            label: AppTranslations.getText('home', language),
+            pageIndex: 2,
+            isHome: true,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.shoppingCart,
+            label: AppTranslations.getText('cart', language),
+            pageIndex: 3,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.listAlt,
+            label: AppTranslations.getText('orders', language),
+            pageIndex: 4,
+          ),
+        ];
+
         return AnimatedBuilder(
           animation: _slideAnimation,
           builder: (context, child) {
@@ -80,7 +112,7 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                 opacity: _slideAnimation.value,
                 child: Align(
                   alignment: Alignment.bottomCenter,
-                child: Container(
+                  child: Container(
                     margin: const EdgeInsets.only(
                       bottom: 16,
                       left: 12,
@@ -183,17 +215,17 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: (widget.items ?? const [
-                              CandyNavItem(icon: FontAwesomeIcons.user, label: 'حسابي', pageIndex: 0),
-                              CandyNavItem(icon: FontAwesomeIcons.heart, label: 'الصحة', pageIndex: 1),
-                              CandyNavItem(icon: FontAwesomeIcons.home, label: 'الرئيسية', pageIndex: 2, isHome: true),
-                              CandyNavItem(icon: FontAwesomeIcons.shoppingCart, label: 'السلة', pageIndex: 3),
-                              CandyNavItem(icon: FontAwesomeIcons.listAlt, label: 'طلباتي', pageIndex: 4),
-                            ]).map((item) {
-                              final bool isActive = appBloc.currentIndex == item.pageIndex;
-                              final int? badge = item.badge ?? (item.pageIndex == 3 && appBloc.cartItemCount > 0
-                                  ? appBloc.cartItemCount
-                                  : null);
+                            children: (widget.items ?? defaultItems).map((
+                              item,
+                            ) {
+                              final bool isActive =
+                                  appBloc.currentIndex == item.pageIndex;
+                              final int? badge =
+                                  item.badge ??
+                                  (item.pageIndex == 3 &&
+                                          appBloc.cartItemCount > 0
+                                      ? appBloc.cartItemCount
+                                      : null);
                               return _buildModernNavItem(
                                 icon: item.icon,
                                 label: item.label,

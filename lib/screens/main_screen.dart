@@ -140,7 +140,7 @@ class _MainScreenState extends State<MainScreen>
             ),
             CandyNavItem(
               icon: FontAwesomeIcons.heart,
-              label: AppTranslations.getText('water_tracking', language),
+              label: AppTranslations.getText('health', language),
               pageIndex: 1,
             ),
             CandyNavItem(

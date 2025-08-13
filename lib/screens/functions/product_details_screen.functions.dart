@@ -80,10 +80,13 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
           }
           _addToCartAsync();
         },
-        child: const Center(
+        child: Center(
           child: Text(
-            'Add to Cart',
-            style: TextStyle(
+            AppTranslations.getText(
+              'add_to_cart',
+              Provider.of<AppSettings>(context, listen: false).currentLanguage,
+            ),
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textInverse,
