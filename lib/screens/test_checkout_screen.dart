@@ -188,18 +188,23 @@ class _TestCheckoutScreenState extends State<TestCheckoutScreen>
 
       final net = max(0.0, amount - discount);
 
-      // Award points based on configured rate per SAR
-      final rate = await RewardsService.instance.getPointsRatePerSar();
-      final earned = (net * rate).floor();
-      await RewardsService.instance.addPoints(earned, reason: 'test_checkout');
+      // Add spending to current cycle (new fixed points system)
+      await RewardsService.instance.addSpendingToCycle(net);
+
+      // Get current cycle info to show progress
+      final cycleInfo = await RewardsService.instance.getCurrentCycleInfo();
+      final cyclePoints = cycleInfo['cyclePoints'] ?? 0;
+      final pointValue = cycleInfo['pointValueSar'] ?? 0.0;
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Paid ${net.toStringAsFixed(0)} SAR, +$earned pts' +
+            'Paid ${net.toStringAsFixed(0)} SAR\n' +
+                'Cycle Progress: $cyclePoints/1,000 points\n' +
+                'Point Value: ${pointValue.toStringAsFixed(3)} SAR' +
                 (discount > 0
-                    ? ' (voucher -${discount.toStringAsFixed(0)})'
+                    ? '\nVoucher Applied: -${discount.toStringAsFixed(0)} SAR'
                     : ''),
           ),
         ),

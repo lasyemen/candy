@@ -25,6 +25,10 @@ class _RewardsScreenState extends State<RewardsScreen>
   bool _checkInAvailable = true;
   bool _spinAvailable = true;
 
+  // New cycle information
+  Map<String, dynamic> _cycleInfo = {};
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -32,20 +36,36 @@ class _RewardsScreenState extends State<RewardsScreen>
   }
 
   Future<void> _loadRewardsOverview() async {
-    final points = await RewardsService.instance.getPointsBalance();
-    final progress =
-        (points % RewardsService.pointsRequiredForVoucher) /
-        RewardsService.pointsRequiredForVoucher;
-    final checkIn = await RewardsService.instance.isDailyCheckInAvailable();
-    final spin = await RewardsService.instance.isDailySpinAvailable();
-
-    if (!mounted) return;
     setState(() {
-      _pointsBalance = points;
-      _voucherProgress = progress.clamp(0.0, 1.0);
-      _checkInAvailable = checkIn;
-      _spinAvailable = spin;
+      _isLoading = true;
     });
+
+    try {
+      final points = await RewardsService.instance.getPointsBalance();
+      final progress =
+          (points % RewardsService.pointsRequiredForVoucher) /
+          RewardsService.pointsRequiredForVoucher;
+      final checkIn = await RewardsService.instance.isDailyCheckInAvailable();
+      final spin = await RewardsService.instance.isDailySpinAvailable();
+
+      // Load new cycle information
+      final cycleInfo = await RewardsService.instance.getCurrentCycleInfo();
+
+      if (!mounted) return;
+      setState(() {
+        _pointsBalance = points;
+        _voucherProgress = progress.clamp(0.0, 1.0);
+        _checkInAvailable = checkIn;
+        _spinAvailable = spin;
+        _cycleInfo = cycleInfo;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -73,54 +93,66 @@ class _RewardsScreenState extends State<RewardsScreen>
       ),
       body: RefreshIndicator(
         onRefresh: _loadRewardsOverview,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(context).viewPadding.bottom +
-                kBottomNavigationBarHeight +
-                16,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildPointsHeader(
-                context,
-                language: language,
-                isEnglish: isEnglish,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  MediaQuery.of(context).viewPadding.bottom +
+                      kBottomNavigationBarHeight +
+                      16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildNewPointsHeader(
+                      context,
+                      language: language,
+                      isEnglish: isEnglish,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildCycleProgressCard(
+                      context,
+                      language: language,
+                      isEnglish: isEnglish,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildActionsRow(context, language: language),
+                    const SizedBox(height: 16),
+                    _buildVouchersSection(context, language: language),
+                    const SizedBox(height: 24),
+                    _buildNewRulesSection(
+                      context,
+                      language: language,
+                      isEnglish: isEnglish,
+                    ),
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pushNamed(AppRoutes.testCheckout);
+                      },
+                      icon: const Icon(Icons.shopping_bag),
+                      label: const Text('Open Test Checkout'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildActionsRow(context, language: language),
-              const SizedBox(height: 16),
-              _buildVouchersSection(context, language: language),
-              const SizedBox(height: 24),
-              _buildRulesSection(
-                context,
-                language: language,
-                isEnglish: isEnglish,
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pushNamed(AppRoutes.testCheckout);
-                },
-                icon: const Icon(Icons.shopping_bag),
-                label: const Text('Open Test Checkout'),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
 
-  Widget _buildPointsHeader(
+  Widget _buildNewPointsHeader(
     BuildContext context, {
     required String language,
     required bool isEnglish,
   }) {
+    final cyclePoints = _cycleInfo['cyclePoints'] ?? 0;
+    final totalRewardValue = _cycleInfo['totalRewardValue'] ?? 0.0;
+    final pointValueSar = _cycleInfo['pointValueSar'] ?? 0.0;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -132,7 +164,7 @@ class _RewardsScreenState extends State<RewardsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            AppTranslations.getText('points', language),
+            '${AppTranslations.getText('points', language)} (${AppTranslations.getText('new_system', language)})',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 14,
@@ -141,7 +173,7 @@ class _RewardsScreenState extends State<RewardsScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            '$_pointsBalance',
+            '$cyclePoints / 1,000',
             style: TextStyle(
               color: Colors.white,
               fontSize: 36,
@@ -153,7 +185,7 @@ class _RewardsScreenState extends State<RewardsScreen>
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: _voucherProgress,
+              value: cyclePoints / 1000.0,
               minHeight: 8,
               backgroundColor: Colors.white24,
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -161,20 +193,112 @@ class _RewardsScreenState extends State<RewardsScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            AppTranslations.getText('voucher_threshold_rule', language)
-                .replaceAll(
-                  '{points}',
-                  RewardsService.pointsRequiredForVoucher.toString(),
-                )
-                .replaceAll(
-                  '{amount}',
-                  RewardsService.voucherValueSar.toStringAsFixed(0),
-                ),
+            '${AppTranslations.getText('point_value', language)}: ${pointValueSar.toStringAsFixed(3)} SAR',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${AppTranslations.getText('total_reward', language)}: ${totalRewardValue.toStringAsFixed(2)} SAR',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildCycleProgressCard(
+    BuildContext context, {
+    required String language,
+    required bool isEnglish,
+  }) {
+    final daysRemaining = _cycleInfo['daysRemaining'] ?? 0;
+    final cycleSpending = _cycleInfo['cycleSpending'] ?? 0.0;
+    final cycleStart = _cycleInfo['cycleStart'] as DateTime?;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: DesignSystem.getBrandShadow('light'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppTranslations.getText('current_cycle', language),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCycleStat(
+                  context,
+                  AppTranslations.getText('days_remaining', language),
+                  '$daysRemaining',
+                  Icons.schedule,
+                  Colors.orange,
+                ),
+              ),
+              Expanded(
+                child: _buildCycleStat(
+                  context,
+                  AppTranslations.getText('cycle_spending', language),
+                  '${cycleSpending.toStringAsFixed(2)} SAR',
+                  Icons.payment,
+                  Colors.green,
+                ),
+              ),
+            ],
+          ),
+          if (cycleStart != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              '${AppTranslations.getText('cycle_started', language)}: ${_formatDate(cycleStart, language)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCycleStat(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime date, String language) {
+    if (language == 'ar') {
+      return '${date.day}/${date.month}/${date.year}';
+    } else if (language == 'ur') {
+      return '${date.day}/${date.month}/${date.year}';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
   }
 
   Widget _buildActionsRow(BuildContext context, {required String language}) {
@@ -293,30 +417,16 @@ class _RewardsScreenState extends State<RewardsScreen>
     );
   }
 
-  Widget _buildRulesSection(
+  Widget _buildNewRulesSection(
     BuildContext context, {
     required String language,
     required bool isEnglish,
   }) {
     final theme = Theme.of(context);
-    // Optionally, show dynamic rate via FutureBuilder if desired
-    // Keeping rules static to avoid async in build; rate shown as em dash
     final rules = <String>[
-      AppTranslations.getText(
-        'points_per_sar_rule',
-        language,
-      ).replaceAll('{rate}', '—'),
-      AppTranslations.getText(
-        'daily_check_in_points_rule',
-        language,
-      ).replaceAll('{points}', RewardsService.dailyCheckInPoints.toString()),
-      AppTranslations.getText('daily_spin_range_rule', language)
-          .replaceAll('{min}', RewardsService.dailySpinMinPoints.toString())
-          .replaceAll('{max}', RewardsService.dailySpinMaxPoints.toString()),
-      AppTranslations.getText(
-        'referral_share_points_rule',
-        language,
-      ).replaceAll('{points}', RewardsService.referralSharePoints.toString()),
+      AppTranslations.getText('fixed_points_rule', language),
+      AppTranslations.getText('five_percent_rule', language),
+      AppTranslations.getText('cycle_duration_rule', language),
       AppTranslations.getText(
         'points_expiry_rule',
         language,
@@ -334,7 +444,7 @@ class _RewardsScreenState extends State<RewardsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            AppTranslations.getText('how_to_earn', language),
+            AppTranslations.getText('how_new_system_works', language),
             style: theme.textTheme.titleLarge,
           ),
           const SizedBox(height: 8),

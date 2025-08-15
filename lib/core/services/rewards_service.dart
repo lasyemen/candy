@@ -10,11 +10,18 @@ class RewardsService {
   static RewardsService? _instance;
   static RewardsService get instance => _instance ??= RewardsService._();
 
-  // Tunable constants
-  static const int pointsRequiredForVoucher = 900; // 900 pts => 50 SAR
-  static const double voucherValueSar = 50.0; // 50 SAR voucher value
-  static const int voucherValidityDays = 60; // must be used within 60 days
-  static const double defaultPointsPerSar = 1.0; // default accrual rate per SAR
+  // New Fixed Points System Constants
+  static const int fixedPointsPerCycle =
+      1000; // Fixed 1,000 points every 60 days
+  static const int cycleDurationDays = 60; // 60-day cycle
+  static const double rewardPercentage = 0.05; // 5% reward rate
+
+  // Legacy constants (kept for backward compatibility)
+  static const int pointsRequiredForVoucher =
+      1000; // Updated to match new system
+  static const double voucherValueSar = 50.0; // This will be dynamic now
+  static const int voucherValidityDays = 60; // 60 days validity
+  static const double defaultPointsPerSar = 1.0; // Default accrual rate per SAR
   static const int dailyWaterGoalPoints = 0; // disabled: no health points
   static const int healthyChangePoints =
       30; // award for a verified healthy change
@@ -47,10 +54,109 @@ class RewardsService {
   String get _awardFlagsKey => 'rewards_award_flags_${_profileKey}_v1';
   String get _streakCurrentKey => 'hydration_streak_current_${_profileKey}_v1';
   String get _streakBestKey => 'hydration_streak_best_${_profileKey}_v1';
-  // removed: _streakLastDayKey (unused)
   String get _ledgerKey => 'rewards_points_ledger_${_profileKey}_v1';
   String get _pointsRateKey => 'rewards_points_rate_${_profileKey}_v1';
 
+  // New storage keys for the fixed points system
+  String get _cycleStartKey => 'rewards_cycle_start_${_profileKey}_v2';
+  String get _cycleSpendingKey => 'rewards_cycle_spending_${_profileKey}_v2';
+  String get _cyclePointsKey => 'rewards_cycle_points_${_profileKey}_v2';
+
+  // Get current cycle information
+  Future<Map<String, dynamic>> getCurrentCycleInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cycleStartStr = prefs.getString(_cycleStartKey);
+    final cycleSpending = prefs.getDouble(_cycleSpendingKey) ?? 0.0;
+    final cyclePoints = prefs.getInt(_cyclePointsKey) ?? 0;
+
+    DateTime cycleStart;
+    if (cycleStartStr == null) {
+      // Start new cycle
+      cycleStart = DateTime.now();
+      await prefs.setString(_cycleStartKey, cycleStart.toIso8601String());
+    } else {
+      cycleStart = DateTime.parse(cycleStartStr);
+    }
+
+    final now = DateTime.now();
+    final daysElapsed = now.difference(cycleStart).inDays;
+    final daysRemaining = cycleDurationDays - daysElapsed;
+    final isCycleComplete = daysRemaining <= 0;
+
+    // Calculate point value based on 5% rule
+    final pointValueSar = cycleSpending > 0
+        ? (cycleSpending * rewardPercentage) / fixedPointsPerCycle
+        : 0.0;
+
+    return {
+      'cycleStart': cycleStart,
+      'daysElapsed': daysElapsed,
+      'daysRemaining': daysRemaining,
+      'isCycleComplete': isCycleComplete,
+      'cycleSpending': cycleSpending,
+      'cyclePoints': cyclePoints,
+      'pointValueSar': pointValueSar,
+      'totalRewardValue': cycleSpending * rewardPercentage,
+    };
+  }
+
+  // Start a new cycle (called automatically when current cycle expires)
+  Future<void> _startNewCycle() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    await prefs.setString(_cycleStartKey, now.toIso8601String());
+    await prefs.setDouble(_cycleSpendingKey, 0.0);
+    await prefs.setInt(_cyclePointsKey, 0);
+  }
+
+  // Add spending to current cycle
+  Future<void> addSpendingToCycle(double amountSar) async {
+    if (amountSar <= 0) return;
+
+    final cycleInfo = await getCurrentCycleInfo();
+
+    // Check if cycle is complete and start new one if needed
+    if (cycleInfo['isCycleComplete']) {
+      await _startNewCycle();
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final currentSpending = prefs.getDouble(_cycleSpendingKey) ?? 0.0;
+    final newSpending = currentSpending + amountSar;
+    await prefs.setDouble(_cycleSpendingKey, newSpending);
+
+    // Calculate new point value
+    final newPointValue =
+        (newSpending * rewardPercentage) / fixedPointsPerCycle;
+
+    // Award points if we haven't reached 1,000 yet
+    final currentPoints = prefs.getInt(_cyclePointsKey) ?? 0;
+    if (currentPoints < fixedPointsPerCycle) {
+      final pointsToAward = min(
+        fixedPointsPerCycle - currentPoints,
+        100,
+      ); // Award in chunks
+      await prefs.setInt(_cyclePointsKey, currentPoints + pointsToAward);
+
+      // Also add to main points balance for voucher generation
+      await addPoints(pointsToAward, reason: 'cycle_progress');
+    }
+  }
+
+  // Get the current point value in SAR
+  Future<double> getCurrentPointValueSar() async {
+    final cycleInfo = await getCurrentCycleInfo();
+    return cycleInfo['pointValueSar'] ?? 0.0;
+  }
+
+  // Get progress toward 1,000 points goal
+  Future<double> getCycleProgress() async {
+    final cycleInfo = await getCurrentCycleInfo();
+    final points = cycleInfo['cyclePoints'] ?? 0;
+    return points / fixedPointsPerCycle;
+  }
+
+  // Legacy methods updated for new system
   Future<int> getPointsBalance() async {
     final prefs = await SharedPreferences.getInstance();
     return _purgeExpiredAndGetBalance(prefs);
@@ -98,14 +204,19 @@ class RewardsService {
     return max(0, balance);
   }
 
-  // Voucher model (simple map)
-  Map<String, dynamic> _createVoucher() {
+  // Voucher model (simple map) - Updated for dynamic value
+  Future<Map<String, dynamic>> _createVoucher() async {
     final id = _generateId();
     final now = DateTime.now();
     final expiresAt = now.add(const Duration(days: voucherValidityDays));
+
+    // Calculate voucher value based on current cycle spending
+    final cycleInfo = await getCurrentCycleInfo();
+    final voucherValue = cycleInfo['totalRewardValue'] ?? voucherValueSar;
+
     return {
       'id': id,
-      'amount': voucherValueSar,
+      'amount': voucherValue,
       'issued_at': now.toIso8601String(),
       'expires_at': expiresAt.toIso8601String(),
       'used': false,
@@ -198,7 +309,8 @@ class RewardsService {
     final vouchers = await _loadVouchers();
     while (updated >= pointsRequiredForVoucher) {
       updated -= pointsRequiredForVoucher;
-      vouchers.add(_createVoucher());
+      final voucher = await _createVoucher();
+      vouchers.add(voucher);
     }
 
     await _setPointsBalance(updated);
@@ -206,11 +318,14 @@ class RewardsService {
     return updated;
   }
 
-  // Purchase accrual (pointsPerSar)
+  // Purchase accrual - Updated for new system
   Future<int> addPointsFromPurchase(double orderTotalSar) async {
-    final rate = await getPointsRatePerSar();
-    final pts = (orderTotalSar * rate).floor();
-    return addPoints(pts, reason: 'purchase');
+    // Add spending to current cycle
+    await addSpendingToCycle(orderTotalSar);
+
+    // In the new system, points are awarded based on cycle progress, not per purchase
+    // This method now just tracks spending
+    return getPointsBalance();
   }
 
   // Orders-only model configuration
@@ -335,11 +450,7 @@ class RewardsService {
     return '$y$m$d';
   }
 
-  // Removed year-month format helper (unused after disabling health points)
-
   // Streak management: returns current streak length
-  // Removed streak update helper (unused after disabling health points)
-
   Future<Map<String, int>> getStreakSummary() async {
     final prefs = await SharedPreferences.getInstance();
     final current = prefs.getInt(_streakCurrentKey) ?? 0;

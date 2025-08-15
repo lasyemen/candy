@@ -29,3 +29,4 @@ mixin PaymentMethodSelectionScreenFunctions
     PaymentMethodItem('cod', 'Cash on Delivery', Icons.money),
   ];
 }
+
