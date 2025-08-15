@@ -8,5 +8,3 @@ mixin TestCheckoutScreenFunctions on State<TestCheckoutScreen> {
     if (mounted) setState(() {});
   }
 }
-
-
