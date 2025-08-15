@@ -144,8 +144,8 @@ class AuthService {
 
         final customer = Customer.fromJson(response);
 
-        // Set current customer in session
-        CustomerSession.instance.setCurrentCustomer(customer);
+        // Set current customer in session and wait until session, cart merge, and cache updates complete
+        await CustomerSession.instance.setCurrentCustomer(customer);
 
         return customer;
       }

@@ -1,16 +1,26 @@
 // lib/screens/product_details_screen.dart
+library product_details_screen;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/services/app_settings.dart';
+import '../core/i18n/product_dictionary.dart';
 import 'package:flutter/services.dart';
 import '../models/products.dart';
 import '../models/product_rating.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/design_system.dart';
 import '../widgets/riyal_icon.dart';
-import '../widgets/star_rating.dart';
 import '../core/services/cart_service.dart';
 import '../core/services/rating_service.dart';
 import '../core/services/customer_session.dart';
+import '../widgets/product_details/star_rating_display.dart';
+import '../widgets/product_details/rating_input_section.dart';
+import '../widgets/product_details/quantity_selector.dart';
+import '../core/constants/translations.dart';
+import '../blocs/app_bloc.dart';
+// duplicate imports removed
+part 'functions/product_details_screen.functions.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Products product;
@@ -23,7 +33,7 @@ class ProductDetailsScreen extends StatefulWidget {
 }
 
 class _ProductDetailsScreenState extends State<ProductDetailsScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, ProductDetailsScreenFunctions {
   late final AnimationController _scaleController;
   late final Animation<double> _scaleAnimation;
   late final AnimationController _slideController;
@@ -38,7 +48,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   bool _isSubmittingRating = false;
   double _selectedRating = 0;
   final TextEditingController _reviewController = TextEditingController();
-  bool _showReviewInput = false;
   bool _isDisposed = false;
 
   @override
@@ -89,378 +98,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     super.dispose();
   }
 
-  // Load rating data for the product
-  Future<void> _loadRatingData() async {
-    if (!CustomerSession.instance.isLoggedIn) {
-      if (!_isDisposed) {
-        setState(() {
-          _isLoadingRating = false;
-        });
-      }
-      return;
-    }
-
-    try {
-      final customerId = CustomerSession.instance.currentCustomerId!;
-
-      // Test table access first
-      final tableAccess = await RatingService.testTableAccess();
-      if (!tableAccess) {
-        print('RatingService - Table access failed, cannot load rating data');
-        if (!_isDisposed) {
-          setState(() {
-            _isLoadingRating = false;
-          });
-        }
-        return;
-      }
-
-      // Load rating summary and user rating in parallel
-      final results = await Future.wait([
-        RatingService.getProductRatingSummary(widget.product.id),
-        RatingService.getUserRating(widget.product.id, customerId),
-      ]);
-
-      if (!_isDisposed) {
-        setState(() {
-          _ratingSummary = results[0] as ProductRatingSummary?;
-          _userRating = results[1] as ProductRating?;
-          _isLoadingRating = false;
-
-          // Set initial values for rating input
-          if (_userRating != null) {
-            _selectedRating = _userRating!.rating.toDouble();
-            _reviewController.text = _userRating!.review ?? '';
-            _showReviewInput =
-                _userRating!.review != null && _userRating!.review!.isNotEmpty;
-          }
-        });
-      }
-    } catch (e) {
-      print('Error loading rating data: $e');
-      if (!_isDisposed) {
-        setState(() {
-          _isLoadingRating = false;
-        });
-      }
-    }
-  }
-
-  // Submit user rating
-  Future<void> _submitRating() async {
-    if (!CustomerSession.instance.isLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى تسجيل الدخول لتقييم المنتج'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    if (_selectedRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى اختيار تقييم'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    if (!_isDisposed) {
-      setState(() {
-        _isSubmittingRating = true;
-      });
-    }
-
-    try {
-      final customerId = CustomerSession.instance.currentCustomerId!;
-      final success = await RatingService.submitRating(
-        productId: widget.product.id,
-        customerId: customerId,
-        rating: _selectedRating.toInt(),
-        review: _reviewController.text.trim().isEmpty
-            ? null
-            : _reviewController.text.trim(),
-      );
-
-      if (success) {
-        // Reload rating data
-        await _loadRatingData();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال تقييمك بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'فشل في إرسال التقييم - تحقق من الاتصال بالإنترنت أو حاول مرة أخرى',
-            ),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error submitting rating: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('حدث خطأ في إرسال التقييم'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (!_isDisposed) {
-        setState(() {
-          _isSubmittingRating = false;
-        });
-      }
-    }
-  }
-
-  // Build star rating display widget (for under title)
-  Widget _buildStarRatingDisplay() {
-    return Row(
-      children: [
-        if (_isLoadingRating)
-          const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else
-          StarRating(
-            rating: _ratingSummary?.averageRating ?? widget.product.rating,
-            size: 22,
-            readOnly: true,
-          ),
-        const SizedBox(width: 8),
-        Text(
-          '${(_ratingSummary?.averageRating ?? widget.product.rating).toStringAsFixed(1)}',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontFamily: 'Rubik',
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '(${_ratingSummary?.totalRatings ?? 0} تقييم)',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontFamily: 'Rubik',
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Build rating input section widget (for under description)
-  Widget _buildRatingInputSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // User rating input (only if logged in)
-        if (CustomerSession.instance.isLoggedIn) ...[
-          Text(
-            'تقييمك',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Colors.black87,
-              fontFamily: 'Rubik',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: InteractiveStarRating(
-                  initialRating: _selectedRating,
-                  onRatingChanged: (rating) {
-                    setState(() {
-                      _selectedRating = rating;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 60,
-                height: 32,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: DesignSystem.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isSubmittingRating ? null : _submitRating,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 8,
-                      ),
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isSubmittingRating
-                        ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            _userRating != null ? 'تحديث' : 'إرسال',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Rubik',
-                              fontSize: 10,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              if (_userRating != null) ...[
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 60,
-                  height: 32,
-                  child: OutlinedButton(
-                    onPressed: _isSubmittingRating ? null : _deleteRating,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'حذف',
-                      style: TextStyle(fontFamily: 'Rubik', fontSize: 10),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ] else ...[
-          // Not logged in message
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'سجل دخولك لتقييم هذا المنتج',
-                    style: TextStyle(
-                      color: Colors.orange[700],
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // Delete user rating
-  Future<void> _deleteRating() async {
-    if (!CustomerSession.instance.isLoggedIn || _userRating == null) {
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('حذف التقييم'),
-        content: const Text('هل أنت متأكد من حذف تقييمك؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('حذف'),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final customerId = CustomerSession.instance.currentCustomerId!;
-      final success = await RatingService.deleteRating(
-        widget.product.id,
-        customerId,
-      );
-
-      if (success) {
-        if (!_isDisposed) {
-          await _loadRatingData();
-          setState(() {
-            _selectedRating = 0;
-            _reviewController.clear();
-            _showReviewInput = false;
-          });
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم حذف تقييمك'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error deleting rating: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('حدث خطأ في حذف التقييم'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  // Functions moved to ProductDetailsScreenFunctions mixin (see part file)
 
   @override
   Widget build(BuildContext context) {
+    final language = Provider.of<AppSettings>(context).currentLanguage;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
@@ -580,11 +222,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             Row(
                               textDirection: TextDirection.ltr,
                               children: [
-                                _buildQuantitySelector(),
+                                QuantitySelector(
+                                  quantity: _selectedQuantity,
+                                  onIncrease: () =>
+                                      setState(() => _selectedQuantity++),
+                                  onDecrease: () {
+                                    if (_selectedQuantity > 1) {
+                                      setState(() => _selectedQuantity--);
+                                    }
+                                  },
+                                ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Text(
-                                    widget.product.name,
+                                    ProductDictionary.translateName(
+                                      widget.product.name,
+                                      language,
+                                    ),
                                     textAlign: TextAlign.right,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -596,7 +250,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                               Brightness.dark
                                           ? Colors.white
                                           : Colors.black87,
-                                      fontFamily: 'Rubik',
+                                      fontFamily: language == 'en'
+                                          ? 'SFProDisplay'
+                                          : 'Rubik',
                                     ),
                                   ),
                                 ),
@@ -605,14 +261,26 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             const SizedBox(height: 16),
 
                             // Star Rating Display
-                            _buildStarRatingDisplay(),
+                            StarRatingDisplay(
+                              isLoading: _isLoadingRating,
+                              rating:
+                                  _ratingSummary?.averageRating ??
+                                  widget.product.rating,
+                              totalRatings: _ratingSummary?.totalRatings ?? 0,
+                            ),
                             const SizedBox(height: 12),
 
                             // Description
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
-                                'الوصف',
+                                AppTranslations.getText(
+                                  'description',
+                                  Provider.of<AppSettings>(
+                                    context,
+                                    listen: false,
+                                  ).currentLanguage,
+                                ),
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -627,7 +295,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              widget.product.description ?? 'لا يوجد وصف.',
+                              widget.product.description ??
+                                  AppTranslations.getText(
+                                    'no_description',
+                                    Provider.of<AppSettings>(
+                                      context,
+                                      listen: false,
+                                    ).currentLanguage,
+                                  ),
                               style: TextStyle(
                                 fontSize: 12,
                                 color:
@@ -642,7 +317,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             const SizedBox(height: 20),
 
                             // Rating Input Section
-                            _buildRatingInputSection(),
+                            RatingInputSection(
+                              isLoggedIn: CustomerSession.instance.isLoggedIn,
+                              selectedRating: _selectedRating,
+                              isSubmitting: _isSubmittingRating,
+                              onSubmit: _submitRating,
+                              onDelete: _userRating != null
+                                  ? _deleteRating
+                                  : null,
+                              onRatingChanged: (rating) {
+                                setState(() {
+                                  _selectedRating = rating;
+                                });
+                              },
+                            ),
                             const SizedBox(height: 20),
 
                             // Price and Add to Cart
@@ -704,318 +392,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     );
   }
 
-  Widget _buildQuantitySelector() => Row(
-    children: [
-      GestureDetector(
-        onTap: () {
-          if (_selectedQuantity > 1) setState(() => _selectedQuantity--);
-        },
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            gradient: DesignSystem.primaryGradient,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.remove_rounded, color: Colors.white),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Text(
-          '$_selectedQuantity',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black87,
-            fontFamily: 'Rubik',
-          ),
-        ),
-      ),
-      GestureDetector(
-        onTap: () => setState(() => _selectedQuantity++),
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            gradient: DesignSystem.primaryGradient,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.add_rounded, color: Colors.white),
-        ),
-      ),
-    ],
-  );
+  // UI helpers moved to ProductDetailsScreenFunctions mixin
 
-  Widget _buildNavButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) => GestureDetector(
-    onTap: onTap,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: isActive ? AppColors.primary : AppColors.glassBackground,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isActive ? AppColors.primary : AppColors.glassBorder,
-          width: 1.5,
-        ),
-      ),
-      child: Icon(
-        icon,
-        color: isActive ? AppColors.textInverse : AppColors.textPrimary,
-        size: 20,
-      ),
-    ),
-  );
+  // UI helpers moved to ProductDetailsScreenFunctions mixin
 
-  Widget _buildAddToCartButton() => Material(
-    color: Colors.transparent,
-    child: Container(
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: DesignSystem.primaryGradient,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: DesignSystem.primary.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          // Add haptic feedback immediately
-          HapticFeedback.lightImpact();
+  // UI helpers moved to ProductDetailsScreenFunctions mixin
 
-          // Show notification immediately (optimistic UI)
-          if (mounted) {
-            _showCartNotification();
-          }
+  // Logic moved to ProductDetailsScreenFunctions mixin
 
-          // Fire and forget cart addition (non-blocking)
-          _addToCartAsync();
-        },
-        child: const Center(
-          child: Text(
-            'أضف إلى السلة',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textInverse,
-              fontFamily: 'Rubik',
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Widget _buildPlaceholderImage() => Container(
-    color: Colors.grey[200],
-    child: Center(
-      child: Icon(Icons.image_outlined, size: 80, color: AppColors.textInverse),
-    ),
-  );
-
-  // Non-blocking cart addition
-  void _addToCartAsync() async {
-    try {
-      await CartManager.instance.addProduct(
-        widget.product.id,
-        quantity: _selectedQuantity,
-      );
-      print('Product added to cart successfully');
-    } catch (e) {
-      print('Error adding product to cart: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_rounded,
-                  color: AppColors.textInverse,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'خطأ في إضافة المنتج إلى السلة',
-                  style: const TextStyle(
-                    fontFamily: 'Rubik',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-    }
-  }
-
-  // Show cart notification immediately
-  void _showCartNotification() {
-    if (!mounted) return;
-
-    print('Showing overlay notification for: ${widget.product.name}');
-
-    final overlay = Overlay.of(context);
-    late final OverlayEntry overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
-        right: 16,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: DesignSystem.primaryGradient,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.shopping_cart_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'تم إضافة المنتج للسلة',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.product.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.9),
-                            fontFamily: 'Rubik',
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.product.price.toStringAsFixed(2),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.attach_money,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {
-                      print('View cart button tapped from product details');
-                      overlayEntry.remove();
-                      // Navigate to cart screen
-                      Navigator.of(context).pushNamed('/cart');
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'عرض السلة',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          fontFamily: 'Rubik',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    // Auto-remove after 2.5 seconds (faster than before)
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
-  }
+  // UI helpers moved to ProductDetailsScreenFunctions mixin
 }

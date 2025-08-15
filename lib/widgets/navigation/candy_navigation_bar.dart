@@ -4,11 +4,30 @@ import 'package:provider/provider.dart';
 import '../../blocs/app_bloc.dart';
 import '../../core/constants/design_system.dart';
 import 'dart:ui'; // Added for ImageFilter
+import '../../core/services/app_settings.dart';
+import '../../core/constants/translations.dart';
+
+class CandyNavItem {
+  final IconData icon;
+  final String label;
+  final int pageIndex;
+  final bool isHome;
+  final int? badge;
+
+  const CandyNavItem({
+    required this.icon,
+    required this.label,
+    required this.pageIndex,
+    this.isHome = false,
+    this.badge,
+  });
+}
 
 class CandyNavigationBar extends StatefulWidget {
   final Function(int) onNavTap;
+  final List<CandyNavItem>? items;
 
-  const CandyNavigationBar({super.key, required this.onNavTap});
+  const CandyNavigationBar({super.key, required this.onNavTap, this.items});
 
   @override
   State<CandyNavigationBar> createState() => _CandyNavigationBarState();
@@ -54,6 +73,36 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
   Widget build(BuildContext context) {
     return Consumer<AppBloc>(
       builder: (context, appBloc, child) {
+        final language = context.watch<AppSettings>().currentLanguage;
+        final defaultItems = [
+          CandyNavItem(
+            icon: FontAwesomeIcons.user,
+            label: AppTranslations.getText('profile', language),
+            pageIndex: 0,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.gift,
+            label: AppTranslations.getText('rewards', language),
+            pageIndex: 1,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.home,
+            label: AppTranslations.getText('home', language),
+            pageIndex: 2,
+            isHome: true,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.shoppingCart,
+            label: AppTranslations.getText('cart', language),
+            pageIndex: 3,
+          ),
+          CandyNavItem(
+            icon: FontAwesomeIcons.listAlt,
+            label: AppTranslations.getText('orders', language),
+            pageIndex: 4,
+          ),
+        ];
+
         return AnimatedBuilder(
           animation: _slideAnimation,
           builder: (context, child) {
@@ -166,42 +215,26 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.user,
-                                label: 'حسابي',
-                                isActive: appBloc.currentIndex == 0,
-                                onTap: () => _onNavTap(0),
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.heart,
-                                label: 'الصحة',
-                                isActive: appBloc.currentIndex == 1,
-                                onTap: () => _onNavTap(1),
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.home,
-                                label: 'الرئيسية',
-                                isActive: appBloc.currentIndex == 2,
-                                onTap: () => _onNavTap(2),
-                                isHome: true,
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.shoppingCart,
-                                label: 'السلة',
-                                isActive: appBloc.currentIndex == 3,
-                                onTap: () => _onNavTap(3),
-                                badge: appBloc.cartItemCount > 0
-                                    ? appBloc.cartItemCount
-                                    : null,
-                              ),
-                              _buildModernNavItem(
-                                icon: FontAwesomeIcons.listAlt,
-                                label: 'طلباتي',
-                                isActive: appBloc.currentIndex == 4,
-                                onTap: () => _onNavTap(4),
-                              ),
-                            ],
+                            children: (widget.items ?? defaultItems).map((
+                              item,
+                            ) {
+                              final bool isActive =
+                                  appBloc.currentIndex == item.pageIndex;
+                              final int? badge =
+                                  item.badge ??
+                                  (item.pageIndex == 3 &&
+                                          appBloc.cartItemCount > 0
+                                      ? appBloc.cartItemCount
+                                      : null);
+                              return _buildModernNavItem(
+                                icon: item.icon,
+                                label: item.label,
+                                isActive: isActive,
+                                onTap: () => _onNavTap(item.pageIndex),
+                                badge: badge,
+                                isHome: item.isHome,
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),

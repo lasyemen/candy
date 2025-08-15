@@ -1,11 +1,16 @@
+// lib/screens/main_screen.dart
+library main_screen;
+
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../blocs/app_bloc.dart';
 import '../widgets/index.dart';
 import 'index.dart';
 import '../core/services/app_settings.dart';
-import '../core/constants/design_system.dart';
+import '../core/constants/translations.dart';
+part 'functions/main_screen.functions.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
@@ -16,17 +21,13 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen>
+    with TickerProviderStateMixin, MainScreenFunctions {
   late PageController _pageController;
   final PageStorageBucket _bucket = PageStorageBucket();
 
-  final List<Widget> _screens = [
-    const UserDashboard(), // My Account (index 0)
-    const HealthTracker(), // Health (index 1)
-    const HomeScreen(), // Home (index 2) - CENTER - Main screen with products
-    const CartScreen(), // Cart (index 3)
-    const MyOrdersScreen(), // My Orders (index 4)
-  ];
+  late final List<Widget> _screens;
+  bool _configured = false;
 
   @override
   void initState() {
@@ -38,6 +39,26 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         context.read<AppBloc>().add(SetCurrentIndexEvent(widget.initialIndex));
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_configured) return;
+
+    // Build screens once. If the app is in a merchant session, hide Health.
+    final Object? args = ModalRoute.of(context)?.settings.arguments;
+    final bool isMerchant = args is Map && (args['isMerchant'] == true);
+
+    _screens = [
+      const UserDashboard(),
+      if (!isMerchant) const RewardsScreen(),
+      const HomeScreen(),
+      const CartScreen(),
+      const MyOrdersScreen(),
+    ];
+
+    _configured = true;
   }
 
   @override
@@ -77,7 +98,69 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Consumer2<AppSettings, AppBloc>(
       builder: (context, appSettings, appBloc, child) {
-        final isDarkMode = appSettings.isDarkMode;
+        // final isDarkMode = appSettings.isDarkMode; // reserved for theming
+        final String language = appSettings.currentLanguage;
+        final Object? args = ModalRoute.of(context)?.settings.arguments;
+        final bool isMerchant = args is Map && (args['isMerchant'] == true);
+        final bool isRtl = Directionality.of(context) == TextDirection.rtl;
+
+        // Build navigation items dynamically so labels react to language changes
+        late final List<CandyNavItem> navItems;
+        if (isMerchant) {
+          final homeItem = CandyNavItem(
+            icon: FontAwesomeIcons.home,
+            label: AppTranslations.getText('home', language),
+            pageIndex: 1,
+            isHome: true,
+          );
+          final others = [
+            CandyNavItem(
+              icon: FontAwesomeIcons.user,
+              label: AppTranslations.getText('profile', language),
+              pageIndex: 0,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.shoppingCart,
+              label: AppTranslations.getText('cart', language),
+              pageIndex: 2,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.listAlt,
+              label: AppTranslations.getText('orders', language),
+              pageIndex: 3,
+            ),
+          ];
+          navItems = isRtl ? [homeItem, ...others] : [...others, homeItem];
+        } else {
+          navItems = [
+            CandyNavItem(
+              icon: FontAwesomeIcons.user,
+              label: AppTranslations.getText('profile', language),
+              pageIndex: 0,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.gift,
+              label: AppTranslations.getText('rewards', language),
+              pageIndex: 1,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.home,
+              label: AppTranslations.getText('home', language),
+              pageIndex: 2,
+              isHome: true,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.shoppingCart,
+              label: AppTranslations.getText('cart', language),
+              pageIndex: 3,
+            ),
+            CandyNavItem(
+              icon: FontAwesomeIcons.listAlt,
+              label: AppTranslations.getText('orders', language),
+              pageIndex: 4,
+            ),
+          ];
+        }
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -100,7 +183,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                   },
                   children: _screens,
                 ),
-                CandyNavigationBar(onNavTap: _onNavTap),
+                CandyNavigationBar(onNavTap: _onNavTap, items: navItems),
               ],
             ),
           ),

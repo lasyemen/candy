@@ -14,11 +14,10 @@ This directory contains the routing configuration for the Candy Water applicatio
 - `AppRoutes.cart` - Shopping cart screen
 - `AppRoutes.orders` - User orders screen
 - `AppRoutes.userDashboard` - User dashboard/profile
-- `AppRoutes.healthTracker` - Health and water tracking
+ - `AppRoutes.rewards` - Rewards and vouchers
 
 ### Delivery & Payment Routes
 - `AppRoutes.deliveryLocation` - Delivery location selection
-- `AppRoutes.paymentTracking` - Payment and order tracking
 
 ## Usage Examples
 
@@ -28,7 +27,7 @@ This directory contains the routing configuration for the Candy Water applicatio
 AppRoutes.navigateTo(context, AppRoutes.home);
 
 // Navigate with arguments
-AppRoutes.navigateTo(context, AppRoutes.paymentTracking, 
+// Payment tracking removed; use AppRoutes.cardPayment for payment
   arguments: {'orderId': '123', 'status': 'pending'});
 ```
 

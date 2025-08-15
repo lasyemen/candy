@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'supabase_service.dart';
 import 'customer_session.dart';
+import 'rewards_service.dart';
 
 class CartSessionManager {
   static CartSessionManager? _instance;
@@ -301,18 +302,12 @@ class CartSessionManager {
     if (!isNetworkAvailable) {
       print('CartSessionManager - No network connectivity available');
 
-      // For guest users, we can work offline
-      if (!CustomerSession.instance.isLoggedIn) {
-        print(
-          'CartSessionManager - Guest user in offline mode, using local storage',
-        );
-        await _addItemToLocalCart(productId, quantity);
-        return;
-      }
-
-      throw Exception(
-        'No network connectivity. Please check your internet connection.',
+      // Work offline for both guest and logged-in users; sync later when online
+      print(
+        'CartSessionManager - Offline mode: adding to local cart storage (will sync later)',
       );
+      await _addItemToLocalCart(productId, quantity);
+      return;
     }
 
     int retryCount = 0;
@@ -601,6 +596,14 @@ class CartSessionManager {
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', _currentCartId!);
+
+      // Award purchase-based points and issue vouchers if applicable
+      try {
+        final double total = (order['total'] as num?)?.toDouble() ?? 0.0;
+        if (total > 0) {
+          await RewardsService.instance.addPointsFromPurchase(total);
+        }
+      } catch (_) {}
 
       _currentCartId = null;
       return order['id'];
@@ -919,12 +922,45 @@ class CartSessionManager {
         return;
       }
 
-      // Ensure we have a valid cart session
+      // Ensure we have a valid cart session; if user is logged in now, merge guest into user cart
       if (_currentCartId == null) {
         await initializeSession();
       }
 
-      // For guest users, ensure the cart exists in the database
+      // If user is logged in, ensure we have a user cart and set it current
+      if (CustomerSession.instance.isLoggedIn) {
+        try {
+          final customerId = CustomerSession.instance.currentCustomerId;
+          if (customerId != null) {
+            final userCart = await SupabaseService.instance.client
+                .from('carts')
+                .select('id')
+                .eq('customer_id', customerId)
+                .maybeSingle();
+
+            if (userCart != null) {
+              _currentCartId = userCart['id'] as String;
+            } else {
+              final newCart = await SupabaseService.instance.client
+                  .from('carts')
+                  .insert({
+                    'customer_id': customerId,
+                    'created_at': DateTime.now().toIso8601String(),
+                    'updated_at': DateTime.now().toIso8601String(),
+                  })
+                  .select('id')
+                  .single();
+              _currentCartId = newCart['id'] as String;
+            }
+          }
+        } catch (e) {
+          print(
+            'CartSessionManager - Failed to prepare user cart for sync: $e',
+          );
+        }
+      }
+
+      // For guests, ensure the cart exists in the database
       if (!CustomerSession.instance.isLoggedIn &&
           _currentCartId == _guestCartId) {
         try {

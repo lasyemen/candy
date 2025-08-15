@@ -1,12 +1,14 @@
 # Exclude everything by default
 *
 
-# Only include lib and assets folders
-!lib/
-!assets/
+# Re-include these files/directories
 !.gitignore
+!lib/
+!lib/**
+!assets/
+!assets/**
 
-# Still exclude build files even in lib and assets
+# Still ignore build outputs and caches even inside lib/ and assets/
 **/build/
 **/ios/
 **/android/
@@ -23,7 +25,7 @@
 **/.pub-cache/
 **/pubspec.lock
 
-# Generated files
+# Generated Dart files
 *.g.dart
 *.freezed.dart
 
@@ -38,9 +40,7 @@
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & temp
 *.log
-
-# Temporary files
 *.tmp
 *.temp

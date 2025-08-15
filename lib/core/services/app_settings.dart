@@ -4,12 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppSettings extends ChangeNotifier {
   static const String _languageKey = 'selected_language';
   static const String _themeKey = 'selected_theme';
+  static const String _taqnyatTokenKey = 'taqnyat_bearer_token';
 
-  String _currentLanguage = 'ar';
+  String _currentLanguage = 'en';
   ThemeMode _currentTheme = ThemeMode.light;
+  String? _taqnyatBearerToken;
 
   String get currentLanguage => _currentLanguage;
   ThemeMode get currentTheme => _currentTheme;
+  String? get taqnyatBearerToken => _taqnyatBearerToken;
 
   AppSettings() {
     _loadSettings();
@@ -17,9 +20,11 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    // Load saved language; default to Arabic for Arabic-first experience
     _currentLanguage = prefs.getString(_languageKey) ?? 'ar';
     final themeString = prefs.getString(_themeKey) ?? 'light';
     _currentTheme = _getThemeModeFromString(themeString);
+    _taqnyatBearerToken = prefs.getString(_taqnyatTokenKey);
     notifyListeners();
   }
 
@@ -30,6 +35,17 @@ class AppSettings extends ChangeNotifier {
       await prefs.setString(_languageKey, language);
       notifyListeners();
     }
+  }
+
+  Future<void> setTaqnyatBearerToken(String? token) async {
+    _taqnyatBearerToken = token?.trim().isEmpty == true ? null : token?.trim();
+    final prefs = await SharedPreferences.getInstance();
+    if (_taqnyatBearerToken == null) {
+      await prefs.remove(_taqnyatTokenKey);
+    } else {
+      await prefs.setString(_taqnyatTokenKey, _taqnyatBearerToken!);
+    }
+    notifyListeners();
   }
 
   Future<void> setTheme(ThemeMode theme) async {

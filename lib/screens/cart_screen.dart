@@ -4,6 +4,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import '../core/services/app_settings.dart';
+import '../core/i18n/product_dictionary.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
 import '../core/services/cart_service.dart';
@@ -832,7 +834,9 @@ class _CartScreenState extends State<CartScreen>
         'products': {'name': 'مياه كاندي'},
       },
     );
-    return item['products']?['name'] ?? 'مياه كاندي';
+    final raw = item['products']?['name'] ?? 'مياه كاندي';
+    final language = context.read<AppSettings>().currentLanguage;
+    return ProductDictionary.translateName(raw, language);
   }
 
   // Helper method to get product price
@@ -984,7 +988,7 @@ class _CartScreenState extends State<CartScreen>
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(80),
+            preferredSize: const Size.fromHeight(64),
             child: AppBar(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               elevation: 0,
@@ -993,7 +997,7 @@ class _CartScreenState extends State<CartScreen>
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical: 12,
+                    vertical: 6,
                   ),
                   child: Row(
                     children: [
@@ -1015,15 +1019,17 @@ class _CartScreenState extends State<CartScreen>
                               ),
                             ),
                             if (_cartItemsWithProducts.isNotEmpty)
-                              Text(
-                                '${_cartItemsWithProducts.length} منتج',
-                                style: DesignSystem.bodySmall.copyWith(
-                                  color:
-                                      Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? Colors.white
-                                      : DesignSystem.textSecondary,
-                                  fontFamily: 'Rubik',
+                              ShaderMask(
+                                shaderCallback: (bounds) => DesignSystem
+                                    .primaryGradient
+                                    .createShader(bounds),
+                                child: Text(
+                                  '${_cartItemsWithProducts.length} منتج',
+                                  style: DesignSystem.bodySmall.copyWith(
+                                    color: Colors.white,
+                                    fontFamily: 'Rubik',
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                           ],
@@ -1086,7 +1092,14 @@ class _CartScreenState extends State<CartScreen>
       children: [
         ListView.builder(
           // Changed from ListView.separated for better performance
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 +
+                MediaQuery.of(context).viewPadding.bottom +
+                kBottomNavigationBarHeight,
+          ),
           physics: const BouncingScrollPhysics(),
           cacheExtent: 800,
           itemCount: _cartItemsWithProducts.length,
@@ -1367,63 +1380,12 @@ class _CartScreenState extends State<CartScreen>
 
   Widget _buildLoadingState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    DesignSystem.surface,
-                    DesignSystem.surface.withOpacity(0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(32),
-                boxShadow: [
-                  BoxShadow(
-                    color: DesignSystem.primary.withOpacity(0.1),
-                    blurRadius: 30,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(
-                  strokeWidth: 4,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    DesignSystem.primary,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'جاري تحميل السلة...',
-              style: DesignSystem.headlineMedium.copyWith(
-                color: DesignSystem.textPrimary,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Rubik',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'يرجى الانتظار بينما نقوم بتحميل محتويات سلة التسوق',
-              style: DesignSystem.bodyLarge.copyWith(
-                color: DesignSystem.textSecondary,
-                fontFamily: 'Rubik',
-                height: 1.6,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: CircularProgressIndicator(
+          strokeWidth: 3,
+          valueColor: AlwaysStoppedAnimation<Color>(DesignSystem.primary),
         ),
       ),
     );
@@ -1702,7 +1664,10 @@ class _CartScreenState extends State<CartScreen>
                           ? Colors.white
                           : DesignSystem.textPrimary,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
+                      fontFamily:
+                          context.read<AppSettings>().currentLanguage == 'en'
+                          ? 'SFProDisplay'
+                          : 'Rubik',
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -1966,15 +1931,24 @@ class _CartScreenState extends State<CartScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _getProductName(cartItem.productId),
-                  style: DesignSystem.titleMedium.copyWith(
-                    color: DesignSystem.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Rubik',
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
+                Builder(
+                  builder: (context) {
+                    final language = context
+                        .read<AppSettings>()
+                        .currentLanguage;
+                    return Text(
+                      _getProductName(cartItem.productId),
+                      style: DesignSystem.titleMedium.copyWith(
+                        color: DesignSystem.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: language == 'en'
+                            ? 'SFProDisplay'
+                            : 'SFArabic',
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    );
+                  },
                 ),
                 const SizedBox(height: 6),
                 Row(

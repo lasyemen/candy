@@ -5,6 +5,9 @@ import '../../models/products.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/i18n/product_dictionary.dart';
+import '../../core/services/app_settings.dart';
+import 'package:provider/provider.dart';
 import '../riyal_icon.dart';
 import '../star_rating.dart';
 
@@ -75,6 +78,7 @@ class _HomeProductCardState extends State<HomeProductCard>
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final language = context.watch<AppSettings>().currentLanguage;
     final isGridView = widget.isGridView;
 
     return GestureDetector(
@@ -163,10 +167,16 @@ class _HomeProductCardState extends State<HomeProductCard>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          product.name,
-                          style: const TextStyle(
+                          ProductDictionary.translateName(
+                            product.name,
+                            language,
+                          ),
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
+                            fontFamily: language == 'en'
+                                ? 'SFProDisplay'
+                                : null,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,

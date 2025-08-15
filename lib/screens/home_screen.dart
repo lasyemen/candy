@@ -1,4 +1,5 @@
 // lib/screens/home_screen.dart
+library home_screen;
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
+import '../core/constants/translations.dart';
 // import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
@@ -19,6 +21,7 @@ import '../core/services/product_service.dart';
 import '../core/services/ads_service.dart';
 import '../core/services/cart_service.dart'; // Added import for CartService
 import '../core/utils/home_utils.dart';
+part 'functions/home_screen.functions.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,7 +31,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with AutomaticKeepAliveClientMixin<HomeScreen> {
+    with AutomaticKeepAliveClientMixin<HomeScreen>, HomeScreenFunctions {
   int _selectedCategory = 0;
   int _currentBanner = 0;
   late PageController _bannerController;
@@ -42,22 +45,26 @@ class _HomeScreenState extends State<HomeScreen>
   List<Map<String, dynamic>> get _banners {
     print('Current ads count: ${_ads.length}'); // Debug log
     print('Ads list: $_ads'); // Debug: show the actual ads list
+    final String lang = Provider.of<AppSettings>(
+      context,
+      listen: false,
+    ).currentLanguage;
 
     if (_ads.isEmpty) {
       print('No ads loaded, showing fallback banners');
       // Fallback banners if no ads are loaded
       return [
         {
-          'title': 'عرض خاص!',
-          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+          'title': AppTranslations.getText('special_offer', lang),
+          'subtitle': AppTranslations.getText('discount_20_all', lang),
           'image': 'https://picsum.photos/400/200?random=fallback1',
           'color': const Color(0xFF6B46C1),
           'gradient': DesignSystem.primaryGradient,
           'icon': Icons.local_offer,
         },
         {
-          'title': 'توصيل مجاني',
-          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
+          'title': AppTranslations.getText('free_delivery', lang),
+          'subtitle': AppTranslations.getText('free_delivery_over_50', lang),
           'image': 'https://picsum.photos/400/200?random=fallback2',
           'color': const Color(0xFF6B46C1),
           'gradient': DesignSystem.primaryGradient,
@@ -71,8 +78,8 @@ class _HomeScreenState extends State<HomeScreen>
     return _ads.map((ad) {
       print('Processing ad: ID=${ad.id}, ImageURL=${ad.imageUrl}');
       return {
-        'title': 'إعلان كاندي',
-        'subtitle': 'عرض خاص من كاندي',
+        'title': AppTranslations.getText('candy_ad', lang),
+        'subtitle': AppTranslations.getText('candy_offer', lang),
         'imageUrl': ad.imageUrl, // Use imageUrl key to match banner widget
         'color': const Color(0xFF6B46C1),
         'gradient': DesignSystem.primaryGradient,
@@ -82,13 +89,7 @@ class _HomeScreenState extends State<HomeScreen>
     }).toList();
   }
 
-  final List<String> _categories = [
-    'الكل',
-    '330 مل',
-    '200 مل',
-    '500 مل',
-    '1 لتر',
-  ];
+  final List<String> _categories = ['All', '330 ml', '200 ml', '500 ml', '1 L'];
 
   @override
   void initState() {
@@ -158,414 +159,21 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Background refresh method that doesn't show loading
   // ignore: unused_element
-  Future<void> _refreshDataSilently() async {
-    try {
-      // Refresh products silently
-      final products = await ProductService.fetchProducts();
-      if (mounted && products.length != _products.length) {
-        setState(() {
-          _products = products;
-        });
-        print('Silently refreshed ${products.length} products');
-      }
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      // Refresh ads silently
-      final ads = await AdsService.fetchAds();
-      if (mounted && ads.length != _ads.length) {
-        setState(() {
-          _ads = ads;
-        });
-        print('Silently refreshed ${ads.length} ads');
-      }
-    } catch (e) {
-      print('Silent refresh error: $e');
-      // Don't show error messages for background refreshes
-    }
-  }
+  // Moved to mixin in functions/home_screen.functions.dart
 
-  Future<void> _loadProducts({bool showLoading = true}) async {
-    try {
-      if (showLoading && mounted) {
-        setState(() {
-          _isLoading = true;
-        });
-      }
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      print('HomeScreen - Loading products from database...');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      // First, test database connection
-      print('HomeScreen - Testing database connection...');
-      final connectionTest = await ProductService.testConnection();
-      print('HomeScreen - Database connection test result: $connectionTest');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      // Test database permissions
-      print('HomeScreen - Testing database permissions...');
-      final permissionsTest = await ProductService.testDatabasePermissions();
-      print('HomeScreen - Database permissions test result: $permissionsTest');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      // Check if products table has data
-      final hasData = await ProductService.hasProducts();
-      print('HomeScreen - Products table has data: $hasData');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      if (!hasData) {
-        print('HomeScreen - Products table is empty - adding sample products');
-        final added = await ProductService.addSampleProducts();
-        print('HomeScreen - Sample products added successfully: $added');
-        if (!added) {
-          print(
-            'HomeScreen - Regular sample products failed, trying force populate...',
-          );
-          final forceAdded = await ProductService.forcePopulateProducts();
-          print('HomeScreen - Force populate successful: $forceAdded');
-          if (!forceAdded) {
-            print('HomeScreen - Failed to add products');
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
-            }
-            return;
-          }
-        }
-      }
-
-      final products = await ProductService.fetchProducts();
-
-      print('HomeScreen - Loaded ${products.length} products from database');
-      print(
-        'HomeScreen - Products list: ${products.map((p) => p.name).toList()}',
-      );
-
-      if (mounted) {
-        setState(() {
-          _products = products;
-          _isLoading = false;
-        });
-        print('HomeScreen - Updated state with ${_products.length} products');
-      }
-    } catch (e) {
-      print('Error loading products from database: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        // Show error message only if it's not a background refresh
-        if (showLoading) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطأ في تحميل المنتجات: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-
-    // If no products loaded and no error, show empty state only on initial load
-    if (mounted && _products.isEmpty && !_isLoading && showLoading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لا يوجد منتجات في قاعدة البيانات'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
-  Future<void> _loadAds() async {
-    try {
-      print('Loading ads from database...');
-      if (mounted) {
-        setState(() {
-          _isLoadingAds = true;
-        });
-      }
-
-      // First check if table exists
-      final tableExists = await AdsService.tableExists();
-      if (!tableExists) {
-        print('Ads table does not exist or is not accessible');
-        if (mounted) {
-          setState(() {
-            _isLoadingAds = false;
-          });
-        }
-        return;
-      }
-
-      // Check if table has data
-      final hasData = await AdsService.hasAds();
-      if (!hasData) {
-        print('Ads table is empty - adding sample ads');
-        final added = await AdsService.addSampleAds();
-        if (!added) {
-          print('Failed to add sample ads');
-          if (mounted) {
-            setState(() {
-              _isLoadingAds = false;
-            });
-          }
-          return;
-        }
-      }
-
-      final ads = await AdsService.fetchAds();
-      print('Loaded ${ads.length} ads from database');
-
-      if (mounted) {
-        setState(() {
-          _ads = ads;
-          _isLoadingAds = false;
-        });
-      }
-
-      print('Ads state updated, total ads: ${_ads.length}');
-
-      // Display ads information
-      if (_ads.isNotEmpty) {
-        print('=== DATABASE ADS INFORMATION ===');
-        for (int i = 0; i < _ads.length; i++) {
-          final ad = _ads[i];
-          print('Ad ${i + 1}:');
-          print('  ID: ${ad.id}');
-          print('  Image URL: ${ad.imageUrl}');
-          print('  Created: ${ad.createdAt}');
-          print('  Will be displayed as banner');
-          print('---');
-        }
-      } else {
-        print('No ads found in database - showing fallback banners');
-      }
-    } catch (e) {
-      print('Error loading ads from database: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingAds = false;
-        });
-      }
-    }
-  }
-
-  List<Products> _getProducts(String language) {
-    // Return products from Supabase, with fallback to static products
-    if (_products.isNotEmpty) {
-      print(
-        'HomeScreen - Returning ${_products.length} products from database',
-      );
-      return _products;
-    } else {
-      // Fallback to static products if database is empty
-      print('HomeScreen - Using fallback static products');
-      final staticProducts = HomeUtils.getProducts(language);
-      print('HomeScreen - Static products count: ${staticProducts.length}');
-      return staticProducts;
-    }
-  }
-
-  List<Products> _getFilteredProducts(String language) {
-    final products = _getProducts(language);
-    if (_selectedCategory == 0) return products;
-    final cat = _categories[_selectedCategory];
-    return products.where((p) => p.name.contains(cat)).toList();
-  }
-
-  void _addToCart(Products product) async {
-    final appBloc = context.read<AppBloc>();
-
-    // Add haptic feedback immediately
-    HapticFeedback.lightImpact();
-
-    // Optimistic UI update - show notification immediately
-    if (mounted) {
-      _showCartNotification(product);
-    }
-
-    // Update app bloc immediately for UI responsiveness
-    appBloc.add(AddToCartEvent(product));
-
-    // Fire and forget cart addition (non-blocking)
-    _addToCartAsync(product);
-  }
-
-  // Non-blocking cart addition
-  void _addToCartAsync(Products product) async {
-    try {
-      // Add product to cart using CartManager (non-blocking)
-      await CartManager.instance.addProduct(product.id);
-      print('Successfully added ${product.name} to cart');
-    } catch (e) {
-      print('Error adding product to cart: $e');
-      // Show error message to user if there's an issue
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في إضافة المنتج إلى السلة: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // Show cart notification immediately
-  void _showCartNotification(Products product) {
-    if (!mounted) return;
-
-    print('Showing cart notification for: ${product.name}');
-
-    final overlay = Overlay.of(context);
-    late final OverlayEntry overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
-        right: 16,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: DesignSystem.primaryGradient,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Animate(
-                      effects: const [
-                        ScaleEffect(
-                          duration: Duration(milliseconds: 150),
-                          curve: Curves.easeOut,
-                        ),
-                        ShakeEffect(
-                          duration: Duration(milliseconds: 200),
-                          hz: 3,
-                        ),
-                      ],
-                      child: Icon(
-                        FontAwesomeIcons.cartShopping,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'تم إضافة المنتج للسلة',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          product.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.9),
-                            fontFamily: 'Rubik',
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          product.price.toStringAsFixed(2),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const RiyalIcon(size: 12, color: Colors.white),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {
-                      print('View cart button tapped');
-                      overlayEntry.remove();
-                      context.read<AppBloc>().add(
-                        SetCurrentIndexEvent(3),
-                      ); // Cart is index 3
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'عرض السلة',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          fontFamily: 'Rubik',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    // Auto-remove after 2.5 seconds (faster than before)
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
-  }
+  // Moved to mixin in functions/home_screen.functions.dart
 
   @override
   Widget build(BuildContext context) {
@@ -586,13 +194,15 @@ class _HomeScreenState extends State<HomeScreen>
               builder: (context) {
                 final isDark = Theme.of(context).brightness == Brightness.dark;
                 if (isDark) {
-                  return const Text(
-                    'مياه كاندي',
+                  return Text(
+                    AppTranslations.getText('app_name', lang),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
                       color: Colors.white,
-                      fontFamily: 'Rubik',
+                      fontFamily: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.fontFamily,
                     ),
                   );
                 } else {
@@ -603,13 +213,15 @@ class _HomeScreenState extends State<HomeScreen>
                       ).createShader(bounds);
                     },
                     blendMode: BlendMode.srcIn,
-                    child: const Text(
-                      'مياه كاندي',
+                    child: Text(
+                      AppTranslations.getText('app_name', lang),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 20,
                         color: Colors.white,
-                        fontFamily: 'Rubik',
+                        fontFamily: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.fontFamily,
                       ),
                     ),
                   );
@@ -838,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Row(
                     children: [
                       Text(
-                        'المنتجات',
+                        AppTranslations.getText('products_title', lang),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -996,12 +608,16 @@ class _HomeScreenState extends State<HomeScreen>
                     border: Border.all(color: Colors.white.withOpacity(0.3)),
                   ),
                   child: Row(
-                    children: const [
-                      Icon(Icons.info_outline, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        'الاسعار شاملة ضريبة القيمة المضافة',
-                        style: TextStyle(
+                        AppTranslations.getText('prices_include_vat', lang),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
@@ -1028,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'جاري تحميل المنتجات...',
+                                AppTranslations.getText('loading', lang),
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 16,
@@ -1050,9 +666,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 size: 40,
                               ),
                               const SizedBox(height: 14),
-                              const Text(
-                                "لا يوجد منتجات متاحة حالياً.",
-                                style: TextStyle(
+                              Text(
+                                AppTranslations.getText('no_products', lang),
+                                style: const TextStyle(
                                   color: Color(0xFF6B46C1),
                                   fontSize: 16,
                                 ),
@@ -1092,175 +708,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildBannerItem(Map<String, dynamic> banner) {
-    final imageUrl = banner['imageUrl'] as String?;
-    print('Building banner with image: $imageUrl');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-    if (imageUrl == null || imageUrl.isEmpty) {
-      print('No image URL found, using fallback');
-      return _buildBannerBackgroundImage('assets/icon/iconApp.png');
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(35),
-        boxShadow: [
-          // Main shadow - same as nav bar
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          // Border shadows - Top
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 1,
-            offset: const Offset(0, -1),
-            spreadRadius: 0,
-          ),
-          // Border shadows - Bottom
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 1,
-            offset: const Offset(0, 1),
-            spreadRadius: 0,
-          ),
-          // Border shadows - Left
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 1,
-            offset: const Offset(-1, 0),
-            spreadRadius: 0,
-          ),
-          // Border shadows - Right
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 1,
-            offset: const Offset(1, 0),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(35)),
-        clipBehavior: Clip.antiAlias,
-        child: _buildBannerBackgroundImage(imageUrl),
-      ),
-    );
-  }
-
-  Widget _buildBannerBackgroundImage(String? imageUrl) {
-    print('Building background image with URL: $imageUrl');
-
-    if (imageUrl == null || imageUrl.isEmpty) {
-      print('No image URL provided, using fallback');
-      return Image.asset(
-        'assets/icon/iconApp.png',
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, assetError, stackTrace) {
-          print('Error loading fallback asset image: $assetError');
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey[300],
-            child: Center(
-              child: Icon(
-                Icons.image_not_supported,
-                size: 60,
-                color: Colors.grey[600],
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    // Check if it's a network image (starts with http or https)
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      print('Loading network image: $imageUrl');
-      return Image.network(
-        imageUrl,
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          print('Error loading network background image: $error');
-          // Fallback to local asset if network fails
-          return Image.asset(
-            'assets/icon/iconApp.png',
-            width: double.infinity,
-            height: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, assetError, stackTrace) {
-              print('Error loading fallback asset image: $assetError');
-              return Container(
-                width: double.infinity,
-                height: double.infinity,
-                color: Colors.grey[300],
-                child: Center(
-                  child: Icon(
-                    Icons.image_not_supported,
-                    size: 60,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            print('Network image loaded successfully');
-            return child;
-          }
-          print(
-            'Loading network image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}',
-          );
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey[200],
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                    : null,
-                strokeWidth: 3,
-                color: Colors.grey[600],
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      // Local asset image
-      print('Loading asset image: $imageUrl');
-      return Image.asset(
-        imageUrl,
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          print('Error loading asset background image: $error');
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey[300],
-            child: Center(
-              child: Icon(
-                Icons.image_not_supported,
-                size: 60,
-                color: Colors.grey[600],
-              ),
-            ),
-          );
-        },
-      );
-    }
-  }
+  // Moved to mixin in functions/home_screen.functions.dart
 }

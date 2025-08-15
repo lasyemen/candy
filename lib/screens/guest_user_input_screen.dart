@@ -1,3 +1,6 @@
+// lib/screens/guest_user_input_screen.dart
+library guest_user_input_screen;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -6,6 +9,7 @@ import '../core/services/customer_session.dart';
 import '../core/services/auth_service.dart';
 import '../core/routes/index.dart';
 // Removed unused imports
+part 'functions/guest_user_input_screen.functions.dart';
 
 class GuestUserInputScreen extends StatefulWidget {
   final Map<String, dynamic> deliveryData;
@@ -17,7 +21,7 @@ class GuestUserInputScreen extends StatefulWidget {
 }
 
 class _GuestUserInputScreenState extends State<GuestUserInputScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, GuestUserInputScreenFunctions {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();

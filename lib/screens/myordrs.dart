@@ -1,8 +1,12 @@
+// lib/screens/myordrs.dart
+library my_orders_screen;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/constants/design_system.dart';
 import '../widgets/riyal_icon.dart';
+part 'functions/myordrs.functions.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
@@ -12,7 +16,7 @@ class MyOrdersScreen extends StatefulWidget {
 }
 
 class _MyOrdersScreenState extends State<MyOrdersScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, MyOrdersScreenFunctions {
   late TabController _tabController;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
