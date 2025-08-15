@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../riyal_icon.dart';
+import '../../core/services/app_settings.dart';
+import '../../core/i18n/product_dictionary.dart';
 
 class CartItemWidget extends StatelessWidget {
   final Map<String, dynamic> item;
@@ -17,7 +20,9 @@ class CartItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = item['name'] as String;
+    final language = context.watch<AppSettings>().currentLanguage;
+    final rawName = item['name'] as String;
+    final name = ProductDictionary.translateName(rawName, language);
     final price = item['price'] as double;
     final quantity = item['quantity'] as int;
     final image = item['image'] as String;
@@ -55,7 +60,8 @@ class CartItemWidget extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Rubik',
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -190,7 +196,12 @@ class CartItemWidget extends StatelessWidget {
   }
 
   void _showProductInfo(BuildContext context) {
-    final name = item['name'] as String;
+    final language = Provider.of<AppSettings>(
+      context,
+      listen: false,
+    ).currentLanguage;
+    final rawName = item['name'] as String;
+    final name = ProductDictionary.translateName(rawName, language);
     final price = item['price'] as double;
     final quantity = item['quantity'] as int;
     final image = item['image'] as String;
@@ -251,7 +262,7 @@ class CartItemWidget extends StatelessWidget {
               // Product Name
               Text(
                 name,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
+import '../core/services/app_settings.dart';
+import 'package:provider/provider.dart';
 import '../core/routes/index.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/customer_session.dart';
+import '../utils/phone_utils.dart';
 // Removed unused import
 
 /*
@@ -139,8 +143,12 @@ class _SignUpScreenState extends State<SignUpScreen>
     });
 
     try {
-      // Clean phone number (remove non-digit characters)
-      final cleanPhone = _phoneController.text.replaceAll(RegExp(r'[^\d]'), '');
+      // Normalize to international format using shared utility
+      final normalized = PhoneUtils.normalizeKsaPhone(_phoneController.text);
+      if (normalized == null) {
+        throw Exception('SA phone validation failed');
+      }
+      final cleanPhone = normalized;
 
       print(
         'Sign-up form submitted with name: ${_nameController.text}, phone: $cleanPhone',
@@ -172,46 +180,19 @@ class _SignUpScreenState extends State<SignUpScreen>
         });
 
         if (customer != null) {
-          // Check if this is a guest user with cart items
-          final isGuestUser = CustomerSession.instance.isGuestUser;
-          final hasGuestData = CustomerSession.instance.guestUser != null;
+          // Set logged-in customer session so profile is not guest
+          await CustomerSession.instance.setCurrentCustomer(customer);
 
-          if (isGuestUser && hasGuestData) {
-            print('SignUpScreen - Guest user with cart items, merging cart...');
+          // Notify
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
+              backgroundColor: Colors.green,
+            ),
+          );
 
-            // Set the customer as current (cart merging runs in background)
-            await CustomerSession.instance.setCurrentCustomer(customer);
-
-            // Note: Guest user data will be cleared automatically when setCurrentCustomer is called
-            print('SignUpScreen - Guest user data preserved for cart merging');
-
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            // Navigate to main and open the Cart tab so the bottom nav is visible
-            Navigator.pushReplacementNamed(
-              context,
-              AppRoutes.main,
-              arguments: {'initialIndex': 3},
-            );
-          } else {
-            // Regular signup without cart items
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('تم إنشاء الحساب بنجاح! مرحباً ${customer.name}'),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            // Navigate to main screen (which includes navigation bar)
-            Navigator.pushReplacementNamed(context, AppRoutes.main);
-          }
+          // Temporarily skip OTP flow and go straight to Home
+          Navigator.pushReplacementNamed(context, AppRoutes.main);
         } else {
           print('SignUpScreen - Customer registration returned null');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -282,6 +263,7 @@ class _SignUpScreenState extends State<SignUpScreen>
 
   @override
   Widget build(BuildContext context) {
+    final language = context.watch<AppSettings>().currentLanguage;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -298,8 +280,8 @@ class _SignUpScreenState extends State<SignUpScreen>
           builder: (context) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             if (isDark) {
-              return const Text(
-                'إنشاء حساب جديد',
+              return Text(
+                language == 'en' ? 'Create Account' : 'إنشاء حساب جديد',
                 style: TextStyle(
                   fontFamily: 'Rubik',
                   fontSize: 18,
@@ -364,10 +346,14 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                       // Subtitle with Gradient
                       Text(
-                        'أنشئ حسابك الجديد\nللاستمتاع بخدماتنا',
+                        language == 'en'
+                            ? 'Create your account\nto enjoy our services'
+                            : 'أنشئ حسابك الجديد\nللاستمتاع بخدماتنا',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily: language == 'en'
+                              ? 'SFProDisplay'
+                              : 'Rubik',
                           fontSize: 20,
                           color: Theme.of(context).brightness == Brightness.dark
                               ? Colors.white
@@ -500,51 +486,68 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: TextFormField(
-                                controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال رقم الهاتف';
-                                  }
-                                  // Remove any non-digit characters for validation
-                                  final cleanPhone = value.replaceAll(
-                                    RegExp(r'[^\d]'),
-                                    '',
-                                  );
-                                  if (cleanPhone.length < 8) {
-                                    return 'يرجى إدخال رقم هاتف صحيح';
-                                  }
-                                  return null;
-                                },
-                                style: const TextStyle(
-                                  fontFamily: 'Rubik',
-                                  fontSize: 12,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'أدخل رقم هاتفك',
-                                  hintStyle: TextStyle(
+                              child: Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: TextFormField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  textAlign: TextAlign.left,
+                                  enableSuggestions: false,
+                                  autocorrect: false,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                      RegExp(r'[0-9+ ]'),
+                                    ),
+                                    LengthLimitingTextInputFormatter(14),
+                                  ],
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'يرجى إدخال رقم الهاتف';
+                                    }
+                                    if (!PhoneUtils.isValidKsaPhone(value)) {
+                                      return 'أدخل رقم سعودي صحيح';
+                                    }
+                                    return null;
+                                  },
+                                  style: const TextStyle(
                                     fontFamily: 'Rubik',
                                     fontSize: 12,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white54
-                                        : Colors.grey[500],
                                   ),
-                                  prefixIcon: Icon(
-                                    Icons.phone_outlined,
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white60
-                                        : Colors.grey[600],
-                                    size: 20,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
+                                  decoration: InputDecoration(
+                                    hintText: '5X XXX XXXX',
+                                    hintStyle: TextStyle(
+                                      fontFamily: 'Rubik',
+                                      fontSize: 12,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white54
+                                          : Colors.grey[500],
+                                    ),
+                                    prefixText: '+966 ',
+                                    prefixStyle: TextStyle(
+                                      fontFamily: 'Rubik',
+                                      fontSize: 12,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white60
+                                          : Colors.grey[600],
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.phone_outlined,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white60
+                                          : Colors.grey[600],
+                                      size: 20,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -624,7 +627,10 @@ class _SignUpScreenState extends State<SignUpScreen>
                           ),
                           GestureDetector(
                             onTap: () {
-                              Navigator.pop(context);
+                              Navigator.pushReplacementNamed(
+                                context,
+                                AppRoutes.signin,
+                              );
                             },
                             child: ShaderMask(
                               shaderCallback: (bounds) => DesignSystem

@@ -1,6 +1,10 @@
+// lib/screens/auth_screen.dart
+library auth_screen;
+
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+part 'functions/auth_screen.functions.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -9,7 +13,7 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen> with AuthScreenFunctions {
   @override
   Widget build(BuildContext context) {
     return Scaffold(

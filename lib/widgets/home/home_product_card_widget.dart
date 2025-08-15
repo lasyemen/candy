@@ -10,6 +10,9 @@ import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
 import '../../core/services/rating_service.dart';
+import '../../core/i18n/product_dictionary.dart';
+import '../../core/services/app_settings.dart';
+import 'package:provider/provider.dart';
 
 class HomeProductCardWidget extends StatefulWidget {
   final Products product;
@@ -58,6 +61,7 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final language = context.watch<AppSettings>().currentLanguage;
     return Container(
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -148,7 +152,10 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                               children: [
                                 // Product Name with Modern Typography
                                 Text(
-                                  widget.product.name,
+                                  ProductDictionary.translateName(
+                                    widget.product.name,
+                                    language,
+                                  ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -158,6 +165,9 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                                         ? Colors.white
                                         : const Color(0xFF1F2937),
                                     height: 1.3,
+                                    fontFamily: language == 'en'
+                                        ? 'SFProDisplay'
+                                        : null,
                                   ),
                                 ),
                                 const SizedBox(height: 4),

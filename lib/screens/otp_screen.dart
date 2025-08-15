@@ -1,8 +1,14 @@
+// lib/screens/otp_screen.dart
+library otp_screen;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
 import 'dart:async';
+import 'dart:math';
+import '../core/services/taqnyat_sms_service.dart';
+part 'functions/otp_screen.functions.dart';
 
 class OtpScreen extends StatefulWidget {
   final String userName;
@@ -14,15 +20,22 @@ class OtpScreen extends StatefulWidget {
   State<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
+class _OtpScreenState extends State<OtpScreen>
+    with TickerProviderStateMixin, OtpScreenFunctions {
   final List<TextEditingController> _otpControllers = List.generate(
     4,
     (index) => TextEditingController(),
   );
   final List<FocusNode> _focusNodes = List.generate(4, (index) => FocusNode());
 
-  bool _isLoading = false;
+  // Remove unused state to satisfy lints (wire in when server verification is added)
   int _remainingTime = 60; // 60 seconds countdown
+
+  // Expected OTP value for local verification
+  String _expectedOtp = '';
+  // Read credentials from compile-time environment (set via --dart-define)
+  final String _taqnyatToken = const String.fromEnvironment('TAQNYAT_TOKEN');
+  final String _taqnyatSender = const String.fromEnvironment('TAQNYAT_SENDER');
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -53,6 +66,8 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
     _animationController.forward();
     _startCountdown();
+    // Generate and send OTP on screen load
+    _sendOtp();
   }
 
   @override
@@ -67,47 +82,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _startCountdown() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted && _remainingTime > 0) {
-        setState(() {
-          _remainingTime--;
-        });
-        _startCountdown();
-      }
-    });
-  }
-
-  void _onOtpChanged(String value, int index) {
-    if (value.length == 1 && index < 3) {
-      _focusNodes[index + 1].requestFocus();
-    } else if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
-    }
-  }
-
-  String _getOtpCode() {
-    return _otpControllers.map((controller) => controller.text).join();
-  }
-
-  void _verifyOtp() {
-    // Navigate immediately without any setState or loading
-    Navigator.pushReplacementNamed(context, AppRoutes.main);
-  }
-
-  void _resendOtp() {
-    setState(() {
-      _remainingTime = 60;
-    });
-    _startCountdown();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم إرسال رمز التحقق الجديد'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
+  // Functions moved to OtpScreenFunctions mixin (see part file)
 
   @override
   Widget build(BuildContext context) {

@@ -8,14 +8,12 @@ class CartSummaryWidget extends StatelessWidget {
   final double subtotal;
   final double deliveryFee;
   final double total;
-  final VoidCallback onCheckout;
 
   const CartSummaryWidget({
     super.key,
     required this.subtotal,
     required this.deliveryFee,
     required this.total,
-    required this.onCheckout,
   });
 
   @override
@@ -115,11 +113,13 @@ class CartSummaryWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          // Checkout Button
+          // Checkout Button -> navigate to our CardPaymentScreen
           GestureDetector(
             onTap: () {
               HapticFeedback.mediumImpact();
-              onCheckout();
+              Navigator.of(
+                context,
+              ).pushNamed('/card-payment', arguments: {'total': total});
             },
             child: Container(
               width: double.infinity,

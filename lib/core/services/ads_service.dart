@@ -54,7 +54,8 @@ class AdsService {
 
               // Check if image_url is already a full URL or just a path
               String imageUrl = json['image_url'];
-              if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+              if (!imageUrl.startsWith('http://') &&
+                  !imageUrl.startsWith('https://')) {
                 // If it's just a path, construct the full URL
                 final baseUrl =
                     'https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/img/';

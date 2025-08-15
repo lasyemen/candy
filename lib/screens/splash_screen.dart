@@ -1,7 +1,12 @@
+// lib/screens/splash_screen.dart
+library splash_screen;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+import '../core/services/customer_session.dart';
+part 'functions/splash_screen.functions.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,7 +16,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, SplashScreenFunctions {
   late AnimationController _fadeController;
   late AnimationController _slideController;
 
@@ -76,13 +81,18 @@ class _SplashScreenState extends State<SplashScreen>
       _slideController.forward();
     }
 
-    // Navigate to auth screen after 4 seconds
-    print('SplashScreen: Waiting 4 seconds before navigation');
-    await Future.delayed(const Duration(milliseconds: 4000));
-    if (mounted) {
-      print('SplashScreen: Navigating to auth screen');
-      Navigator.pushReplacementNamed(context, AppRoutes.auth);
-    }
+    // Navigate depending on session
+    print('SplashScreen: Waiting 1.2 seconds before navigation');
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+    final isLoggedIn = CustomerSession.instance.isLoggedIn;
+    final isMerchant = CustomerSession.instance.isMerchant;
+    print('SplashScreen: isLoggedIn=$isLoggedIn isMerchant=$isMerchant');
+    Navigator.pushReplacementNamed(
+      context,
+      isLoggedIn ? AppRoutes.main : AppRoutes.auth,
+      arguments: isLoggedIn ? {'isMerchant': isMerchant} : null,
+    );
   }
 
   @override
@@ -142,13 +152,13 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 40),
 
-              // App Title with slide animation (Arabic only)
+              // App Title with slide animation
               SlideTransition(
                 position: _slideAnimation,
                 child: FadeTransition(
                   opacity: _fadeAnimation,
                   child: Text(
-                    'مياه كاندي',
+                    'Candy Water',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
