@@ -3,6 +3,7 @@ library delivery_location_screen;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/services/cart_session_manager.dart';
 import '../core/constants/app_colors.dart';
 // import '../core/constants/design_system.dart';
 import '../widgets/navigation/navigation_wrapper.dart';
@@ -472,7 +473,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
     });
   }
 
-  void _continueToPayment() {
+  Future<void> _continueToPayment() async {
     // Validate custom address if selected
     if (selectedDeliveryType == 'custom' &&
         _addressController.text.trim().isEmpty) {
@@ -517,10 +518,19 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           : null,
     };
 
-    // Navigate to payment methods screen (then card payment)
+    // Get cart total and pass it to payment methods
+    double total = 0.0;
+    try {
+      final cartSummary = await CartSessionManager.instance.getCartSummary();
+      total = (cartSummary['total'] as double?) ?? 0.0;
+    } catch (e) {
+      print('DeliveryLocationScreen - Error fetching cart total: $e');
+    }
+
+    // Navigate to payment methods screen with the calculated total
     Navigator.of(context).pushNamed(
       '/payment-methods',
-      arguments: {'total': 0.0, 'deliveryData': deliveryData},
+      arguments: {'total': total, 'deliveryData': deliveryData},
     );
   }
 }

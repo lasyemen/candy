@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../core/constants/design_system.dart';
 import '../core/constants/app_colors.dart';
 import '../core/services/rewards_service.dart';
+import '../core/services/cart_session_manager.dart';
 import '../core/routes/app_routes.dart';
 
 part 'functions/card_payment_screen.functions.dart';
@@ -298,29 +299,43 @@ class _CardPaymentScreenState extends State<CardPaymentScreen>
                 setState(() => isPaying = true);
                 await Future.delayed(const Duration(milliseconds: 200));
 
-                // Award points for this order with configured rate
-                final rate = await RewardsService.instance
-                    .getPointsRatePerSar();
-                int earned = (amount * rate).floor();
-                if (amount >= 500) {
-                  earned += 300; // big order bonus
-                } else if (amount >= 300) {
-                  earned += 150;
-                } else if (amount >= 150) {
-                  earned += 50;
-                }
+                // Before navigating to Thank You, perform checkout: move cart -> orders
                 try {
-                  await RewardsService.instance.addPoints(
-                    earned,
-                    reason: 'purchase',
-                  );
-                } catch (_) {}
+                  // Use authoritative cart total from server before checkout
+                  final cartSummary = await CartSessionManager.instance
+                      .getCartSummary();
+                  final cartTotal = (cartSummary['total'] as double?) ?? amount;
 
-                if (!mounted) return;
-                Navigator.of(context).pushReplacementNamed(
-                  AppRoutes.thankYou,
-                  arguments: {'total': amount, 'earned': earned},
-                );
+                  // get deliveryData from route args if available
+                  final args =
+                      ModalRoute.of(context)?.settings.arguments
+                          as Map<String, dynamic>?;
+                  final deliveryData =
+                      args?['deliveryData'] as Map<String, dynamic>?;
+
+                  // perform checkout (moves cart items to orders table)
+                  final orderId = await CartSessionManager.instance.checkout(
+                    deliveryData: deliveryData,
+                  );
+
+                  // Award purchase points via RewardsService using authoritative total
+                  await RewardsService.instance.addPointsFromPurchase(
+                    cartTotal,
+                  );
+
+                  if (!mounted) return;
+                  Navigator.of(context).pushReplacementNamed(
+                    AppRoutes.thankYou,
+                    arguments: {'total': cartTotal, 'orderId': orderId},
+                  );
+                } catch (e) {
+                  print('CardPaymentScreen - Checkout failed: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Checkout failed: $e')),
+                    );
+                  }
+                }
                 if (mounted) setState(() => isPaying = false);
               },
         style: ElevatedButton.styleFrom(
