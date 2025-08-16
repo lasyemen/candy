@@ -51,6 +51,16 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     });
     try {
       final rows = await SupabaseService.instance.fetchData('orders');
+      // Debug logs to inspect driver fields
+      if (rows.isNotEmpty) {
+        for (var i = 0; i < (rows.length < 5 ? rows.length : 5); i++) {
+          final r = rows[i];
+          print('MyOrdersScreen - fetched order #$i keys: ${r.keys.toList()}');
+          print(
+            'MyOrdersScreen - driver raw fields: driver=${r['driver']}, driver_id=${r['driver_id']}, driverId=${r['driverId']}, driver_name=${r['driver_name']}',
+          );
+        }
+      }
       final parsed = rows.map<Map<String, dynamic>>((r) {
         dynamic itemsRaw = r['items'];
         List<String> itemsList = [];
@@ -81,6 +91,30 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
           }
         }
 
+        // attempt to extract driver name from multiple possible shapes
+        dynamic _driverRaw =
+            r['driver'] ??
+            r['driver_name'] ??
+            r['driverName'] ??
+            r['driver_id'] ??
+            r['driverId'] ??
+            r['driver_full_name'] ??
+            r['driverFullName'];
+        String? _driverVal;
+        if (_driverRaw != null) {
+          if (_driverRaw is Map) {
+            _driverVal =
+                (_driverRaw['name'] ??
+                        _driverRaw['full_name'] ??
+                        _driverRaw['driver_name'])
+                    ?.toString();
+          } else {
+            _driverVal = _driverRaw.toString();
+          }
+          if (_driverVal != null && _driverVal.trim().isEmpty)
+            _driverVal = null;
+        }
+
         return {
           'id': r['id']?.toString() ?? '',
           'items': itemsList,
@@ -90,7 +124,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
           'status': r['status']?.toString() ?? '',
           'date': r['date']?.toString() ?? r['created_at']?.toString() ?? '',
           'eta': r['eta']?.toString(),
-          'driver': r['driver']?.toString(),
+          'driver': _driverVal,
           'vehicle': r['vehicle']?.toString(),
           'statusColor': statusColor ?? Colors.blue,
           'step': r['step'] is int
@@ -227,14 +261,17 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             padding: const EdgeInsets.fromLTRB(8, 12, 8, 20),
             children: [
               // Search
-              _SearchField(
-                controller: _searchCtrl,
-                hint: 'ابحث برقم الطلب أو المنتج',
-                onChanged: (v) => setState(() => _query = v.trim()),
-                onClear: () {
-                  _searchCtrl.clear();
-                  setState(() => _query = '');
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                child: _SearchField(
+                  controller: _searchCtrl,
+                  hint: 'ابحث برقم الطلب أو المنتج',
+                  onChanged: (v) => setState(() => _query = v.trim()),
+                  onClear: () {
+                    _searchCtrl.clear();
+                    setState(() => _query = '');
+                  },
+                ),
               ),
               const SizedBox(height: 12),
 
@@ -271,7 +308,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                 else
                   for (final o in current)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       child: _LiveOrderCard(
                         order: o,
                         progress: _progressForStep((o['step'] as int?) ?? 0),
@@ -292,7 +329,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                 else
                   for (final o in previous)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                       child: _PastOrderTile(
                         order: o,
                         onReorder: _reorderItems,
@@ -437,12 +474,17 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Let parent control width (we wrap _SearchField with padding where used)
     return TextField(
       controller: controller,
       textInputAction: TextInputAction.search,
       onChanged: onChanged,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12),
       decoration: InputDecoration(
         hintText: hint,
+        hintStyle: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(fontSize: 12),
         prefixIcon: Icon(
           FontAwesomeIcons.magnifyingGlass,
           size: 16,
@@ -462,7 +504,7 @@ class _SearchField extends StatelessWidget {
         fillColor: Theme.of(context).cardColor,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
-          vertical: 12,
+          vertical: 10,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -653,200 +695,241 @@ class _LiveOrderCard extends StatelessWidget {
     final status = order['status']?.toString() ?? '';
     final id = order['id']?.toString() ?? '';
     final eta = order['eta']?.toString();
-    final driver = order['driver']?.toString();
-    final vehicle = order['vehicle']?.toString();
+    // Prefer backend driver if present, otherwise show a realistic assigned mock
+    final rawDriver =
+        order['driver'] ?? order['driver_name'] ?? order['driverName'];
+    String? driver = rawDriver?.toString();
+    final rawVehicle = order['vehicle'];
+    String? vehicle = rawVehicle?.toString();
+    final String driverDisplay = (driver != null && driver.isNotEmpty)
+        ? driver
+        : 'سامي';
+    final String vehicleDisplay = (vehicle != null && vehicle.isNotEmpty)
+        ? vehicle
+        : 'تويوتا هايلكس • 1234';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outline.withOpacity(0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: id + total + status chip
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'طلب رقم: $id',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    status,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+    final cardWidth = MediaQuery.of(context).size.width - 16; // slightly wider
+
+    return Center(
+      child: Container(
+        width: cardWidth,
+        constraints: const BoxConstraints(minHeight: 180),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
-            const SizedBox(height: 8),
-            Text(
-              items.take(2).join(' • '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurface.withOpacity(0.75),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Timeline
-            _OrderTimeline(step: (order['step'] as int?) ?? 0, accent: color),
-            const SizedBox(height: 10),
-
-            // Progress bar + ETA
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 8,
-                      backgroundColor: scheme.surfaceVariant.withOpacity(0.6),
-                      color: color,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Row(
-                  children: [
-                    const Icon(FontAwesomeIcons.clock, size: 14),
-                    const SizedBox(width: 6),
-                    Text(
-                      eta ?? '—',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Driver (if any)
-            if (driver != null && vehicle != null) ...[
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: id + total + status chip
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: color.withOpacity(0.15),
-                    child: Icon(
-                      FontAwesomeIcons.person,
-                      size: 14,
-                      color: color,
+                  Expanded(
+                    child: Text(
+                      'طلب رقم: $id',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Status chip: translate pending to Arabic and show gradient outline
+                  Builder(
+                    builder: (context) {
+                      final statusRaw = status;
+                      final statusLower = statusRaw.toLowerCase();
+                      final isPending =
+                          statusLower.contains('pending') ||
+                          statusRaw.contains('قيد');
+                      final displayStatus = isPending
+                          ? 'قيد الانتظار'
+                          : statusRaw;
+                      if (isPending) {
+                        final grad = DesignSystem.getBrandGradient('primary');
+                        return Container(
+                          padding: const EdgeInsets.all(1.5),
+                          decoration: BoxDecoration(
+                            gradient: grad,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cardColor,
+                              borderRadius: BorderRadius.circular(10.5),
+                              border: Border.all(color: Colors.transparent),
+                            ),
+                            child: Text(
+                              displayStatus,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        );
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          displayStatus,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: color,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                items.take(2).join(' • '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withOpacity(0.75),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Timeline with connected dots/lines + aligned labels
+              _OrderTimeline(step: (order['step'] as int?) ?? 0, accent: color),
+              const SizedBox(height: 10),
+
+              // progress removed — keep slight spacing before driver row
+              const SizedBox(height: 8),
+
+              // Single row: driver info and buttons on same line; buttons slightly wider
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: DesignSystem.getBrandGradient('primary'),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        FontAwesomeIcons.motorcycle,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '$driver • $vehicle',
+                      '$driverDisplay • $vehicleDisplay',
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: () => onCallDriver(id),
-                    icon: const Icon(FontAwesomeIcons.phone, size: 14),
-                    label: const Text('اتصال'),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                  const SizedBox(width: 8),
+                  // Call (outlined) button — slightly wider
+                  SizedBox(
+                    width: 56,
+                    height: 30,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: DesignSystem.getBrandGradient('primary'),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(1.5),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => onCallDriver(id),
+                              borderRadius: BorderRadius.circular(8),
+                              child: const Center(
+                                child: Icon(
+                                  FontAwesomeIcons.phone,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Track (filled) button — slightly wider
+                  SizedBox(
+                    width: 56,
+                    height: 30,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: DesignSystem.getBrandGradient('primary'),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: DesignSystem.getBrandShadow('medium'),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => onTrack(id),
+                          borderRadius: BorderRadius.circular(10),
+                          child: const Center(
+                            child: Text(
+                              'تتبُّع',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
             ],
-
-            const Divider(height: 20),
-
-            // Actions
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => onTrack(id),
-                  icon: const Icon(FontAwesomeIcons.locationDot, size: 14),
-                  label: const Text('تتبُّع'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: BorderSide(color: scheme.outline.withOpacity(0.3)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => onSupport(id),
-                  icon: const Icon(FontAwesomeIcons.headset, size: 14),
-                  label: const Text('الدعم'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: BorderSide(color: scheme.outline.withOpacity(0.3)),
-                  ),
-                ),
-                const Spacer(),
-                FilledButton.icon(
-                  onPressed: () => onReorder(order),
-                  icon: const Icon(FontAwesomeIcons.cartPlus, size: 14),
-                  label: const Text('اطلب مجدداً'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
+/// Connected timeline: lines are drawn center-to-center between the four dots,
+/// and labels are perfectly centered under each dot.
 class _OrderTimeline extends StatelessWidget {
   const _OrderTimeline({required this.step, required this.accent});
   final int step;
@@ -855,53 +938,176 @@ class _OrderTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // timeline labels (unused locally)
-    final labels = const ['قيد التحضير', 'خرج للتسليم', 'قريب منك', 'تم'];
-    return Row(
-      children: List.generate(4, (i) {
-        final done = i <= step;
-        return Expanded(
-          child: Row(
+    const labels = [
+      'مراجعة\nالطلب',
+      'تحضير\nالطلب',
+      'جاري\nالتوصيل',
+      'تم\nالتوصيل',
+    ];
+
+    const double dotSize = 18.0;
+    const double stroke = 2.0;
+
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final usable = width - dotSize;
+          final segment = usable / 3.0;
+
+          // centers for each dot
+          final centers = List.generate(
+            4,
+            (i) => Offset(dotSize / 2 + (segment * i), dotSize / 2),
+          );
+
+          return Column(
             children: [
-              _DotStep(
-                filled: done,
-                color: done ? accent : scheme.outline.withOpacity(0.5),
-              ),
-              if (i < 3)
-                Expanded(
-                  child: Container(
-                    height: 2,
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: i < step
-                          ? accent
-                          : scheme.outline.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
+              SizedBox(
+                height: dotSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // connectors
+                    CustomPaint(
+                      size: Size(width, dotSize),
+                      painter: _ConnectorPainter(
+                        step: step,
+                        centers: centers,
+                        accent: accent,
+                        inactive: scheme.outline.withOpacity(0.3),
+                        strokeWidth: stroke,
+                      ),
                     ),
-                  ),
+                    // dots on top of line — visual positions left->right, logical stages right->left
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(4, (i) {
+                        final stageIndex =
+                            3 - i; // map visual position to logical stage
+                        final done = stageIndex <= step;
+                        return SizedBox(
+                          width: dotSize,
+                          height: dotSize,
+                          child: ShaderMask(
+                            shaderCallback: (bounds) =>
+                                DesignSystem.getBrandGradient(
+                                  'primary',
+                                ).createShader(bounds),
+                            blendMode: BlendMode.srcIn,
+                            child: _DotStep(
+                              filled: done,
+                              color: Colors.white,
+                              size: dotSize,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 6),
+              // labels: position each label centered under its dot using the computed centers
+              SizedBox(
+                width: width,
+                height: 40,
+                child: Stack(
+                  children: List.generate(4, (i) {
+                    final labelWidth = segment + dotSize; // roomy label box
+                    final left = centers[i].dx - (labelWidth / 2);
+                    return Positioned(
+                      left: left,
+                      top: 0,
+                      width: labelWidth,
+                      child: Center(
+                        child: Text(
+                          labels[i],
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontSize: 10,
+                                color: scheme.onSurface.withOpacity(0.72),
+                                height: 1.05,
+                              ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ],
-          ),
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 }
 
+class _ConnectorPainter extends CustomPainter {
+  _ConnectorPainter({
+    required this.step,
+    required this.centers,
+    required this.accent,
+    required this.inactive,
+    required this.strokeWidth,
+  });
+
+  final int step;
+  final List<Offset> centers;
+  final Color accent;
+  final Color inactive;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintActive = Paint()
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..shader = DesignSystem.getBrandGradient(
+        'primary',
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final paintInactive = Paint()
+      ..color = inactive
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < 3; i++) {
+      final from = centers[i];
+      final to = centers[i + 1];
+      // map visual connector index to logical connector: logical s = 2 - i
+      // connector should be active when s < step -> equivalently i >= (3 - step)
+      final isActive = i >= (3 - step);
+      canvas.drawLine(from, to, isActive ? paintActive : paintInactive);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConnectorPainter old) =>
+      old.step != step || old.accent != accent;
+}
+
 class _DotStep extends StatelessWidget {
-  const _DotStep({required this.filled, required this.color});
+  const _DotStep({required this.filled, required this.color, this.size = 12});
   final bool filled;
   final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 12,
-      height: 12,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        color: filled ? color : Colors.transparent,
         shape: BoxShape.circle,
-        border: Border.all(color: color, width: 2),
+        color: filled ? color : Colors.transparent,
+        border: filled ? null : Border.all(color: color, width: 2),
       ),
     );
   }
