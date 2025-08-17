@@ -498,14 +498,16 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     FilteringTextInputFormatter.allow(
                                       RegExp(r'[0-9+ ]'),
                                     ),
-                                    LengthLimitingTextInputFormatter(14),
+                                    LengthLimitingTextInputFormatter(15),
                                   ],
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'يرجى إدخال رقم الهاتف';
                                     }
-                                    if (!PhoneUtils.isValidKsaPhone(value)) {
-                                      return 'أدخل رقم سعودي صحيح';
+                                    // Use normalizer to validate various international formats
+                                    if (PhoneUtils.normalizeKsaPhone(value) ==
+                                        null) {
+                                      return 'أدخل رقم هاتف صحيح';
                                     }
                                     return null;
                                   },
@@ -524,16 +526,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                           ? Colors.white54
                                           : Colors.grey[500],
                                     ),
-                                    prefixText: '+966 ',
-                                    prefixStyle: TextStyle(
-                                      fontFamily: 'Rubik',
-                                      fontSize: 12,
-                                      color:
-                                          Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white60
-                                          : Colors.grey[600],
-                                    ),
+                                    // Allow user to enter full international number including country code
                                     suffixIcon: Icon(
                                       Icons.phone_outlined,
                                       color:

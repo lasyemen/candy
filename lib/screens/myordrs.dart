@@ -4,6 +4,7 @@ library my_orders_screen;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import '../core/services/supabase_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/constants/design_system.dart';
@@ -308,7 +309,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                 else
                   for (final o in current)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 12),
                       child: _LiveOrderCard(
                         order: o,
                         progress: _progressForStep((o['step'] as int?) ?? 0),
@@ -329,7 +330,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                 else
                   for (final o in previous)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 10),
                       child: _PastOrderTile(
                         order: o,
                         onReorder: _reorderItems,
@@ -475,6 +476,13 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     // Let parent control width (we wrap _SearchField with padding where used)
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final searchFillColor = isDark
+        ? const Color(0xFF2A2A2A)
+        : const Color(0xFFF0F0F0);
+    final searchIconColor = isDark
+        ? scheme.onSurface.withOpacity(0.7)
+        : Colors.black;
     return TextField(
       controller: controller,
       textInputAction: TextInputAction.search,
@@ -488,7 +496,7 @@ class _SearchField extends StatelessWidget {
         prefixIcon: Icon(
           FontAwesomeIcons.magnifyingGlass,
           size: 16,
-          color: scheme.onSurface.withOpacity(0.7),
+          color: searchIconColor,
         ),
         suffixIcon: controller.text.isEmpty
             ? null
@@ -497,11 +505,11 @@ class _SearchField extends StatelessWidget {
                 icon: Icon(
                   FontAwesomeIcons.xmark,
                   size: 16,
-                  color: scheme.onSurface.withOpacity(0.7),
+                  color: searchIconColor,
                 ),
               ),
         filled: true,
-        fillColor: Theme.of(context).cardColor,
+        fillColor: searchFillColor,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 10,
@@ -687,9 +695,24 @@ class _LiveOrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     // Use same product card background here as well
-    final cardColor = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF2A2A2A)
-        : Colors.white;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF2A2A2A) : Colors.white;
+    // stronger shadow in light mode for order cards
+    final cardShadows = isDark
+        ? [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ]
+        : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ];
     final color = (order['statusColor'] as Color?) ?? scheme.primary;
     final items = (order['items'] as List).cast<String>();
     final status = order['status']?.toString() ?? '';
@@ -708,25 +731,22 @@ class _LiveOrderCard extends StatelessWidget {
         ? vehicle
         : 'تويوتا هايلكس • 1234';
 
-    final cardWidth = MediaQuery.of(context).size.width - 16; // slightly wider
+    final cardWidth =
+        double.infinity; // fill available width to match nav bar margins
 
     return Center(
       child: Container(
         width: cardWidth,
-        constraints: const BoxConstraints(minHeight: 180),
+        // reduce the minimum height to make order cards more compact
+        constraints: const BoxConstraints(minHeight: 120),
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: cardShadows,
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+          // reduce vertical padding to make the card more compact
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -821,13 +841,10 @@ class _LiveOrderCard extends StatelessWidget {
 
               // Timeline with connected dots/lines + aligned labels
               _OrderTimeline(step: (order['step'] as int?) ?? 0, accent: color),
-              const SizedBox(height: 10),
-
-              // progress removed — keep slight spacing before driver row
-              const SizedBox(height: 8),
+              // reduced spacing between timeline (progress dots) and driver row
+              const SizedBox(height: 6),
 
               // Single row: driver info and buttons on same line; buttons slightly wider
-              const SizedBox(height: 8),
               Row(
                 children: [
                   Container(
@@ -875,11 +892,11 @@ class _LiveOrderCard extends StatelessWidget {
                             child: InkWell(
                               onTap: () => onCallDriver(id),
                               borderRadius: BorderRadius.circular(8),
-                              child: const Center(
+                              child: Center(
                                 child: Icon(
                                   FontAwesomeIcons.phone,
                                   size: 14,
-                                  color: Colors.white,
+                                  color: isDark ? Colors.white : Colors.black,
                                 ),
                               ),
                             ),
@@ -930,6 +947,8 @@ class _LiveOrderCard extends StatelessWidget {
 
 /// Connected timeline: lines are drawn center-to-center between the four dots,
 /// and labels are perfectly centered under each dot.
+// Make sure you have: import 'dart:math' as math;
+
 class _OrderTimeline extends StatelessWidget {
   const _OrderTimeline({required this.step, required this.accent});
   final int step;
@@ -946,21 +965,25 @@ class _OrderTimeline extends StatelessWidget {
     ];
 
     const double dotSize = 18.0;
-    const double stroke = 2.0;
+    const double stroke = 1.6;
 
     return Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: TextDirection.rtl,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final usable = width - dotSize;
+          const double horizontalPadding =
+              30.0; // padding from left/right edges
+          final usable = width - dotSize - (horizontalPadding * 2);
           final segment = usable / 3.0;
 
-          // centers for each dot
-          final centers = List.generate(
-            4,
-            (i) => Offset(dotSize / 2 + (segment * i), dotSize / 2),
-          );
+          // centers for each dot (visual order: left -> right) with padding
+          final centers = List.generate(4, (i) {
+            return Offset(
+              horizontalPadding + (dotSize / 2) + (segment * i),
+              dotSize / 2,
+            );
+          });
 
           return Column(
             children: [
@@ -969,7 +992,7 @@ class _OrderTimeline extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // connectors
+                    // connectors (shorter stretch but still visually connected to dots)
                     CustomPaint(
                       size: Size(width, dotSize),
                       painter: _ConnectorPainter(
@@ -978,55 +1001,59 @@ class _OrderTimeline extends StatelessWidget {
                         accent: accent,
                         inactive: scheme.outline.withOpacity(0.3),
                         strokeWidth: stroke,
+                        dotRadius: dotSize / 2,
+                        shorten:
+                            14.0, // total middle reduction between two dots
+                        underlap:
+                            6.0, // increase underlap so the short connectors still tuck under the dots
                       ),
                     ),
-                    // dots on top of line — visual positions left->right, logical stages right->left
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(4, (i) {
-                        final stageIndex =
-                            3 - i; // map visual position to logical stage
-                        final done = stageIndex <= step;
-                        return SizedBox(
-                          width: dotSize,
-                          height: dotSize,
-                          child: ShaderMask(
-                            shaderCallback: (bounds) =>
-                                DesignSystem.getBrandGradient(
-                                  'primary',
-                                ).createShader(bounds),
-                            blendMode: BlendMode.srcIn,
-                            child: _DotStep(
-                              filled: done,
-                              color: Colors.white,
-                              size: dotSize,
-                            ),
+                    // dots on top - position dots at the exact connector centers so
+                    // they always align with the painted connectors and move together
+                    for (int i = 0; i < 4; i++)
+                      Positioned(
+                        left: centers[i].dx - (dotSize / 2),
+                        top: 0,
+                        width: dotSize,
+                        height: dotSize,
+                        child: ShaderMask(
+                          shaderCallback: (bounds) =>
+                              DesignSystem.getBrandGradient(
+                                'primary',
+                              ).createShader(bounds),
+                          blendMode: BlendMode.srcIn,
+                          child: _DotStep(
+                            filled: (3 - i) <= step,
+                            color: Colors.white,
+                            size: dotSize,
                           ),
-                        );
-                      }),
-                    ),
+                        ),
+                      ),
                   ],
                 ),
               ),
               const SizedBox(height: 6),
-              // labels: position each label centered under its dot using the computed centers
+              // labels centered under each dot
               SizedBox(
                 width: width,
-                height: 40,
+                height: 56,
                 child: Stack(
                   children: List.generate(4, (i) {
-                    final labelWidth = segment + dotSize; // roomy label box
-                    final left = centers[i].dx - (labelWidth / 2);
+                    final labelIndex = 3 - i; // map to logical label
+                    const double labelWidth = 84.0;
+                    var left = centers[i].dx - (labelWidth / 2);
+                    left = left.clamp(0.0, width - labelWidth);
                     return Positioned(
                       left: left,
                       top: 0,
                       width: labelWidth,
                       child: Center(
                         child: Text(
-                          labels[i],
+                          labels[labelIndex],
                           textAlign: TextAlign.center,
                           maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 fontSize: 10,
@@ -1054,6 +1081,10 @@ class _ConnectorPainter extends CustomPainter {
     required this.accent,
     required this.inactive,
     required this.strokeWidth,
+    this.dotRadius = 0,
+    this.shorten = 8.0, // total reduction per segment
+    this.underlap =
+        2.0, // how much the line hides under the dots (keeps connection feeling)
   });
 
   final int step;
@@ -1061,6 +1092,13 @@ class _ConnectorPainter extends CustomPainter {
   final Color accent;
   final Color inactive;
   final double strokeWidth;
+  final double dotRadius;
+
+  /// Total amount to reduce the visible line between two dots.
+  final double shorten;
+
+  /// Positive value means the line goes slightly under the dot, so it still looks connected.
+  final double underlap;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1078,19 +1116,53 @@ class _ConnectorPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
+    // base edge position (edge of dot, accounting for stroke so it doesn't peek out)
+    final edgeGap = dotRadius - (strokeWidth / 2);
+
+    // we want a small underlap under each dot (keeps visual connection)
+    final edgeWithUnderlap = (edgeGap - underlap).clamp(0.0, edgeGap);
+
     for (int i = 0; i < 3; i++) {
       final from = centers[i];
       final to = centers[i + 1];
-      // map visual connector index to logical connector: logical s = 2 - i
-      // connector should be active when s < step -> equivalently i >= (3 - step)
+
+      final angle = (to - from).direction;
+
+      // start/end near the dot edge, slightly under the dot
+      var p1 =
+          from +
+          Offset(
+            math.cos(angle) * edgeWithUnderlap,
+            math.sin(angle) * edgeWithUnderlap,
+          );
+      var p2 =
+          to -
+          Offset(
+            math.cos(angle) * edgeWithUnderlap,
+            math.sin(angle) * edgeWithUnderlap,
+          );
+
+      // now shorten the visible span in the middle, but keep underlap so it still feels connected
+      final halfShorten = shorten / 2;
+      final midShift = Offset(
+        math.cos(angle) * halfShorten,
+        math.sin(angle) * halfShorten,
+      );
+      p1 = p1 + midShift;
+      p2 = p2 - midShift;
+
       final isActive = i >= (3 - step);
-      canvas.drawLine(from, to, isActive ? paintActive : paintInactive);
+      canvas.drawLine(p1, p2, isActive ? paintActive : paintInactive);
     }
   }
 
   @override
   bool shouldRepaint(covariant _ConnectorPainter old) =>
-      old.step != step || old.accent != accent;
+      old.step != step ||
+      old.accent != accent ||
+      old.strokeWidth != strokeWidth ||
+      old.shorten != shorten ||
+      old.underlap != underlap;
 }
 
 class _DotStep extends StatelessWidget {
@@ -1154,7 +1226,7 @@ class _PastOrderTile extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '${(order['total'] as num).toStringAsFixed(2)} SAR',
+            '${((order['total'] as num?) ?? 0).toStringAsFixed(2)} SAR',
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),

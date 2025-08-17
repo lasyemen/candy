@@ -41,11 +41,12 @@ class AuthActions {
     required String phone,
     String? address,
   }) async {
-    final String cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    final String? normalized = PhoneUtils.normalizeKsaPhone(phone);
+    if (normalized == null) return null;
 
     final customer = await AuthService.instance.registerCustomer(
       name: name,
-      phone: cleanPhone,
+      phone: normalized,
       address: address,
     );
 
