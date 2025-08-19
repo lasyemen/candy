@@ -6,11 +6,15 @@ class PhoneTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final String? Function(String?)? validator;
+
+  /// Optional visual prefix (e.g. '+966 ')
+  final String? prefix;
   const PhoneTextField({
     super.key,
     required this.controller,
     required this.hintText,
     this.validator,
+    this.prefix,
   });
 
   @override
@@ -39,6 +43,10 @@ class PhoneTextField extends StatelessWidget {
         style: const TextStyle(fontFamily: 'Rubik', fontSize: 12),
         decoration: InputDecoration(
           hintText: hintText,
+          prefixText: prefix ?? null,
+          prefixStyle: prefix != null
+              ? const TextStyle(fontFamily: 'Rubik', fontSize: 12)
+              : null,
           hintStyle: TextStyle(
             fontFamily: 'Rubik',
             fontSize: 12,

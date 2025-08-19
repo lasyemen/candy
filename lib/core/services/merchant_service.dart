@@ -46,14 +46,38 @@ class MerchantService {
   }
 
   Future<Map<String, dynamic>?> findMerchantByPhone(String phoneInput) async {
-    final String digitsOnly = phoneInput.replaceAll(RegExp(r'[^0-9]'), '');
     try {
-      final result = await _client
-          .from(_merchantsTable)
-          .select('merchant_id, store_name, owner_name, phone, address, status')
-          .ilike('phone', '%$digitsOnly%')
-          .maybeSingle();
-      return result;
+      // Try to normalize input to E.164 and match exactly (preferred)
+      try {
+        // Importing PhoneUtils here would create a cycle if placed at top; keep lightweight normalization
+        final String digitsOnly = phoneInput.replaceAll(RegExp(r'[^0-9+]'), '');
+        // If input already looks like +966... or starts with 966, try exact match on digits+plus
+        if (digitsOnly.startsWith('+') || digitsOnly.length >= 9) {
+          // First attempt exact equality on phone field (expects E.164 in DB)
+          final exact = await _client
+              .from(_merchantsTable)
+              .select(
+                'merchant_id, store_name, owner_name, phone, address, status',
+              )
+              .eq('phone', phoneInput)
+              .maybeSingle();
+          if (exact != null) return exact;
+        }
+
+        // Fallback: search by digits contained in phone (handles legacy non-normalized records)
+        final digits = phoneInput.replaceAll(RegExp(r'[^0-9]'), '');
+        final result = await _client
+            .from(_merchantsTable)
+            .select(
+              'merchant_id, store_name, owner_name, phone, address, status',
+            )
+            .ilike('phone', '%$digits%')
+            .maybeSingle();
+        return result;
+      } catch (e) {
+        // If any DB error, return null
+        return null;
+      }
     } catch (_) {
       return null;
     }

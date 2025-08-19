@@ -13,8 +13,9 @@ part 'functions/card_payment_screen.functions.dart';
 
 class CardPaymentScreen extends StatefulWidget {
   final double? orderTotal;
+  final String? initialMethod;
 
-  const CardPaymentScreen({super.key, this.orderTotal});
+  const CardPaymentScreen({super.key, this.orderTotal, this.initialMethod});
 
   @override
   State<CardPaymentScreen> createState() => _CardPaymentScreenState();

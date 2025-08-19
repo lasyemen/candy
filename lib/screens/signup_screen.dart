@@ -7,7 +7,7 @@ import '../core/routes/index.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/customer_session.dart';
 import '../utils/phone_utils.dart';
-// Removed unused import
+import '../widgets/shared/phone_text_field.dart';
 
 /*
  * ACCOUNT CREATION ISSUES AND SOLUTIONS:
@@ -488,60 +488,20 @@ class _SignUpScreenState extends State<SignUpScreen>
                               ),
                               child: Directionality(
                                 textDirection: TextDirection.ltr,
-                                child: TextFormField(
+                                child: PhoneTextField(
                                   controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  textAlign: TextAlign.left,
-                                  enableSuggestions: false,
-                                  autocorrect: false,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.allow(
-                                      RegExp(r'[0-9+ ]'),
-                                    ),
-                                    LengthLimitingTextInputFormatter(15),
-                                  ],
+                                  hintText: '5X XXX XXXX',
+                                  prefix: '+966 ',
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'يرجى إدخال رقم الهاتف';
                                     }
-                                    // Use normalizer to validate various international formats
-                                    if (PhoneUtils.normalizeKsaPhone(value) ==
-                                        null) {
+                                    final normalized =
+                                        PhoneUtils.normalizeKsaPhone(value);
+                                    if (normalized == null)
                                       return 'أدخل رقم هاتف صحيح';
-                                    }
                                     return null;
                                   },
-                                  style: const TextStyle(
-                                    fontFamily: 'Rubik',
-                                    fontSize: 12,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: '5X XXX XXXX',
-                                    hintStyle: TextStyle(
-                                      fontFamily: 'Rubik',
-                                      fontSize: 12,
-                                      color:
-                                          Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white54
-                                          : Colors.grey[500],
-                                    ),
-                                    // Allow user to enter full international number including country code
-                                    suffixIcon: Icon(
-                                      Icons.phone_outlined,
-                                      color:
-                                          Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white60
-                                          : Colors.grey[600],
-                                      size: 20,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 16,
-                                    ),
-                                  ),
                                 ),
                               ),
                             ),
