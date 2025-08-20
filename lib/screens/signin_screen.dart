@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../core/routes/index.dart';
 import '../core/services/customer_session.dart';
 import '../utils/auth_actions.dart';
+import '../utils/phone_utils.dart';
 import '../widgets/shared/phone_text_field.dart';
 part 'functions/signin_screen.functions.dart';
 
@@ -219,6 +220,19 @@ class _SignInScreenState extends State<SignInScreen>
                                 hintText: language == 'en'
                                     ? '5X XXX XXXX'
                                     : '5X XXX XXXX',
+                                // Require Saudi number with country code on sign-in
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'يرجى إدخال رقم الهاتف';
+                                  }
+                                  final normalized =
+                                      PhoneUtils.normalizeKsaPhone(value);
+                                  if (normalized == null)
+                                    return 'أدخل رقم هاتف صحيح';
+                                  if (!normalized.startsWith('+966'))
+                                    return 'يرجى إدخال رقم سعودي مع رمز الدولة (+966)';
+                                  return null;
+                                },
                               ),
                             ),
                           ),

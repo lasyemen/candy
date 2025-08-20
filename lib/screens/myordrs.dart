@@ -3,775 +3,359 @@ library my_orders_screen;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:convert';
+import 'dart:math' as math;
+import '../core/services/supabase_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/constants/design_system.dart';
-import '../widgets/riyal_icon.dart';
 part 'functions/myordrs.functions.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
-
   @override
   State<MyOrdersScreen> createState() => _MyOrdersScreenState();
 }
 
 class _MyOrdersScreenState extends State<MyOrdersScreen>
-    with TickerProviderStateMixin, MyOrdersScreenFunctions {
-  late TabController _tabController;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
+    with TickerProviderStateMixin {
+  late final TextEditingController _searchCtrl;
+  late final ScrollController _scrollCtrl;
+  late final AnimationController _fadeCtrl;
+  late final Animation<double> _fade;
 
-  // Mock data for orders
-  final List<Map<String, dynamic>> _currentOrders = [
-    {
-      'id': 'ORD-001',
-      'items': ['ماء زمزم 5 لتر × 2', 'ماء نستله 1.5 لتر × 6'],
-      'total': 85.50,
-      'status': 'قيد التوصيل',
-      'date': '2024-01-15',
-      'estimatedTime': '30 دقيقة',
-      'statusColor': Colors.orange,
-      'icon': FontAwesomeIcons.truck,
-    },
-    {
-      'id': 'ORD-002',
-      'items': ['ماء أكوافينا 500 مل × 12'],
-      'total': 42.00,
-      'status': 'قيد التحضير',
-      'date': '2024-01-15',
-      'estimatedTime': '45 دقيقة',
-      'statusColor': Colors.blue,
-      'icon': FontAwesomeIcons.kitchenSet,
-    },
-  ];
+  // Orders loaded from backend
+  List<Map<String, dynamic>> _allOrders = [];
+  bool _isLoadingOrders = false;
 
-  final List<Map<String, dynamic>> _previousOrders = [
-    {
-      'id': 'ORD-003',
-      'items': ['ماء زمزم 5 لتر × 1', 'ماء الهدا 1 لتر × 8'],
-      'total': 67.25,
-      'status': 'تم التوصيل',
-      'date': '2024-01-14',
-      'statusColor': Colors.green,
-      'icon': FontAwesomeIcons.circleCheck,
-    },
-    {
-      'id': 'ORD-004',
-      'items': ['ماء نستله 1.5 لتر × 4', 'ماء أكوافينا 500 مل × 6'],
-      'total': 38.50,
-      'status': 'تم التوصيل',
-      'date': '2024-01-13',
-      'statusColor': Colors.green,
-      'icon': FontAwesomeIcons.circleCheck,
-    },
-    {
-      'id': 'ORD-005',
-      'items': ['ماء زمزم 5 لتر × 3'],
-      'total': 128.25,
-      'status': 'تم التوصيل',
-      'date': '2024-01-12',
-      'statusColor': Colors.green,
-      'icon': FontAwesomeIcons.circleCheck,
-    },
-    {
-      'id': 'ORD-006',
-      'items': ['ماء الهدا 1 لتر × 12'],
-      'total': 96.00,
-      'status': 'ملغي',
-      'date': '2024-01-11',
-      'statusColor': Colors.red,
-      'icon': FontAwesomeIcons.circleXmark,
-    },
-  ];
+  String _query = '';
+  String _statusFilter =
+      'الكل'; // الكل / قيد التحضير / قيد التوصيل / تم التوصيل
+  String _timeFilter = 'الكل'; // الكل / الأسبوع / الشهر
+  String _viewMode = 'current'; // 'current' or 'previous'
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _searchCtrl = TextEditingController();
+    _scrollCtrl = ScrollController();
+    _fadeCtrl = AnimationController(
       vsync: this,
-    );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
-    _fadeController.forward();
+      duration: const Duration(milliseconds: 450),
+    )..forward();
+    _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() {
+      _isLoadingOrders = true;
+    });
+    try {
+      final rows = await SupabaseService.instance.fetchData('orders');
+      // Debug logs to inspect driver fields
+      if (rows.isNotEmpty) {
+        for (var i = 0; i < (rows.length < 5 ? rows.length : 5); i++) {
+          final r = rows[i];
+          print('MyOrdersScreen - fetched order #$i keys: ${r.keys.toList()}');
+          print(
+            'MyOrdersScreen - driver raw fields: driver=${r['driver']}, driver_id=${r['driver_id']}, driverId=${r['driverId']}, driver_name=${r['driver_name']}',
+          );
+        }
+      }
+      final parsed = rows.map<Map<String, dynamic>>((r) {
+        dynamic itemsRaw = r['items'];
+        List<String> itemsList = [];
+        if (itemsRaw is String) {
+          try {
+            final decoded = jsonDecode(itemsRaw);
+            if (decoded is List) {
+              itemsList = decoded.map((e) => e.toString()).toList();
+            } else {
+              itemsList = [decoded.toString()];
+            }
+          } catch (_) {
+            itemsList = [itemsRaw];
+          }
+        } else if (itemsRaw is List) {
+          itemsList = itemsRaw.map((e) => e.toString()).toList();
+        }
+
+        Color? statusColor;
+        final sc = r['status_color'] ?? r['statusColor'];
+        if (sc != null) {
+          if (sc is int) statusColor = Color(sc);
+          if (sc is String) {
+            final s = sc.replaceAll('#', '');
+            try {
+              statusColor = Color(int.parse('0xFF$s'));
+            } catch (_) {}
+          }
+        }
+
+        // attempt to extract driver name from multiple possible shapes
+        dynamic _driverRaw =
+            r['driver'] ??
+            r['driver_name'] ??
+            r['driverName'] ??
+            r['driver_id'] ??
+            r['driverId'] ??
+            r['driver_full_name'] ??
+            r['driverFullName'];
+        String? _driverVal;
+        if (_driverRaw != null) {
+          if (_driverRaw is Map) {
+            _driverVal =
+                (_driverRaw['name'] ??
+                        _driverRaw['full_name'] ??
+                        _driverRaw['driver_name'])
+                    ?.toString();
+          } else {
+            _driverVal = _driverRaw.toString();
+          }
+          if (_driverVal != null && _driverVal.trim().isEmpty)
+            _driverVal = null;
+        }
+
+        return {
+          'id': r['id']?.toString() ?? '',
+          'items': itemsList,
+          'total': (r['total'] is num)
+              ? r['total']
+              : double.tryParse(r['total']?.toString() ?? '') ?? 0.0,
+          'status': r['status']?.toString() ?? '',
+          'date': r['date']?.toString() ?? r['created_at']?.toString() ?? '',
+          'eta': r['eta']?.toString(),
+          'driver': _driverVal,
+          'vehicle': r['vehicle']?.toString(),
+          'statusColor': statusColor ?? Colors.blue,
+          'step': r['step'] is int
+              ? r['step']
+              : int.tryParse(r['step']?.toString() ?? '') ?? 0,
+        };
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _allOrders = parsed;
+        _isLoadingOrders = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingOrders = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('خطأ في جلب الطلبات: $e')));
+      }
+    }
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _fadeController.dispose();
+    _searchCtrl.dispose();
+    _scrollCtrl.dispose();
+    _fadeCtrl.dispose();
     super.dispose();
+  }
+
+  // Simple filters (you can replace with real logic later)
+  List<Map<String, dynamic>> _filterList(List<Map<String, dynamic>> src) {
+    final now = DateTime(2024, 1, 15); // mock for demo
+    return src.where((o) {
+      final matchesQuery = _query.isEmpty
+          ? true
+          : (o['id'].toString().contains(_query) ||
+                (o['items'] as List).join(' ').contains(_query));
+      final matchesStatus = _statusFilter == 'الكل'
+          ? true
+          : (o['status'] == _statusFilter);
+
+      bool matchesTime = true;
+      if (_timeFilter != 'الكل') {
+        final date = DateTime.tryParse(o['date'] ?? '') ?? now;
+        final diff = now.difference(date).inDays;
+        if (_timeFilter == 'الأسبوع') {
+          matchesTime = diff <= 7;
+        } else if (_timeFilter == 'الشهر') {
+          matchesTime = diff <= 30;
+        }
+      }
+
+      return matchesQuery && matchesStatus && matchesTime;
+    }).toList();
+  }
+
+  Future<void> _onRefresh() async {
+    HapticFeedback.lightImpact();
+    await Future.delayed(const Duration(milliseconds: 650));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('تم التحديث'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
+  double _progressForStep(int step) {
+    // 0..3 -> 0.15, 0.5, 0.8, 1.0
+    switch (step) {
+      case 0:
+        return 0.15;
+      case 1:
+        return 0.5;
+      case 2:
+        return 0.8;
+      case 3:
+        return 1.0;
+      default:
+        return 0.15;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Match product card background: white in light mode, 0xFF2A2A2A in dark mode
+    final cardColor = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF2A2A2A)
+        : Colors.white;
+
+    final unfilteredCurrent = _allOrders
+        .where((o) => (o['status']?.toString() ?? '') != 'تم التوصيل')
+        .toList();
+    final unfilteredPrevious = _allOrders
+        .where((o) => (o['status']?.toString() ?? '') == 'تم التوصيل')
+        .toList();
+    final current = _filterList(unfilteredCurrent);
+    final previous = _filterList(unfilteredPrevious);
+
     return Scaffold(
-      backgroundColor: DesignSystem.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: DesignSystem.getBrandGradient('primary'),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                FontAwesomeIcons.clipboardList,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'طلباتي',
-              style: DesignSystem.headlineSmall.copyWith(
-                color: DesignSystem.textPrimary,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Rubik',
-              ),
-            ),
-          ],
+        backgroundColor:
+            Theme.of(context).appBarTheme.backgroundColor ?? cardColor,
+        title: Text(
+          'طلباتي',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: DesignSystem.primary,
-              unselectedLabelColor: DesignSystem.textSecondary,
-              indicatorColor: DesignSystem.primary,
-              indicatorWeight: 3,
-              indicatorSize: TabBarIndicatorSize.label,
-              labelStyle: DesignSystem.titleMedium.copyWith(
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Rubik',
-              ),
-              unselectedLabelStyle: DesignSystem.titleMedium.copyWith(
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Rubik',
-              ),
-              tabs: const [
-                Tab(text: 'الطلبات الحالية'),
-                Tab(text: 'الطلبات السابقة'),
-              ],
-            ),
+        actions: [
+          IconButton(
+            tooltip: 'الدعم',
+            onPressed: () => _contactSupport(''),
+            icon: const Icon(FontAwesomeIcons.headset, size: 18),
           ),
-        ),
+        ],
       ),
       body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: TabBarView(
-          controller: _tabController,
-          children: [_buildCurrentOrders(), _buildPreviousOrders()],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrentOrders() {
-    if (_currentOrders.isEmpty) {
-      return _buildEmptyState(
-        icon: FontAwesomeIcons.clipboard,
-        title: 'لا توجد طلبات حالية',
-        subtitle: 'لم تقم بإنشاء أي طلبات بعد',
-        actionText: 'تصفح المنتجات',
-        onAction: () {
-          // Navigate to home/products
-        },
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: _currentOrders.length,
-      itemBuilder: (context, index) {
-        final order = _currentOrders[index];
-        return _buildCurrentOrderCard(order, index);
-      },
-    );
-  }
-
-  Widget _buildPreviousOrders() {
-    if (_previousOrders.isEmpty) {
-      return _buildEmptyState(
-        icon: FontAwesomeIcons.clockRotateLeft,
-        title: 'لا توجد طلبات سابقة',
-        subtitle: 'سيتم عرض طلباتك المكتملة هنا',
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: _previousOrders.length,
-      itemBuilder: (context, index) {
-        final order = _previousOrders[index];
-        return _buildPreviousOrderCard(order, index);
-      },
-    );
-  }
-
-  Widget _buildCurrentOrderCard(Map<String, dynamic> order, int index) {
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 300 + (index * 100)),
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: order['statusColor'].withOpacity(0.2),
-          width: 1,
-        ),
-        boxShadow: DesignSystem.getBrandShadow('medium'),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        opacity: _fade,
+        child: RefreshIndicator(
+          onRefresh: _onRefresh,
+          edgeOffset: 8,
+          child: ListView(
+            controller: _scrollCtrl,
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 20),
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: order['statusColor'].withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        order['icon'],
-                        color: order['statusColor'],
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'طلب رقم: ${order['id']}',
-                          style: DesignSystem.titleMedium.copyWith(
-                            color: DesignSystem.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'تاريخ الطلب: ${order['date']}',
-                          style: DesignSystem.bodySmall.copyWith(
-                            color: DesignSystem.textSecondary,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              // Search
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                child: _SearchField(
+                  controller: _searchCtrl,
+                  hint: 'ابحث برقم الطلب أو المنتج',
+                  onChanged: (v) => setState(() => _query = v.trim()),
+                  onClear: () {
+                    _searchCtrl.clear();
+                    setState(() => _query = '');
+                  },
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      order['statusColor'].withOpacity(0.1),
-                      order['statusColor'].withOpacity(0.05),
-                    ],
+              const SizedBox(height: 12),
+
+              // removed top status bars; status will be inside cards
+              const SizedBox(height: 8),
+
+              // View toggle: Current / Previous (use gradient ChipPill)
+              Row(
+                children: [
+                  _ChipPill(
+                    label: 'الطلبات الحالية',
+                    selected: _viewMode == 'current',
+                    onTap: () => setState(() => _viewMode = 'current'),
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: order['statusColor'], width: 1),
-                ),
-                child: Text(
-                  order['status'],
-                  style: DesignSystem.labelMedium.copyWith(
-                    color: order['statusColor'],
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Rubik',
+                  _ChipPill(
+                    label: 'الطلبات السابقة',
+                    selected: _viewMode == 'previous',
+                    onTap: () => setState(() => _viewMode = 'previous'),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
 
-          const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                Icon(FontAwesomeIcons.clock, color: Colors.orange, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'الوقت المتوقع للتوصيل: ${order['estimatedTime']}',
-                  style: DesignSystem.bodyMedium.copyWith(
-                    color: Colors.orange[800],
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Rubik',
-                  ),
-                ),
+              // Show selected category (no extra title — filters above already indicate selection)
+              if (_viewMode == 'current') ...[
+                const SizedBox(height: 6),
+                if (current.isEmpty)
+                  const _EmptyBlock(
+                    icon: FontAwesomeIcons.truckFast,
+                    title: 'لا توجد طلبات قيد التنفيذ',
+                    subtitle: 'ابدأ التسوق وسيظهر طلبك الحي هنا',
+                  )
+                else
+                  for (final o in current)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 12),
+                      child: _LiveOrderCard(
+                        order: o,
+                        progress: _progressForStep((o['step'] as int?) ?? 0),
+                        onTrack: _trackOrder,
+                        onSupport: _contactSupport,
+                        onCallDriver: _callDriver,
+                        onReorder: _reorderItems,
+                      ),
+                    ),
+              ] else ...[
+                const SizedBox(height: 6),
+                if (previous.isEmpty)
+                  const _EmptyBlock(
+                    icon: FontAwesomeIcons.clockRotateLeft,
+                    title: 'لا توجد طلبات سابقة',
+                    subtitle: 'ستظهر هنا جميع الطلبات المكتملة',
+                  )
+                else
+                  for (final o in previous)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 10),
+                      child: _PastOrderTile(
+                        order: o,
+                        onReorder: _reorderItems,
+                        onViewDetails: _openOrderDetails,
+                      ),
+                    ),
               ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          Text(
-            'المنتجات:',
-            style: DesignSystem.titleSmall.copyWith(
-              color: DesignSystem.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Rubik',
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: DesignSystem.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: order['items']
-                  .map<Widget>(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          Icon(
-                            FontAwesomeIcons.droplet,
-                            color: DesignSystem.primary,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item,
-                              style: DesignSystem.bodyMedium.copyWith(
-                                color: DesignSystem.textSecondary,
-                                fontFamily: 'Rubik',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-          Divider(color: Colors.grey[200]),
-          const SizedBox(height: 12),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'المجموع:',
-                style: DesignSystem.titleMedium.copyWith(
-                  color: DesignSystem.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Rubik',
-                ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    '${order['total'].toStringAsFixed(2)}',
-                    style: DesignSystem.headlineSmall.copyWith(
-                      color: DesignSystem.primary,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const RiyalIcon(size: 18, color: DesignSystem.primary),
-                ],
-              ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: DesignSystem.getBrandGradient('primary'),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: DesignSystem.getBrandShadow('light'),
-                  ),
-                  child: ElevatedButton.icon(
-                    onPressed: () => _trackOrder(order['id']),
-                    icon: Icon(FontAwesomeIcons.locationDot, size: 16),
-                    label: Text(
-                      'تتبع الطلب',
-                      style: TextStyle(
-                        fontFamily: 'Rubik',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      shadowColor: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () => _contactSupport(order['id']),
-                icon: Icon(FontAwesomeIcons.headset, size: 16),
-                label: Text(
-                  'الدعم',
-                  style: TextStyle(
-                    fontFamily: 'Rubik',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: DesignSystem.primary,
-                  side: BorderSide(color: DesignSystem.primary, width: 1.5),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 14,
-                    horizontal: 20,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPreviousOrderCard(Map<String, dynamic> order, int index) {
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 300 + (index * 100)),
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: DesignSystem.getBrandShadow('light'),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: order['statusColor'].withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        order['icon'],
-                        color: order['statusColor'],
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'طلب رقم: ${order['id']}',
-                          style: DesignSystem.titleMedium.copyWith(
-                            color: DesignSystem.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'تاريخ الطلب: ${order['date']}',
-                          style: DesignSystem.bodySmall.copyWith(
-                            color: DesignSystem.textSecondary,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: order['statusColor'].withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: order['statusColor'], width: 1),
-                ),
-                child: Text(
-                  order['status'],
-                  style: DesignSystem.labelMedium.copyWith(
-                    color: order['statusColor'],
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Rubik',
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          Text(
-            'المنتجات:',
-            style: DesignSystem.titleSmall.copyWith(
-              color: DesignSystem.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Rubik',
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: DesignSystem.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: order['items']
-                  .map<Widget>(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          Icon(
-                            FontAwesomeIcons.droplet,
-                            color: DesignSystem.primary,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item,
-                              style: DesignSystem.bodyMedium.copyWith(
-                                color: DesignSystem.textSecondary,
-                                fontFamily: 'Rubik',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-          Divider(color: Colors.grey[200]),
-          const SizedBox(height: 12),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'المجموع:',
-                style: DesignSystem.titleMedium.copyWith(
-                  color: DesignSystem.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Rubik',
-                ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    '${order['total'].toStringAsFixed(2)}',
-                    style: DesignSystem.headlineSmall.copyWith(
-                      color: DesignSystem.primary,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const RiyalIcon(size: 18, color: DesignSystem.primary),
-                ],
-              ),
-            ],
-          ),
-
-          if (order['status'] == 'تم التوصيل') ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: DesignSystem.getBrandGradient('primary'),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: DesignSystem.getBrandShadow('light'),
-                ),
-                child: ElevatedButton.icon(
-                  onPressed: () => _reorderItems(order),
-                  icon: Icon(FontAwesomeIcons.arrowRotateRight, size: 16),
-                  label: Text(
-                    'إعادة الطلب',
-                    style: TextStyle(
-                      fontFamily: 'Rubik',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    String? actionText,
-    VoidCallback? onAction,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    DesignSystem.surface,
-                    DesignSystem.surface.withOpacity(0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: DesignSystem.getBrandShadow('light'),
-              ),
-              child: Icon(
-                icon,
-                size: 64,
-                color: DesignSystem.textSecondary.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: DesignSystem.headlineSmall.copyWith(
-                color: DesignSystem.textPrimary,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Rubik',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: DesignSystem.bodyLarge.copyWith(
-                color: DesignSystem.textSecondary,
-                fontFamily: 'Rubik',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (actionText != null && onAction != null) ...[
-              const SizedBox(height: 24),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: DesignSystem.getBrandGradient('primary'),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: DesignSystem.getBrandShadow('light'),
-                ),
-                child: ElevatedButton.icon(
-                  onPressed: onAction,
-                  icon: Icon(FontAwesomeIcons.magnifyingGlass, size: 16),
-                  label: Text(
-                    actionText,
-                    style: TextStyle(
-                      fontFamily: 'Rubik',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
-          ],
         ),
       ),
     );
   }
+
+  // ===== Actions =====
 
   void _trackOrder(String orderId) {
-    HapticFeedback.lightImpact();
+    HapticFeedback.selectionClick();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
-          children: [
+          children: const [
             Icon(FontAwesomeIcons.locationDot, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Text('تتبع الطلب $orderId', style: TextStyle(fontFamily: 'Rubik')),
+            SizedBox(width: 8),
+            Expanded(child: Text('فتح شاشة تتبُّع الطلب…')),
           ],
         ),
         backgroundColor: DesignSystem.primary,
@@ -786,17 +370,33 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
+        content: const Row(
           children: [
             Icon(FontAwesomeIcons.headset, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              'تواصل مع الدعم للطلب $orderId',
-              style: TextStyle(fontFamily: 'Rubik'),
-            ),
+            SizedBox(width: 8),
+            Expanded(child: Text('سيتم تحويلك للدعم')),
           ],
         ),
         backgroundColor: Colors.blue,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _callDriver(String orderId) {
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(FontAwesomeIcons.phone, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Expanded(child: Text('جارٍ الاتصال بالسائق…')),
+          ],
+        ),
+        backgroundColor: Colors.teal,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -810,12 +410,16 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
       SnackBar(
         content: Row(
           children: [
-            Icon(FontAwesomeIcons.cartShopping, color: Colors.white, size: 16),
+            const Icon(
+              FontAwesomeIcons.cartShopping,
+              color: Colors.white,
+              size: 16,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'تم إضافة منتجات الطلب ${order['id']} إلى السلة',
-                style: TextStyle(fontFamily: 'Rubik'),
+                'تمت إضافة منتجات ${order['id']} إلى السلة',
+                style: const TextStyle(fontFamily: 'Rubik'),
               ),
             ),
           ],
@@ -827,10 +431,873 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
         action: SnackBarAction(
           label: 'عرض السلة',
           textColor: Colors.white,
-          onPressed: () {
-            // Navigate to cart
-          },
+          onPressed: () {},
         ),
+      ),
+    );
+  }
+
+  void _openOrderDetails(Map<String, dynamic> order) {
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(FontAwesomeIcons.receipt, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Expanded(child: Text('فتح تفاصيل ${order['id']}')),
+          ],
+        ),
+        backgroundColor: Colors.indigo,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+}
+
+// ============= Widgets =============
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.hint,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Let parent control width (we wrap _SearchField with padding where used)
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final searchFillColor = isDark
+        ? const Color(0xFF2A2A2A)
+        : const Color(0xFFF0F0F0);
+    final searchIconColor = isDark
+        ? scheme.onSurface.withOpacity(0.7)
+        : Colors.black;
+    return TextField(
+      controller: controller,
+      textInputAction: TextInputAction.search,
+      onChanged: onChanged,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(fontSize: 12),
+        prefixIcon: Icon(
+          FontAwesomeIcons.magnifyingGlass,
+          size: 16,
+          color: searchIconColor,
+        ),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                onPressed: onClear,
+                icon: Icon(
+                  FontAwesomeIcons.xmark,
+                  size: 16,
+                  color: searchIconColor,
+                ),
+              ),
+        filled: true,
+        fillColor: searchFillColor,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: scheme.outline.withOpacity(0.24)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: scheme.outline.withOpacity(0.24)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: scheme.primary),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({
+    required this.status,
+    required this.time,
+    required this.onStatus,
+    required this.onTime,
+  });
+
+  final String status;
+  final String time;
+  final ValueChanged<String> onStatus;
+  final ValueChanged<String> onTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _ChipPill(
+          label: 'الكل',
+          selected: status == 'الكل',
+          onTap: () => onStatus('الكل'),
+        ),
+        _ChipPill(
+          label: 'قيد التحضير',
+          selected: status == 'قيد التحضير',
+          onTap: () => onStatus('قيد التحضير'),
+        ),
+        _ChipPill(
+          label: 'قيد التوصيل',
+          selected: status == 'قيد التوصيل',
+          onTap: () => onStatus('قيد التوصيل'),
+        ),
+        _ChipPill(
+          label: 'تم التوصيل',
+          selected: status == 'تم التوصيل',
+          onTap: () => onStatus('تم التوصيل'),
+        ),
+        const SizedBox(width: 4),
+        Container(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: scheme.outline.withOpacity(0.2)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: time,
+              icon: Icon(
+                FontAwesomeIcons.chevronDown,
+                size: 12,
+                color: scheme.onSurface.withOpacity(0.7),
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+              items: const [
+                DropdownMenuItem(value: 'الكل', child: Text('كل الفترات')),
+                DropdownMenuItem(value: 'الأسبوع', child: Text('آخر أسبوع')),
+                DropdownMenuItem(value: 'الشهر', child: Text('آخر شهر')),
+              ],
+              onChanged: (v) {
+                if (v != null) onTime(v);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChipPill extends StatelessWidget {
+  const _ChipPill({required this.label, required this.selected, this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final gradient = DesignSystem.getBrandGradient('primary');
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: selected
+            ? Container(
+                decoration: BoxDecoration(
+                  gradient: gradient,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: DesignSystem.getBrandShadow('light'),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                alignment: Alignment.center,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              )
+            : Container(
+                // Gradient outline: outer gradient with inner surface container
+                decoration: BoxDecoration(
+                  gradient: gradient,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(2.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: scheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: scheme.outline.withOpacity(0.2),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _LiveOrderCard extends StatelessWidget {
+  const _LiveOrderCard({
+    required this.order,
+    required this.progress,
+    required this.onTrack,
+    required this.onSupport,
+    required this.onCallDriver,
+    required this.onReorder,
+  });
+
+  final Map<String, dynamic> order;
+  final double progress;
+  final void Function(String) onTrack;
+  final void Function(String) onSupport;
+  final void Function(String) onCallDriver;
+  final void Function(Map<String, dynamic>) onReorder;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Use same product card background here as well
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF2A2A2A) : Colors.white;
+    // stronger shadow in light mode for order cards
+    final cardShadows = isDark
+        ? [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ]
+        : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ];
+    final color = (order['statusColor'] as Color?) ?? scheme.primary;
+    final items = (order['items'] as List).cast<String>();
+    final status = order['status']?.toString() ?? '';
+    final id = order['id']?.toString() ?? '';
+    final eta = order['eta']?.toString();
+    // Prefer backend driver if present, otherwise show a realistic assigned mock
+    final rawDriver =
+        order['driver'] ?? order['driver_name'] ?? order['driverName'];
+    String? driver = rawDriver?.toString();
+    final rawVehicle = order['vehicle'];
+    String? vehicle = rawVehicle?.toString();
+    final String driverDisplay = (driver != null && driver.isNotEmpty)
+        ? driver
+        : 'سامي';
+    final String vehicleDisplay = (vehicle != null && vehicle.isNotEmpty)
+        ? vehicle
+        : 'تويوتا هايلكس • 1234';
+
+    final cardWidth =
+        double.infinity; // fill available width to match nav bar margins
+
+    return Center(
+      child: Container(
+        width: cardWidth,
+        // reduce the minimum height to make order cards more compact
+        constraints: const BoxConstraints(minHeight: 120),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: cardShadows,
+        ),
+        child: Padding(
+          // reduce vertical padding to make the card more compact
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: id + total + status chip
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'طلب رقم: $id',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Status chip: translate pending to Arabic and show gradient outline
+                  Builder(
+                    builder: (context) {
+                      final statusRaw = status;
+                      final statusLower = statusRaw.toLowerCase();
+                      final isPending =
+                          statusLower.contains('pending') ||
+                          statusRaw.contains('قيد');
+                      final displayStatus = isPending
+                          ? 'قيد الانتظار'
+                          : statusRaw;
+                      if (isPending) {
+                        final grad = DesignSystem.getBrandGradient('primary');
+                        return Container(
+                          padding: const EdgeInsets.all(1.5),
+                          decoration: BoxDecoration(
+                            gradient: grad,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cardColor,
+                              borderRadius: BorderRadius.circular(10.5),
+                              border: Border.all(color: Colors.transparent),
+                            ),
+                            child: Text(
+                              displayStatus,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        );
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          displayStatus,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: color,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                items.take(2).join(' • '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withOpacity(0.75),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Timeline with connected dots/lines + aligned labels
+              _OrderTimeline(step: (order['step'] as int?) ?? 0, accent: color),
+              // reduced spacing between timeline (progress dots) and driver row
+              const SizedBox(height: 6),
+
+              // Single row: driver info and buttons on same line; buttons slightly wider
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: DesignSystem.getBrandGradient('primary'),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        FontAwesomeIcons.motorcycle,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '$driverDisplay • $vehicleDisplay',
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Call (outlined) button — slightly wider
+                  SizedBox(
+                    width: 56,
+                    height: 30,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: DesignSystem.getBrandGradient('primary'),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(1.5),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => onCallDriver(id),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Center(
+                                child: Icon(
+                                  FontAwesomeIcons.phone,
+                                  size: 14,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Track (filled) button — slightly wider
+                  SizedBox(
+                    width: 56,
+                    height: 30,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: DesignSystem.getBrandGradient('primary'),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: DesignSystem.getBrandShadow('medium'),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => onTrack(id),
+                          borderRadius: BorderRadius.circular(10),
+                          child: const Center(
+                            child: Text(
+                              'تتبُّع',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Connected timeline: lines are drawn center-to-center between the four dots,
+/// and labels are perfectly centered under each dot.
+// Make sure you have: import 'dart:math' as math;
+
+class _OrderTimeline extends StatelessWidget {
+  const _OrderTimeline({required this.step, required this.accent});
+  final int step;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    const labels = [
+      'مراجعة\nالطلب',
+      'تحضير\nالطلب',
+      'جاري\nالتوصيل',
+      'تم\nالتوصيل',
+    ];
+
+    const double dotSize = 18.0;
+    const double stroke = 1.6;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          const double horizontalPadding =
+              30.0; // padding from left/right edges
+          final usable = width - dotSize - (horizontalPadding * 2);
+          final segment = usable / 3.0;
+
+          // centers for each dot (visual order: left -> right) with padding
+          final centers = List.generate(4, (i) {
+            return Offset(
+              horizontalPadding + (dotSize / 2) + (segment * i),
+              dotSize / 2,
+            );
+          });
+
+          return Column(
+            children: [
+              SizedBox(
+                height: dotSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // connectors (shorter stretch but still visually connected to dots)
+                    CustomPaint(
+                      size: Size(width, dotSize),
+                      painter: _ConnectorPainter(
+                        step: step,
+                        centers: centers,
+                        accent: accent,
+                        inactive: scheme.outline.withOpacity(0.3),
+                        strokeWidth: stroke,
+                        dotRadius: dotSize / 2,
+                        shorten:
+                            14.0, // total middle reduction between two dots
+                        underlap:
+                            6.0, // increase underlap so the short connectors still tuck under the dots
+                      ),
+                    ),
+                    // dots on top - position dots at the exact connector centers so
+                    // they always align with the painted connectors and move together
+                    for (int i = 0; i < 4; i++)
+                      Positioned(
+                        left: centers[i].dx - (dotSize / 2),
+                        top: 0,
+                        width: dotSize,
+                        height: dotSize,
+                        child: ShaderMask(
+                          shaderCallback: (bounds) =>
+                              DesignSystem.getBrandGradient(
+                                'primary',
+                              ).createShader(bounds),
+                          blendMode: BlendMode.srcIn,
+                          child: _DotStep(
+                            filled: (3 - i) <= step,
+                            color: Colors.white,
+                            size: dotSize,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              // labels centered under each dot
+              SizedBox(
+                width: width,
+                height: 56,
+                child: Stack(
+                  children: List.generate(4, (i) {
+                    final labelIndex = 3 - i; // map to logical label
+                    const double labelWidth = 84.0;
+                    var left = centers[i].dx - (labelWidth / 2);
+                    left = left.clamp(0.0, width - labelWidth);
+                    return Positioned(
+                      left: left,
+                      top: 0,
+                      width: labelWidth,
+                      child: Center(
+                        child: Text(
+                          labels[labelIndex],
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontSize: 10,
+                                color: scheme.onSurface.withOpacity(0.72),
+                                height: 1.05,
+                              ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ConnectorPainter extends CustomPainter {
+  _ConnectorPainter({
+    required this.step,
+    required this.centers,
+    required this.accent,
+    required this.inactive,
+    required this.strokeWidth,
+    this.dotRadius = 0,
+    this.shorten = 8.0, // total reduction per segment
+    this.underlap =
+        2.0, // how much the line hides under the dots (keeps connection feeling)
+  });
+
+  final int step;
+  final List<Offset> centers;
+  final Color accent;
+  final Color inactive;
+  final double strokeWidth;
+  final double dotRadius;
+
+  /// Total amount to reduce the visible line between two dots.
+  final double shorten;
+
+  /// Positive value means the line goes slightly under the dot, so it still looks connected.
+  final double underlap;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintActive = Paint()
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..shader = DesignSystem.getBrandGradient(
+        'primary',
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final paintInactive = Paint()
+      ..color = inactive
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // base edge position (edge of dot, accounting for stroke so it doesn't peek out)
+    final edgeGap = dotRadius - (strokeWidth / 2);
+
+    // we want a small underlap under each dot (keeps visual connection)
+    final edgeWithUnderlap = (edgeGap - underlap).clamp(0.0, edgeGap);
+
+    for (int i = 0; i < 3; i++) {
+      final from = centers[i];
+      final to = centers[i + 1];
+
+      final angle = (to - from).direction;
+
+      // start/end near the dot edge, slightly under the dot
+      var p1 =
+          from +
+          Offset(
+            math.cos(angle) * edgeWithUnderlap,
+            math.sin(angle) * edgeWithUnderlap,
+          );
+      var p2 =
+          to -
+          Offset(
+            math.cos(angle) * edgeWithUnderlap,
+            math.sin(angle) * edgeWithUnderlap,
+          );
+
+      // now shorten the visible span in the middle, but keep underlap so it still feels connected
+      final halfShorten = shorten / 2;
+      final midShift = Offset(
+        math.cos(angle) * halfShorten,
+        math.sin(angle) * halfShorten,
+      );
+      p1 = p1 + midShift;
+      p2 = p2 - midShift;
+
+      final isActive = i >= (3 - step);
+      canvas.drawLine(p1, p2, isActive ? paintActive : paintInactive);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConnectorPainter old) =>
+      old.step != step ||
+      old.accent != accent ||
+      old.strokeWidth != strokeWidth ||
+      old.shorten != shorten ||
+      old.underlap != underlap;
+}
+
+class _DotStep extends StatelessWidget {
+  const _DotStep({required this.filled, required this.color, this.size = 12});
+  final bool filled;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: filled ? color : Colors.transparent,
+        border: filled ? null : Border.all(color: color, width: 2),
+      ),
+    );
+  }
+}
+
+class _PastOrderTile extends StatelessWidget {
+  const _PastOrderTile({
+    required this.order,
+    required this.onReorder,
+    required this.onViewDetails,
+  });
+
+  final Map<String, dynamic> order;
+  final void Function(Map<String, dynamic>) onReorder;
+  final void Function(Map<String, dynamic>) onViewDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final items = (order['items'] as List).cast<String>();
+    final color = (order['statusColor'] as Color?) ?? scheme.primary;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.14),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(FontAwesomeIcons.circleCheck, size: 18, color: color),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'طلب ${order['id']}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${((order['total'] as num?) ?? 0).toStringAsFixed(2)} SAR',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          '${order['date']} • ${items.take(2).join(' • ')}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: scheme.onSurface.withOpacity(0.7),
+          ),
+        ),
+      ),
+      trailing: FilledButton.tonal(
+        onPressed: () => onReorder(order),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text('اطلب مجدداً'),
+      ),
+      onTap: () => onViewDetails(order),
+    );
+  }
+}
+
+class _EmptyBlock extends StatelessWidget {
+  const _EmptyBlock({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 6, bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.12)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 54, color: scheme.onSurface.withOpacity(0.18)),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

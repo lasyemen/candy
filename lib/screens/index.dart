@@ -21,3 +21,4 @@ export 'test_checkout_screen.dart';
 export 'card_payment_screen.dart';
 export 'payment_method_selection_screen.dart';
 export 'thank_you_screen.dart';
+export 'reminder_settings_screen.dart';

@@ -10,7 +10,7 @@ class AuthActions {
     if (normalized == null) return false;
     final String phone = normalized;
 
-    // Check merchant record to tag session
+    // Check merchant record to tag session (optional)
     final merchantRecord = await MerchantService.instance.findMerchantByPhone(
       phone,
     );
@@ -29,10 +29,10 @@ class AuthActions {
       return false;
     }
 
-    // Mark session merchant flag
+    // Mark session merchant flag but always return true on successful login
     final bool isMerchant = merchantRecord != null;
     await CustomerSession.instance.setMerchant(isMerchant);
-    return isMerchant;
+    return true;
   }
 
   /// Registers a new customer and sets session. Returns the customer's name if successful.
@@ -41,11 +41,12 @@ class AuthActions {
     required String phone,
     String? address,
   }) async {
-    final String cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    final String? normalized = PhoneUtils.normalizeKsaPhone(phone);
+    if (normalized == null) return null;
 
     final customer = await AuthService.instance.registerCustomer(
       name: name,
-      phone: cleanPhone,
+      phone: normalized,
       address: address,
     );
 
