@@ -6,6 +6,7 @@ import 'blocs/app_bloc.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/notification_service.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'core/services/cart_service.dart';
 import 'core/services/customer_session.dart';
 import 'screens/index.dart';
@@ -38,8 +39,24 @@ void main() async {
 
     try {
       // Initialize Firebase Messaging and local notifications (fire-and-forget)
-      NotificationService.instance.init();
+      await NotificationService.instance.init();
       print('background init: NotificationService started');
+
+      // Debug: schedule a one-minute test reminder so you can verify notifications
+      if (kDebugMode) {
+        try {
+          // schedule a quick test ~1 minute from now
+          await NotificationService.instance.scheduleHourlyReminder(
+            id: 9999,
+            title: 'Test Reminder',
+            body: 'This is a test — drink water 💧',
+            minutesInterval: 1,
+          );
+          print('background init: scheduled debug test reminder (id=9999)');
+        } catch (e) {
+          print('background init: failed to schedule debug reminder: $e');
+        }
+      }
     } catch (e) {
       print('background init: NotificationService failed: $e');
     }
