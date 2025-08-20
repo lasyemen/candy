@@ -31,6 +31,7 @@ class AppRoutes {
   static const String cardPayment = '/card-payment';
   static const String paymentMethods = '/payment-methods';
   static const String thankYou = '/thank-you';
+  static const String reminderSettings = '/reminder-settings';
 
   /// Get all routes for the application
   static Map<String, WidgetBuilder> getRoutes() {
@@ -107,6 +108,8 @@ class AppRoutes {
         final earned = (args?['earned'] as num?)?.toInt();
         return ThankYouScreen(total: total, earned: earned);
       },
+      // Reminder settings
+      reminderSettings: (context) => const ReminderSettingsScreen(),
 
       // Product Routes
       productDetails: (context) {
