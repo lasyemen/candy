@@ -515,15 +515,15 @@ class _SearchField extends StatelessWidget {
           vertical: 10,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outline.withOpacity(0.24)),
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outline.withOpacity(0.24)),
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide.none, // remove grey outline when enabled
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide(color: scheme.primary),
         ),
       ),
@@ -615,6 +615,9 @@ class _ChipPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final gradient = DesignSystem.getBrandGradient('primary');
+    // When a chip is not selected, show a white inner surface while keeping the
+    // gradient outline intact.
+    final innerColor = Colors.white;
 
     return InkWell(
       onTap: onTap,
@@ -647,14 +650,16 @@ class _ChipPill extends StatelessWidget {
                   borderRadius: BorderRadius.circular(22),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(2.0),
+                  // reduce padding so gradient outline appears thinner
+                  padding: const EdgeInsets.all(1.0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
-                      color: scheme.surface,
-                      borderRadius: BorderRadius.circular(20),
+                      color: innerColor,
+                      borderRadius: BorderRadius.circular(21),
                       border: Border.all(
-                        color: scheme.outline.withOpacity(0.2),
+                        color: scheme.outline.withOpacity(0.18),
+                        width: 1,
                       ),
                     ),
                     alignment: Alignment.center,
