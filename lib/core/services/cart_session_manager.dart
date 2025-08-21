@@ -545,7 +545,7 @@ class CartSessionManager {
   }
 
   // Checkout cart
-  Future<String> checkout() async {
+  Future<String> checkout({Map<String, dynamic>? deliveryData}) async {
     try {
       if (_currentCartId == null) {
         throw Exception('No active cart');
@@ -559,25 +559,58 @@ class CartSessionManager {
           .single();
 
       // Create order
+      final double orderTotal = await _calculateCartTotal(_currentCartId!);
+      print(
+        'CartSessionManager - Checkout: orderTotal=$orderTotal, cartId=$_currentCartId',
+      );
+
+      // Guard: prevent inserting orders with zero/invalid totals which violate DB constraints
+      if (orderTotal <= 0.0) {
+        print(
+          'CartSessionManager - Aborting checkout: order total is zero or invalid',
+        );
+        throw Exception('Invalid order total: $orderTotal');
+      }
+      print('CartSessionManager - Cart contents: $cart');
+      final orderInsertBody = {
+        'customer_id': cart['customer_id'],
+        'status': 'pending',
+        // Provide both common column names so insert succeeds regardless of schema naming
+        'total_amount': orderTotal,
+        'total': orderTotal,
+        // Ensure positive amounts required by DB constraints
+        'subtotal': orderTotal,
+        'final_amount': orderTotal,
+        'tax_amount': 0.00,
+        'shipping_amount': 0.00,
+        'discount_amount': 0.00,
+        'voucher_discount': 0.00,
+        // Only include delivery_address/notes (avoid delivery_type which some schemas may not have)
+        'delivery_address': deliveryData?['address'] ?? '',
+        'delivery_notes': deliveryData?['notes'] ?? '',
+        // Some schemas require delivery_phone not-null
+        'delivery_phone': CustomerSession.instance.currentCustomerPhone ?? '',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
       final order = await SupabaseService.instance.client
           .from('orders')
-          .insert({
-            'customer_id': cart['customer_id'],
-            'status': 'pending',
-            'total': await _calculateCartTotal(_currentCartId!),
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
+          .insert(orderInsertBody)
           .select()
           .single();
+      print('CartSessionManager - Order insert response: $order');
 
       // Move cart items to order items
       for (final item in cart['cart_items']) {
+        final prodPrice = await _getProductPrice(item['product_id']);
+        // Insert price fields that common schemas expect: unit_price and total_price
         await SupabaseService.instance.client.from('order_items').insert({
           'order_id': order['id'],
           'product_id': item['product_id'],
           'quantity': item['quantity'],
-          'price': await _getProductPrice(item['product_id']),
+          'unit_price': prodPrice,
+          'total_price': prodPrice * (item['quantity'] as int),
           'created_at': DateTime.now().toIso8601String(),
         });
       }
@@ -599,7 +632,7 @@ class CartSessionManager {
 
       // Award purchase-based points and issue vouchers if applicable
       try {
-        final double total = (order['total'] as num?)?.toDouble() ?? 0.0;
+        final double total = orderTotal; // use calculated total_amount
         if (total > 0) {
           await RewardsService.instance.addPointsFromPurchase(total);
         }
@@ -622,13 +655,40 @@ class CartSessionManager {
           .eq('cart_id', cartId);
 
       double total = 0;
-      for (final item in items) {
-        final quantity = item['quantity'] as int;
-        final product = item['products'] as Map<String, dynamic>;
-        final price = product['price'] as double;
-        total += quantity * price;
+      if (items == null || (items is List && items.isEmpty)) {
+        print('CartSessionManager - _calculateCartTotal: no items found for cart $cartId');
+        return 0.0;
       }
 
+      for (final item in items) {
+        final quantity = item['quantity'] as int? ?? 0;
+        final product = item['products'] as Map<String, dynamic>?;
+        if (product == null) {
+          print('CartSessionManager - _calculateCartTotal: product data missing for item $item');
+          continue;
+        }
+
+        final dynamic rawPrice = product['price'];
+        double price = 0.0;
+        try {
+          if (rawPrice is num) {
+            price = (rawPrice as num).toDouble();
+          } else if (rawPrice is String && rawPrice.isNotEmpty) {
+            price = double.tryParse(rawPrice) ?? 0.0;
+          }
+        } catch (e) {
+          print('CartSessionManager - _calculateCartTotal: error parsing price for product ${product['id']}: $e');
+        }
+
+        if (price <= 0.0) {
+          print('CartSessionManager - _calculateCartTotal: price is zero or missing for product ${product['id']}, rawPrice=$rawPrice');
+        }
+
+        total += quantity * price;
+        print('CartSessionManager - _calculateCartTotal: item product=${product['id']}, qty=$quantity, unitPrice=$price');
+      }
+
+      print('CartSessionManager - _calculateCartTotal: computed total=$total for cart $cartId');
       return total;
     } catch (e) {
       print('CartSessionManager - Error calculating cart total: $e');

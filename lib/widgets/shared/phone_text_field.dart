@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../utils/phone_utils.dart';
 
 class PhoneTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final String? Function(String?)? validator;
+
+  /// Optional visual prefix (e.g. '+966 ')
+  final String? prefix;
   const PhoneTextField({
     super.key,
     required this.controller,
     required this.hintText,
     this.validator,
+    this.prefix,
   });
 
   @override
@@ -24,31 +29,24 @@ class PhoneTextField extends StatelessWidget {
         autocorrect: false,
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')),
-          LengthLimitingTextInputFormatter(14),
+          LengthLimitingTextInputFormatter(15),
         ],
         validator:
             validator ??
             (value) {
-              if (value == null || value.isEmpty) {
+              if (value == null || value.isEmpty)
                 return 'يرجى إدخال رقم الهاتف';
-              }
-              final digits = value.replaceAll(RegExp(r'[^0-9+]'), '');
-              // Accept formats: 5XXXXXXXX, 05XXXXXXXXX, 9665XXXXXXXXX, +9665XXXXXXXXX
-              final cleaned = value.replaceAll(RegExp(r'[^0-9]'), '');
-              bool valid = false;
-              if (cleaned.length == 9 && cleaned.startsWith('5')) valid = true;
-              if (cleaned.length == 10 && cleaned.startsWith('05'))
-                valid = true;
-              if (cleaned.length == 12 && cleaned.startsWith('9665'))
-                valid = true;
-              if (digits.startsWith('+9665') && cleaned.length == 12)
-                valid = true;
-              if (!valid) return 'أدخل رقم سعودي صحيح';
+              if (PhoneUtils.normalizeKsaPhone(value) == null)
+                return 'أدخل رقم هاتف صحيح';
               return null;
             },
         style: const TextStyle(fontFamily: 'Rubik', fontSize: 12),
         decoration: InputDecoration(
           hintText: hintText,
+          prefixText: prefix ?? null,
+          prefixStyle: prefix != null
+              ? const TextStyle(fontFamily: 'Rubik', fontSize: 12)
+              : null,
           hintStyle: TextStyle(
             fontFamily: 'Rubik',
             fontSize: 12,
@@ -56,14 +54,7 @@ class PhoneTextField extends StatelessWidget {
                 ? Colors.white54
                 : Colors.grey[500],
           ),
-          prefixText: '+966 ',
-          prefixStyle: TextStyle(
-            fontFamily: 'Rubik',
-            fontSize: 12,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white60
-                : Colors.grey[600],
-          ),
+          // No fixed prefix; allow entering full international number
           suffixIcon: Icon(
             Icons.phone_outlined,
             color: Theme.of(context).brightness == Brightness.dark

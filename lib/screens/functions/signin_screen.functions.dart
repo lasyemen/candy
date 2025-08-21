@@ -11,20 +11,27 @@ mixin SignInScreenFunctions on State<SignInScreen> {
     try {
       final String rawPhone = (this as _SignInScreenState)._phoneController.text
           .trim();
-      final String digits = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
-      if (digits.length != 9 || !digits.startsWith('5')) {
+
+      // Normalize first so we accept local and international formats
+      final String? normalized = PhoneUtils.normalizeKsaPhone(rawPhone);
+      if (normalized == null || !normalized.startsWith('+966')) {
         (this as _SignInScreenState).setState(() {
           (this as _SignInScreenState)._isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('أدخل رقم سعودي صحيح (9 أرقام ويبدأ بـ 5)'),
+            content: Text('أدخل رقم سعودي صحيح'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
-      final bool? isMerchant = await AuthActions.signInAndSetSession(rawPhone);
+
+      // Pass normalized phone to sign-in flow
+      final bool? isMerchant = await AuthActions.signInAndSetSession(
+        normalized,
+      );
+      print('SignInScreen - AuthActions returned: $isMerchant');
       if (isMerchant == false) {
         if (mounted) {
           (this as _SignInScreenState).setState(() {

@@ -2,6 +2,7 @@ import '../../models/customer.dart';
 import 'supabase_service.dart';
 import 'customer_session.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../utils/phone_utils.dart';
 
 class AuthService {
   static AuthService? _instance;
@@ -28,10 +29,16 @@ class AuthService {
         throw Exception('Phone number is required');
       }
 
-      // Prepare customer data
+      // Normalize and enforce E.164 storage format
+      final String? normalizedPhone = PhoneUtils.normalizeKsaPhone(phone);
+      if (normalizedPhone == null) {
+        throw Exception('Invalid phone number format');
+      }
+
+      // Prepare customer data (store normalized phone)
       final customerData = {
         'name': name.trim(),
-        'phone': phone.trim(),
+        'phone': normalizedPhone,
         'address':
             address?.trim() ??
             '', // Provide empty string as default for NOT NULL constraint
@@ -127,13 +134,46 @@ class AuthService {
     try {
       print('Attempting to login customer with phone: $phone');
 
-      // Find customer by phone number directly from customers table
-      final response = await _supabaseService.client
+      // Normalize phone for lookup
+      final String? normalizedPhone = PhoneUtils.normalizeKsaPhone(phone);
+      if (normalizedPhone == null) {
+        print('loginCustomer - phone normalization failed for: $phone');
+        return null;
+      }
+
+      // Find customer by normalized phone number
+      var response = await _supabaseService.client
           .from('customers')
           .select()
-          .eq('phone', phone)
+          .eq('phone', normalizedPhone)
           .eq('is_active', true)
           .maybeSingle();
+
+      // Fallback: if not found, try digit-substring search to match legacy/non-normalized records
+      if (response == null) {
+        final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+        final fallback = await _supabaseService.client
+            .from('customers')
+            .select()
+            .ilike('phone', '%$digits%')
+            .eq('is_active', true)
+            .maybeSingle();
+        if (fallback != null) {
+          // Attempt to migrate phone field to normalized E.164
+          try {
+            await _supabaseService.updateData(
+              'customers',
+              (fallback['id']).toString(),
+              {'phone': normalizedPhone},
+            );
+            // reflect normalized phone in response
+            response = {...fallback, 'phone': normalizedPhone};
+          } catch (e) {
+            // if migration fails, use fallback as-is
+            response = fallback;
+          }
+        }
+      }
 
       print('Login response: $response');
       if (response != null) {
@@ -161,13 +201,43 @@ class AuthService {
   Future<bool> customerExists({required String phone}) async {
     try {
       print('Checking if customer exists with phone: $phone');
-      final response = await _supabaseService.client
+      final String? normalizedPhone = PhoneUtils.normalizeKsaPhone(phone);
+      if (normalizedPhone == null) {
+        print('customerExists - phone normalization failed for: $phone');
+        return false;
+      }
+
+      var response = await _supabaseService.client
           .from('customers')
           .select('id')
-          .eq('phone', phone)
+          .eq('phone', normalizedPhone)
           .eq('is_active', true)
           .maybeSingle()
           .timeout(const Duration(seconds: 4));
+
+      // Fallback to digit substring search for legacy records
+      if (response == null) {
+        final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+        response = await _supabaseService.client
+            .from('customers')
+            .select('id')
+            .ilike('phone', '%$digits%')
+            .eq('is_active', true)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 4));
+        if (response != null) {
+          // Try to migrate record to normalized phone
+          try {
+            await _supabaseService.updateData(
+              'customers',
+              (response['id']).toString(),
+              {'phone': normalizedPhone},
+            );
+          } catch (_) {
+            // ignore migration errors
+          }
+        }
+      }
 
       print('Customer exists response: $response');
       return response != null;

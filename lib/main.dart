@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'blocs/app_bloc.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/supabase_service.dart';
+import 'core/services/notification_service.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'core/services/cart_service.dart';
 import 'core/services/customer_session.dart';
 import 'screens/index.dart';
@@ -23,21 +25,64 @@ void main() async {
     ),
   );
 
-  // Initialize Supabase
-  await SupabaseService.instance.initialize();
-
-  // Initialize cart session
-  await CartService.initializeCartSession();
-
-  // Initialize auto translator cache
-  await AutoTranslator.instance.initialize();
-
-  // Load guest user data if available
-  await CustomerSession.instance.loadGuestUser();
-  // Restore logged-in customer if present
-  await CustomerSession.instance.loadCurrentCustomer();
-
+  // Start the app immediately to avoid blocking on long initializations.
   runApp(const MyApp());
+
+  // Run initialization tasks in the background so the UI shows immediately.
+  (() async {
+    try {
+      await SupabaseService.instance.initialize();
+      print('background init: Supabase initialized');
+    } catch (e) {
+      print('background init: Supabase failed: $e');
+    }
+
+    try {
+      // Initialize Firebase Messaging and local notifications (fire-and-forget)
+      await NotificationService.instance.init();
+      print('background init: NotificationService started');
+
+      // Debug: schedule a one-minute test reminder so you can verify notifications
+      if (kDebugMode) {
+        try {
+          // schedule a quick test ~1 minute from now
+          await NotificationService.instance.scheduleHourlyReminder(
+            id: 9999,
+            title: 'Test Reminder',
+            body: 'This is a test — drink water 💧',
+            minutesInterval: 1,
+          );
+          print('background init: scheduled debug test reminder (id=9999)');
+        } catch (e) {
+          print('background init: failed to schedule debug reminder: $e');
+        }
+      }
+    } catch (e) {
+      print('background init: NotificationService failed: $e');
+    }
+
+    try {
+      await CartService.initializeCartSession();
+      print('background init: Cart session initialized');
+    } catch (e) {
+      print('background init: Cart session failed: $e');
+    }
+
+    try {
+      await AutoTranslator.instance.initialize();
+      print('background init: AutoTranslator initialized');
+    } catch (e) {
+      print('background init: AutoTranslator failed: $e');
+    }
+
+    try {
+      await CustomerSession.instance.loadGuestUser();
+      await CustomerSession.instance.loadCurrentCustomer();
+      print('background init: Customer session restored');
+    } catch (e) {
+      print('background init: Customer session failed: $e');
+    }
+  })();
 }
 
 class MyApp extends StatelessWidget {
