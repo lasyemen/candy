@@ -1,4 +1,4 @@
-part of payment_method_selection_screen;
+part of '../payment_method_selection_screen.dart';
 
 class PaymentMethodItem {
   final String id;

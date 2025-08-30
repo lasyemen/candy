@@ -1,4 +1,4 @@
-part of home_screen;
+part of '../home_screen.dart';
 
 mixin HomeScreenFunctions on State<HomeScreen> {
   Future<void> _loadProducts({bool showLoading = true}) async {
@@ -97,33 +97,13 @@ mixin HomeScreenFunctions on State<HomeScreen> {
         });
       }
 
-      final tableExists = await AdsService.tableExists();
-      if (!tableExists) {
-        print('Ads table does not exist or is not accessible');
-        if (mounted) {
-          (this as _HomeScreenState).setState(() {
-            (this as _HomeScreenState)._isLoadingAds = false;
-          });
-        }
-        return;
-      }
-
+      // Check if there's any ads data and then fetch
       final hasData = await AdsService.hasAds();
       if (!hasData) {
-        print('Ads table is empty - adding sample ads');
-        final added = await AdsService.addSampleAds();
-        if (!added) {
-          print('Failed to add sample ads');
-          if (mounted) {
-            (this as _HomeScreenState).setState(() {
-              (this as _HomeScreenState)._isLoadingAds = false;
-            });
-          }
-          return;
-        }
+        print('Ads table appears empty');
       }
 
-      final ads = await AdsService.fetchAds();
+  final ads = await AdsService.fetchAds();
       print('Loaded ${ads.length} ads from database');
 
       if (mounted) {

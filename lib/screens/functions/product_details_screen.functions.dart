@@ -1,4 +1,4 @@
-part of product_details_screen;
+part of '../product_details_screen.dart';
 
 mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
   Future<void> _loadRatingData() async {

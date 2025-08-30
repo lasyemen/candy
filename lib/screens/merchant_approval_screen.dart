@@ -1,13 +1,8 @@
-// lib/screens/merchant_approval_screen.dart
 library merchant_approval_screen;
 
 import 'package:flutter/material.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
-import '../core/services/merchant_service.dart';
-import '../core/services/auth_service.dart';
-import '../core/services/customer_session.dart';
-import '../widgets/merchant/summary_row.dart';
 part 'functions/merchant_approval_screen.functions.dart';
 
 class MerchantApprovalScreen extends StatefulWidget {
@@ -20,7 +15,7 @@ class MerchantApprovalScreen extends StatefulWidget {
 }
 
 class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
-    with TickerProviderStateMixin, MerchantApprovalScreenFunctions {
+    with TickerProviderStateMixin {
   bool _isLoading = false;
   bool _agreedToTerms = false;
 
@@ -73,57 +68,13 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
 
     setState(() => _isLoading = true);
 
-    try {
-      final String merchantId = (widget.merchantData['merchantId'] ?? '')
-          .toString();
-      if (merchantId.isEmpty) {
-        throw Exception('merchantId is missing');
-      }
-      await MerchantService.instance.acceptTerms(merchantId: merchantId);
+    await Future.delayed(const Duration(seconds: 2));
 
-      // Ensure customer session exists for owner (so app doesn't treat as guest)
-      final String ownerName = (widget.merchantData['ownerName'] ?? '')
-          .toString();
-      final String phoneDisplay = (widget.merchantData['phone'] ?? '')
-          .toString();
-      final String phoneNormalized = phoneDisplay.replaceAll(
-        RegExp(r'\s+'),
-        '',
-      );
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-      // Try login; if not exists, register then login to set session
-      final existing = await AuthService.instance.loginCustomer(
-        phone: phoneNormalized,
-      );
-      if (existing == null) {
-        await AuthService.instance.registerCustomer(
-          name: ownerName.isNotEmpty ? ownerName : 'Merchant',
-          phone: phoneNormalized,
-          address: widget.merchantData['address']?.toString(),
-        );
-        await AuthService.instance.loginCustomer(phone: phoneNormalized);
-      }
-      // Mark session as merchant for future app launches
-      await CustomerSession.instance.setMerchant(true);
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      // Navigate to main with merchant flag to hide Health tab
-      Navigator.pushReplacementNamed(
-        context,
-        AppRoutes.main,
-        arguments: {'isMerchant': true},
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر إكمال التسجيل: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    // Navigate to main screen
+    Navigator.pushReplacementNamed(context, AppRoutes.main);
   }
 
   @override
@@ -297,25 +248,25 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
                             ),
                           ),
                           const SizedBox(height: 16),
-                          SummaryRow(
-                            label: 'اسم المتجر',
-                            value: widget.merchantData['storeName'] ?? '',
+                          _buildSummaryRow(
+                            'اسم المتجر',
+                            widget.merchantData['storeName'] ?? '',
                           ),
-                          SummaryRow(
-                            label: 'اسم المالك',
-                            value: widget.merchantData['ownerName'] ?? '',
+                          _buildSummaryRow(
+                            'اسم المالك',
+                            widget.merchantData['ownerName'] ?? '',
                           ),
-                          SummaryRow(
-                            label: 'رقم الجوال',
-                            value: widget.merchantData['phone'] ?? '',
+                          _buildSummaryRow(
+                            'رقم الجوال',
+                            widget.merchantData['phone'] ?? '',
                           ),
-                          SummaryRow(
-                            label: 'العنوان',
-                            value: widget.merchantData['address'] ?? '',
+                          _buildSummaryRow(
+                            'العنوان',
+                            widget.merchantData['address'] ?? '',
                           ),
-                          const SummaryRow(
-                            label: 'المستندات',
-                            value: 'تم رفع جميع المستندات',
+                          _buildSummaryRow(
+                            'المستندات',
+                            'تم رفع جميع المستندات',
                             showCheckmark: true,
                           ),
                         ],
@@ -464,5 +415,56 @@ class _MerchantApprovalScreenState extends State<MerchantApprovalScreen>
     );
   }
 
-  // Summary rows extracted
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool showCheckmark = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontSize: 14,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.grey[600],
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      fontSize: 14,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (showCheckmark)
+                  Icon(
+                    Icons.check_circle,
+                    color: const Color(0xFF6B46C1),
+                    size: 20,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

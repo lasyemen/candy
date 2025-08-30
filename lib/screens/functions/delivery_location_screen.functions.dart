@@ -1,4 +1,4 @@
-part of delivery_location_screen;
+part of '../delivery_location_screen.dart';
 
 mixin DeliveryLocationScreenFunctions on State<DeliveryLocationScreen> {
   // Currently placeholders: kept for structural parity and future reuse.

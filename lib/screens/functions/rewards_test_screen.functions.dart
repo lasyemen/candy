@@ -1,4 +1,4 @@
-part of rewards_test_screen;
+part of '../rewards_test_screen.dart';
 
 mixin RewardsTestScreenFunctions on State<RewardsTestScreen> {
   int points = 0;
