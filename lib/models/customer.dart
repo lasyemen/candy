@@ -18,6 +18,9 @@ class Customer {
   @JsonKey(name: 'orders_count')
   final int ordersCount;
   final double rating;
+  // Customer location (nullable)
+  final double? lat;
+  final double? lng;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
   @JsonKey(name: 'updated_at')
@@ -34,6 +37,8 @@ class Customer {
     required this.totalSpent,
     required this.ordersCount,
     required this.rating,
+    this.lat,
+    this.lng,
     required this.createdAt,
     required this.updatedAt,
   });

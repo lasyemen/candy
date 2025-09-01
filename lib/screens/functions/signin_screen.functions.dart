@@ -1,4 +1,4 @@
-part of '../signin_screen.dart';
+part of signin_screen;
 
 mixin SignInScreenFunctions on State<SignInScreen> {
   void _submitForm() async {

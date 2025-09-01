@@ -20,8 +20,8 @@ class BannerWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 220,
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      height: 80, // reduced from 120
+      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
@@ -64,21 +64,33 @@ class BannerWidget extends StatelessWidget {
   }
 
   Widget _buildBanner(Map<String, dynamic> banner) {
-    // Require imageUrl/image_url from ads table only
     final imageUrl = banner['imageUrl'] ?? banner['image_url'];
     if (imageUrl == null || imageUrl.toString().isEmpty) {
       print('ERROR: No imageUrl found in ads data for banner: $banner');
       return Container();
     }
 
-    // Check if it's a network image (starts with http or https)
+    print('Loading banner image: $imageUrl');
+
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       return Image.network(
         imageUrl,
         fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: Colors.grey[300],
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        },
         errorBuilder: (context, error, stackTrace) {
           print('Error loading network image: $error');
-          return const Icon(Icons.broken_image, color: Colors.white);
+          return Container(
+            color: Colors.grey[300],
+            child: const Center(
+              child: Icon(Icons.broken_image, color: Colors.grey),
+            ),
+          );
         },
       );
     } else {
@@ -88,157 +100,14 @@ class BannerWidget extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           print('Error loading asset image: $error');
-          return const Icon(Icons.broken_image, color: Colors.white);
+          return Container(
+            color: Colors.grey[300],
+            child: const Center(
+              child: Icon(Icons.broken_image, color: Colors.grey),
+            ),
+          );
         },
       );
     }
-
-    final gradient =
-        banner['gradient'] ??
-        LinearGradient(
-          colors: [Colors.blue.shade400, Colors.blue.shade200],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-    final color = banner['color'] ?? Colors.blue;
-    final icon = banner['icon'] ?? Icons.star;
-    final title = banner['title'] ?? '';
-    final subtitle = banner['subtitle'] ?? '';
-    return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: gradient,
-            borderRadius: BorderRadius.circular(35),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-                spreadRadius: 0,
-              ),
-              BoxShadow(
-                color: color.withOpacity(0.08),
-                blurRadius: 40,
-                offset: const Offset(0, 16),
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(35),
-            child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withOpacity(0.1),
-                    Colors.white.withOpacity(0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(35),
-              ),
-              child: Row(
-                children: [
-                  // Banner info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(icon, color: Colors.white, size: 24),
-                            const SizedBox(width: 8),
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                height: 1.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          subtitle,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white.withOpacity(0.3),
-                                Colors.white.withOpacity(0.1),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Text(
-                            'عرض محدود',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Banner image with gradient overlay
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.3),
-                          Colors.white.withOpacity(0.1),
-                        ],
-                        center: Alignment.center,
-                        radius: 0.8,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: imageUrl != null && imageUrl.toString().isNotEmpty
-                        ? Center(
-                            child: Image.network(
-                              imageUrl,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                    Icons.broken_image,
-                                    color: Colors.white,
-                                  ),
-                            ),
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        )
-        .animate()
-        .fadeIn(duration: 300.ms)
-        .slideX(begin: 0.2, end: 0, duration: 300.ms, curve: Curves.easeOut);
   }
 }

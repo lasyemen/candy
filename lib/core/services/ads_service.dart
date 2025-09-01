@@ -17,12 +17,15 @@ class AdsService {
       }
 
       // Fetch all ads with detailed logging
+      print('Attempting to fetch ads from table: ads');
       final response = await _supabase
           .from('ads')
           .select('*')
           .order('created_at', ascending: false);
 
       print('Raw ads response: $response'); // Debug log
+      print('Response type: ${response.runtimeType}');
+      print('Response length: ${response is List ? response.length : 'N/A'}');
 
       if (response == null) {
         print('No ads response from database');
@@ -49,10 +52,15 @@ class AdsService {
                 return null;
               }
 
-              // Construct full URL for image_url
-              final baseUrl =
-                  'https://supabase.com/storage/v1/object/public/img/';
-              json['image_url'] = '$baseUrl${json['image_url']}';
+              // Check if image_url is already a full URL or just a path
+              String imageUrl = json['image_url'];
+              if (!imageUrl.startsWith('http://') &&
+                  !imageUrl.startsWith('https://')) {
+                // If it's just a path, construct the full URL
+                final baseUrl =
+                    'https://zzmqxporppazopgxfbwj.supabase.co/storage/v1/object/public/img/';
+                json['image_url'] = '$baseUrl$imageUrl';
+              }
 
               final ad = Ads.fromJson(json);
               print(
@@ -110,22 +118,64 @@ class AdsService {
 
   /// Add multiple sample ads to the database
   static Future<bool> addSampleAds() async {
-    print(
-      'addSampleAds method is deprecated. Use fetchAds to retrieve ads from the database.',
-    );
-    return false;
+    try {
+      print('Adding sample ads to database...');
+
+      final sampleAds = [
+        {
+          'id': '1',
+          'image_url': 'sample_ad_1.jpg',
+          'created_at': DateTime.now().toIso8601String(),
+          'storage_bucket': 'img',
+          'storage_path': 'sample_ad_1.jpg',
+        },
+        {
+          'id': '2',
+          'image_url': 'sample_ad_2.jpg',
+          'created_at': DateTime.now().toIso8601String(),
+          'storage_bucket': 'img',
+          'storage_path': 'sample_ad_2.jpg',
+        },
+      ];
+
+      for (final ad in sampleAds) {
+        await _supabase.from('ads').insert(ad);
+        print('Added sample ad: ${ad['id']}');
+      }
+
+      print('Successfully added ${sampleAds.length} sample ads');
+      return true;
+    } catch (e) {
+      print('Error adding sample ads: $e');
+      return false;
+    }
   }
 
   /// Check if ads table has any data
   static Future<bool> hasAds() async {
     try {
+      print('Checking if ads table has data...');
       final response = await _supabase.from('ads').select('id').limit(1);
 
       final hasData = response.isNotEmpty;
       print('Ads table has data: $hasData');
+      print('Response: $response');
       return hasData;
     } catch (e) {
       print('Error checking ads table: $e');
+      return false;
+    }
+  }
+
+  /// Check if ads table exists and is accessible
+  static Future<bool> tableExists() async {
+    try {
+      print('Checking if ads table exists...');
+      final response = await _supabase.from('ads').select('count').limit(1);
+      print('Table exists and is accessible');
+      return true;
+    } catch (e) {
+      print('Error accessing ads table: $e');
       return false;
     }
   }

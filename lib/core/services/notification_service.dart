@@ -27,9 +27,17 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
-  Future<void> init() async {
+  Future<bool> init() async {
     // Ensure Firebase is initialized before using messaging
-    await Firebase.initializeApp();
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+    } catch (e) {
+      // If Firebase isn't configured for this platform, skip notifications gracefully
+      print('NotificationService init skipped: Firebase not available: $e');
+      return false;
+    }
     // initialize FirebaseMessaging instance after Firebase is ready
     _fm = FirebaseMessaging.instance;
 
@@ -54,8 +62,7 @@ class NotificationService {
 
     await _local
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(androidChannel);
 
     // Initialize timezone data for scheduled reminders. We avoid using the
@@ -69,7 +76,14 @@ class NotificationService {
     }
 
     // Background handler registration
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+    } catch (e) {
+      // ignore on platforms that don't support background handlers
+      print('NotificationService - background handler registration failed: $e');
+    }
 
     // Request permissions and get token
     await _requestPermissions();
@@ -94,6 +108,7 @@ class NotificationService {
       print('NotificationService - onMessageOpenedApp: ${message.data}');
       // TODO: navigate to specific screen using message.data
     });
+    return true;
   }
 
   Future<void> _requestPermissions() async {
@@ -212,8 +227,8 @@ class NotificationService {
     );
     // Use a time-based id so multiple notifications don't replace each other.
     final int notifId = DateTime.now().millisecondsSinceEpoch.remainder(
-      1 << 31,
-    );
+          1 << 31,
+        );
     await _local.show(
       notifId,
       notification.title,

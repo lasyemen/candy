@@ -1,4 +1,4 @@
-part of '../main_screen.dart';
+part of main_screen;
 
 mixin MainScreenFunctions on State<MainScreen> {
   // Currently the main navigation logic is cohesive in state. This placeholder

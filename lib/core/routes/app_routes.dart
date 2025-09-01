@@ -32,6 +32,8 @@ class AppRoutes {
   static const String paymentMethods = '/payment-methods';
   static const String thankYou = '/thank-you';
   static const String reminderSettings = '/reminder-settings';
+  static const String fullMap = '/full-map';
+  static const String orderTracking = '/order-tracking';
 
   /// Get all routes for the application
   static Map<String, WidgetBuilder> getRoutes() {
@@ -110,6 +112,14 @@ class AppRoutes {
       },
       // Reminder settings
       reminderSettings: (context) => const ReminderSettingsScreen(),
+      fullMap: (context) => const FullMapScreen(),
+      orderTracking: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final orderId = (args?['orderId'] ?? args?['id'] ?? '').toString();
+        final userLat = (args?['userLat'] as num?)?.toDouble();
+        final userLng = (args?['userLng'] as num?)?.toDouble();
+        return LiveOrderTrackingScreen(orderId: orderId, userLat: userLat, userLng: userLng);
+      },
 
       // Product Routes
       productDetails: (context) {

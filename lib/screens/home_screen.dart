@@ -10,6 +10,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
+import '../core/constants/translations.dart';
+// import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';
 import '../widgets/home/home_product_card_widget.dart';
@@ -17,8 +19,8 @@ import '../widgets/home/home_search_delegate.dart';
 import '../models/index.dart';
 import '../core/services/product_service.dart';
 import '../core/services/ads_service.dart';
+import '../core/services/cart_service.dart'; // Added import for CartService
 import '../core/utils/home_utils.dart';
-import '../core/services/cart_service.dart';
 part 'functions/home_screen.functions.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -28,11 +30,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin<HomeScreen>, HomeScreenFunctions {
   int _selectedCategory = 0;
   int _currentBanner = 0;
   late PageController _bannerController;
   Timer? _bannerTimer;
+  Timer? _refreshTimer;
   List<Products> _products = [];
   List<Ads> _ads = [];
   bool _isLoading = true;
@@ -41,22 +45,26 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> get _banners {
     print('Current ads count: ${_ads.length}'); // Debug log
     print('Ads list: $_ads'); // Debug: show the actual ads list
+    final String lang = Provider.of<AppSettings>(
+      context,
+      listen: false,
+    ).currentLanguage;
 
     if (_ads.isEmpty) {
       print('No ads loaded, showing fallback banners');
       // Fallback banners if no ads are loaded
       return [
         {
-          'title': 'عرض خاص!',
-          'subtitle': 'احصل على خصم ٢٠٪ على جميع منتجات كاندي',
+          'title': AppTranslations.getText('special_offer', lang),
+          'subtitle': AppTranslations.getText('discount_20_all', lang),
           'image': 'https://picsum.photos/400/200?random=fallback1',
           'color': const Color(0xFF6B46C1),
           'gradient': DesignSystem.primaryGradient,
           'icon': Icons.local_offer,
         },
         {
-          'title': 'توصيل مجاني',
-          'subtitle': 'للطلبات التي تزيد عن ٥٠ ريال',
+          'title': AppTranslations.getText('free_delivery', lang),
+          'subtitle': AppTranslations.getText('free_delivery_over_50', lang),
           'image': 'https://picsum.photos/400/200?random=fallback2',
           'color': const Color(0xFF6B46C1),
           'gradient': DesignSystem.primaryGradient,
@@ -70,9 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return _ads.map((ad) {
       print('Processing ad: ID=${ad.id}, ImageURL=${ad.imageUrl}');
       return {
-        'title': 'إعلان كاندي',
-        'subtitle': 'عرض خاص من كاندي',
-        'image': ad.imageUrl,
+        'title': AppTranslations.getText('candy_ad', lang),
+        'subtitle': AppTranslations.getText('candy_offer', lang),
+        'imageUrl': ad.imageUrl, // Use imageUrl key to match banner widget
         'color': const Color(0xFF6B46C1),
         'gradient': DesignSystem.primaryGradient,
         'icon': Icons.local_offer,
@@ -81,15 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  final List<String> _categories = [
-    'الكل',
-    '330 مل',
-    '200 مل',
-    '500 مل',
-    '1 لتر',
-    'معدنية',
-    'غازية',
-  ];
+  final List<String> _categories = ['All', '330 ml', '200 ml', '500 ml', '1 L'];
 
   @override
   void initState() {
@@ -101,309 +101,132 @@ class _HomeScreenState extends State<HomeScreen> {
         _bannerController.animateToPage(
           next,
           duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+          curve: Curves.easeInOut,
         );
+        setState(() {
+          _currentBanner = next;
+        });
       }
     });
-    _loadProducts();
-    _loadAds();
+
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (mounted) {
+        _loadProducts(showLoading: false);
+        _loadAds();
+      }
+    });
+
+    // Test cart functionality on startup
+    _testCartFunctionality();
+
+    // Test database connection
+    ProductService.checkProductsTable();
+    ProductService.testDatabaseAccess();
+    ProductService.showCurrentProducts();
+
+    // Force populate products
+    ProductService.forcePopulateProducts();
+
+    // Test single product addition
+    ProductService.addSingleTestProduct();
+
+    // Load data with mounted checks
+    if (mounted) {
+      _loadProducts();
+      _loadAds();
+    }
+  }
+
+  // Test cart functionality
+  Future<void> _testCartFunctionality() async {
+    try {
+      print('HomeScreen - Cart functionality is ready');
+    } catch (e) {
+      print('HomeScreen - Cart functionality test failed: $e');
+    }
   }
 
   @override
   void dispose() {
     _bannerController.dispose();
     _bannerTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
+  @override
+  bool get wantKeepAlive => true;
 
-      final products = await ProductService.fetchProducts();
+  // Background refresh method that doesn't show loading
+  // ignore: unused_element
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      print('Loaded ${products.length} products from database');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      if (mounted) {
-        setState(() {
-          _products = products;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في تحميل المنتجات: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  // Moved to mixin in functions/home_screen.functions.dart
 
-    // If no products loaded and no error, show empty state
-    if (mounted && _products.isEmpty && !_isLoading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لا يوجد منتجات في قاعدة البيانات'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
+  // Moved to mixin in functions/home_screen.functions.dart
 
-  Future<void> _loadAds() async {
-    try {
-      print('Loading ads from database...');
-      setState(() {
-        _isLoadingAds = true;
-      });
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      final ads = await AdsService.fetchAds();
-      print('Loaded ${ads.length} ads from database');
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      if (mounted) {
-        setState(() {
-          _ads = ads;
-          _isLoadingAds = false;
-        });
-      }
+  // Moved to mixin in functions/home_screen.functions.dart
 
-      print('Ads state updated, total ads: ${_ads.length}');
-
-      // Display ads information
-      if (_ads.isNotEmpty) {
-        print('=== DATABASE ADS INFORMATION ===');
-        for (int i = 0; i < _ads.length; i++) {
-          final ad = _ads[i];
-          print('Ad ${i + 1}:');
-          print('  ID: ${ad.id}');
-          print('  Image URL: ${ad.imageUrl}');
-          print('  Created: ${ad.createdAt}');
-          print('  Will be displayed as banner');
-          print('---');
-        }
-      } else {
-        print('No ads found in database - showing fallback banners');
-      }
-    } catch (e) {
-      print('Error loading ads from database: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingAds = false;
-        });
-      }
-    }
-  }
-
-  List<Products> _getProducts(String language) {
-    // Return products from Supabase only
-    return _products;
-  }
-
-  List<Products> _getFilteredProducts(String language) {
-    final products = _getProducts(language);
-    if (_selectedCategory == 0) return products;
-    final cat = _categories[_selectedCategory];
-    return products.where((p) => p.name.contains(cat)).toList();
-  }
-
-  void _addToCart(Products product) {
-    final appBloc = context.read<AppBloc>();
-
-    // Add haptic feedback
-    HapticFeedback.lightImpact();
-
-    // Add product to cart
-    appBloc.add(AddToCartEvent(product));
-
-    // Show success message with enhanced design at top
-    final overlay = Overlay.of(context);
-    late final OverlayEntry overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
-        right: 16,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: DesignSystem.primaryGradient,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Animate(
-                      effects: const [
-                        ScaleEffect(
-                          duration: Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                        ),
-                        ShakeEffect(
-                          duration: Duration(milliseconds: 300),
-                          hz: 3,
-                        ),
-                      ],
-                      child: Icon(
-                        FontAwesomeIcons.cartShopping,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'تم إضافة المنتج للسلة',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          product.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.9),
-                            fontFamily: 'Rubik',
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          product.price.toStringAsFixed(2),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Rubik',
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const RiyalIcon(size: 12, color: Colors.white),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {
-                      overlayEntry.remove();
-                      appBloc.add(SetCurrentIndexEvent(3)); // Cart is index 3
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'عرض السلة',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          fontFamily: 'Rubik',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    // Remove the overlay after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
-  }
+  // Moved to mixin in functions/home_screen.functions.dart
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Consumer<AppSettings>(
       builder: (context, appSettings, child) {
         final lang = appSettings.currentLanguage;
         final products = _getFilteredProducts(lang);
 
         return Scaffold(
-          backgroundColor: Colors.grey[50],
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
-            centerTitle: true,
-            title: ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return DesignSystem.getBrandGradient(
-                  'primary',
-                ).createShader(bounds);
+            centerTitle: false,
+            automaticallyImplyLeading: false,
+            title: Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                if (isDark) {
+                  return Text(
+                    AppTranslations.getText('app_name', lang),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontFamily: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.fontFamily,
+                    ),
+                  );
+                } else {
+                  return ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return DesignSystem.getBrandGradient(
+                        'primary',
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.srcIn,
+                    child: Text(
+                      AppTranslations.getText('app_name', lang),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: Colors.white,
+                        fontFamily: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.fontFamily,
+                      ),
+                    ),
+                  );
+                }
               },
-              blendMode: BlendMode.srcIn,
-              child: const Text(
-                'مياه كاندي',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Colors.white,
-                  fontFamily: 'Rubik',
-                ),
-              ),
             ),
             actions: [
               IconButton(
@@ -421,17 +244,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           body: CustomScrollView(
+            key: const PageStorageKey<String>('home_scroll'),
             physics: const BouncingScrollPhysics(),
             slivers: [
               // Banner carousel
               SliverToBoxAdapter(
                 child: Container(
-                  height: 320,
+                  height: 230,
                   margin: const EdgeInsets.only(
                     left: 8,
                     right: 8,
                     top: 8,
-                    bottom: 32,
+                    bottom: 24,
                   ),
                   child: Stack(
                     alignment: Alignment.bottomCenter,
@@ -489,11 +313,8 @@ class _HomeScreenState extends State<HomeScreen> {
               // Categories
               SliverToBoxAdapter(
                 child: Container(
-                  height: 36,
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 14,
-                  ),
+                  height: 0,
+                  margin: EdgeInsets.zero,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     scrollDirection: Axis.horizontal,
@@ -528,8 +349,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         setState(() => _selectedCategory = idx),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
+                                        horizontal: 10,
+                                        vertical: 4,
                                       ),
                                       child: Text(
                                         _categories[idx],
@@ -558,7 +379,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Container(
                                   margin: const EdgeInsets.all(1),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1A1A1A)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                   child: Material(
@@ -568,38 +393,45 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onTap: () => setState(
                                         () => _selectedCategory = idx,
                                       ),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        child: ShaderMask(
-                                          shaderCallback: (Rect bounds) {
-                                            return const LinearGradient(
-                                              colors: [
-                                                Color.fromARGB(
-                                                  255,
-                                                  179,
-                                                  58,
-                                                  255,
+                                      child:
+                                          (Theme.of(context).brightness ==
+                                              Brightness.dark)
+                                          ? Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                _categories[idx],
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
                                                 ),
-                                                Color.fromARGB(255, 23, 6, 212),
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ).createShader(bounds);
-                                          },
-                                          blendMode: BlendMode.srcIn,
-                                          child: Text(
-                                            _categories[idx],
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
+                                              ),
+                                            )
+                                          : Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                _categories[idx],
+                                                style: TextStyle(
+                                                  color:
+                                                      Theme.of(
+                                                            context,
+                                                          ).brightness ==
+                                                          Brightness.dark
+                                                      ? Colors.white
+                                                      : DesignSystem.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                      ),
                                     ),
                                   ),
                                 ),
@@ -609,20 +441,146 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              // Extra space between categories and title (removed)
+              const SliverToBoxAdapter(child: SizedBox.shrink()),
               // Toggle view label
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
-                    children: const [
+                    children: [
                       Text(
-                        'المنتجات',
+                        AppTranslations.getText('products_title', lang),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : null,
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              // Categories under title
+              SliverToBoxAdapter(
+                child: Container(
+                  height: 32,
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 14,
+                  ),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (context, idx) {
+                      final isSelected = _selectedCategory == idx;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        child: isSelected
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: DesignSystem.getBrandShadow(
+                                    'medium',
+                                  ),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          _categories[idx],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 179, 58, 255),
+                                      Color.fromARGB(255, 23, 6, 212),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFF1A1A1A)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () => setState(
+                                        () => _selectedCategory = idx,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          _categories[idx],
+                                          style: TextStyle(
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? Colors.white
+                                                : DesignSystem.primary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -646,16 +604,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withOpacity(0.3)),
                   ),
                   child: Row(
-                    children: const [
-                      Icon(Icons.info_outline, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        'الاسعار شاملة ضريبة القيمة المضافة',
-                        style: TextStyle(
+                        AppTranslations.getText('prices_include_vat', lang),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
@@ -682,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'جاري تحميل المنتجات...',
+                                AppTranslations.getText('loading', lang),
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 16,
@@ -704,9 +666,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 size: 40,
                               ),
                               const SizedBox(height: 14),
-                              const Text(
-                                "لا يوجد منتجات متاحة حالياً.",
-                                style: TextStyle(
+                              Text(
+                                AppTranslations.getText('no_products', lang),
+                                style: const TextStyle(
                                   color: Color(0xFF6B46C1),
                                   fontSize: 16,
                                 ),
@@ -745,123 +707,5 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
-  Widget _buildBannerItem(Map<String, dynamic> banner) {
-    final imageUrl = banner['image'] as String;
-    print('Building banner with image: $imageUrl');
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(35),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 40,
-            offset: const Offset(0, 16),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(35)),
-        clipBehavior: Clip.antiAlias,
-        child: _buildBannerBackgroundImage(imageUrl),
-      ),
-    );
-  }
-
-  Widget _buildBannerBackgroundImage(String imageUrl) {
-    print('Building background image with URL: $imageUrl');
-
-    // Check if it's a network image (starts with http or https)
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      print('Loading network image: $imageUrl');
-      return Image.network(
-        imageUrl,
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          print('Error loading network background image: $error');
-          // Fallback to local asset if network fails
-          return Image.asset(
-            'assets/icon/iconApp.png',
-            width: double.infinity,
-            height: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, assetError, stackTrace) {
-              print('Error loading fallback asset image: $assetError');
-              return Container(
-                width: double.infinity,
-                height: double.infinity,
-                color: Colors.grey[300],
-                child: Center(
-                  child: Icon(
-                    Icons.image_not_supported,
-                    size: 60,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            print('Network image loaded successfully');
-            return child;
-          }
-          print(
-            'Loading network image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}',
-          );
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey[200],
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                    : null,
-                strokeWidth: 3,
-                color: Colors.grey[600],
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      // Local asset image
-      print('Loading asset image: $imageUrl');
-      return Image.asset(
-        imageUrl,
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          print('Error loading asset background image: $error');
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey[300],
-            child: Center(
-              child: Icon(
-                Icons.image_not_supported,
-                size: 60,
-                color: Colors.grey[600],
-              ),
-            ),
-          );
-        },
-      );
-    }
-  }
+ // Moved to mixin in functions/home_screen.functions.dart
 }

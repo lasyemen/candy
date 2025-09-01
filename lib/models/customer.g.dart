@@ -19,6 +19,8 @@ Customer _$CustomerFromJson(Map<String, dynamic> json) => Customer(
       totalSpent: (json['total_spent'] as num).toDouble(),
       ordersCount: (json['orders_count'] as num).toInt(),
       rating: (json['rating'] as num).toDouble(),
+  lat: (json['lat'] as num?)?.toDouble(),
+  lng: (json['lng'] as num?)?.toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -34,6 +36,8 @@ Map<String, dynamic> _$CustomerToJson(Customer instance) => <String, dynamic>{
       'total_spent': instance.totalSpent,
       'orders_count': instance.ordersCount,
       'rating': instance.rating,
+  'lat': instance.lat,
+  'lng': instance.lng,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
     };

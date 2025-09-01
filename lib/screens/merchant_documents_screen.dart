@@ -1,10 +1,13 @@
+// lib/screens/merchant_documents_screen.dart
 library merchant_documents_screen;
 
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+import '../core/services/merchant_service.dart';
 import '../core/constants/design_system.dart';
 import '../core/routes/index.dart';
+import '../utils/document_picker.dart';
+import '../widgets/merchant/document_card.dart';
 part 'functions/merchant_documents_screen.functions.dart';
 
 class MerchantDocumentsScreen extends StatefulWidget {
@@ -18,7 +21,7 @@ class MerchantDocumentsScreen extends StatefulWidget {
 }
 
 class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, MerchantDocumentsScreenFunctions {
   bool _isLoading = false;
   final Map<String, bool> _uploadedDocuments = {
     'commercial_register': false,
@@ -72,237 +75,38 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
 
   Future<void> _pickDocument(String documentType) async {
     try {
-      // Show options dialog
-      final String? choice = await showDialog<String>(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            backgroundColor: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF121212)
-                : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 40,
-              vertical: 80,
-            ),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    gradient: DesignSystem.primaryGradient,
-                  ),
-                  child: Icon(Icons.upload_file, color: Colors.white, size: 16),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'اختر طريقة الرفع',
-                  style: TextStyle(
-                    fontFamily: 'Rubik',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xFF1A1A1A)
-                        : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        leading: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            gradient: DesignSystem.primaryGradient,
-                          ),
-                          child: Icon(
-                            Icons.image,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                        title: Text(
-                          'معرض الصور',
-                          style: TextStyle(
-                            fontFamily: 'Rubik',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.black87,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'اختر صورة من المعرض',
-                          style: TextStyle(
-                            fontFamily: 'Rubik',
-                            fontSize: 11,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white70
-                                : Colors.grey[600],
-                          ),
-                        ),
-                        onTap: () => Navigator.pop(context, 'gallery'),
-                      ),
-                      Divider(height: 1, color: Colors.grey[200]),
-                      ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        leading: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            gradient: DesignSystem.primaryGradient,
-                          ),
-                          child: Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                        title: Text(
-                          'الكاميرا',
-                          style: TextStyle(
-                            fontFamily: 'Rubik',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.black87,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'التقاط صورة جديدة',
-                          style: TextStyle(
-                            fontFamily: 'Rubik',
-                            fontSize: 11,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white70
-                                : Colors.grey[600],
-                          ),
-                        ),
-                        onTap: () => Navigator.pop(context, 'camera'),
-                      ),
-                      Divider(height: 1, color: Colors.grey[200]),
-                      ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        leading: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            gradient: DesignSystem.primaryGradient,
-                          ),
-                          child: Icon(
-                            Icons.folder,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                        title: Text(
-                          'الملفات',
-                          style: TextStyle(
-                            fontFamily: 'Rubik',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.black87,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'اختر ملف من الجهاز',
-                          style: TextStyle(
-                            fontFamily: 'Rubik',
-                            fontSize: 11,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white70
-                                : Colors.grey[600],
-                          ),
-                        ),
-                        onTap: () => Navigator.pop(context, 'files'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'إلغاء',
-                  style: TextStyle(
-                    fontFamily: 'Rubik',
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.grey[600],
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      debugPrint('[MerchantDocuments] Start pick → docType=$documentType');
+      final result = await DocumentPicker.pickViaDialog(context);
+      if (result == null) {
+        debugPrint('[MerchantDocuments] Picker dismissed');
+        return;
+      }
+      final String? fileName = result.fileName;
+      final String? localPath = result.localPath;
+      final Uint8List? bytes = result.bytes;
+      debugPrint(
+        '[MerchantDocuments] Pick result → fileName=${fileName ?? 'null'}, path=${localPath ?? 'null'}, bytes=${bytes?.lengthInBytes ?? 0}',
       );
 
-      if (choice == null) return;
-
-      String? fileName;
-      if (choice == 'gallery') {
-        final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(
-          source: ImageSource.gallery,
-        );
-        if (image != null) {
-          fileName = image.name;
-        }
-      } else if (choice == 'camera') {
-        final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(source: ImageSource.camera);
-        if (image != null) {
-          fileName = image.name;
-        }
-      } else if (choice == 'files') {
-        FilePickerResult? result = await FilePicker.platform.pickFiles();
-        if (result != null) {
-          fileName = result.files.first.name;
-        }
-      }
-
       if (fileName != null) {
+        // Upload to Supabase storage + upsert metadata
+        final String merchantId = (widget.merchantData['merchantId'] ?? '')
+            .toString();
+        if (merchantId.isEmpty) {
+          throw Exception('merchantId is missing');
+        }
+
+        debugPrint(
+          '[MerchantDocuments] Uploading → merchantId=$merchantId, docType=$documentType',
+        );
+        await MerchantService.instance.upsertDocument(
+          merchantId: merchantId,
+          docType: documentType,
+          // Use fileName for mime inference if no path; pass bytes for robust uploads
+          localFilePath: (localPath ?? fileName),
+          bytes: bytes,
+        );
+
         setState(() {
           _uploadedDocuments[documentType] = true;
           _documentNames[documentType] = fileName;
@@ -330,6 +134,7 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
         );
       }
     } catch (e) {
+      debugPrint('[MerchantDocuments][ERROR] $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -455,7 +260,7 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
 
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 2));
+    // No-op: already uploaded while selecting each document
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -475,90 +280,14 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
   ) {
     final isUploaded = _uploadedDocuments[documentType]!;
     final fileName = _documentNames[documentType] ?? '';
-
-    return GestureDetector(
+    return DocumentCard(
+      title: title,
+      subtitle: subtitle,
+      isUploaded: isUploaded,
+      fileName: fileName,
       onTap: () => isUploaded
           ? _deleteDocument(documentType)
           : _pickDocument(documentType),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.green[50],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green[200]!),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                gradient: isUploaded
-                    ? LinearGradient(
-                        colors: [Colors.green[400]!, Colors.green[600]!],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : LinearGradient(
-                        colors: [Colors.grey[400]!, Colors.grey[600]!],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-              ),
-              child: Icon(
-                isUploaded ? Icons.check : Icons.upload_file,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontFamily: 'Rubik',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isUploaded ? 'تم الرفع بنجاح' : subtitle,
-                    style: TextStyle(
-                      fontFamily: 'Rubik',
-                      fontSize: 11,
-                      color: isUploaded ? Colors.green[600] : Colors.grey[600],
-                    ),
-                  ),
-                  if (isUploaded && fileName.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      fileName,
-                      style: const TextStyle(
-                        fontFamily: 'Rubik',
-                        fontSize: 10,
-                        color: Colors.grey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Icon(
-              isUploaded ? Icons.delete_outline : Icons.add,
-              color: isUploaded ? Colors.red[600] : Colors.grey[600],
-              size: 16,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -691,10 +420,8 @@ class _MerchantDocumentsScreenState extends State<MerchantDocumentsScreen>
                     Text(
                       'رفع المستندات المطلوبة\nلإكمال التسجيل',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Rubik',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontSize: 20,
-                        color: Colors.black87,
                         height: 1.8,
                       ),
                     ),

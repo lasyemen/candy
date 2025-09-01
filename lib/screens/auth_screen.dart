@@ -1,3 +1,4 @@
+// lib/screens/auth_screen.dart
 library auth_screen;
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen> with AuthScreenFunctions {
   @override
   Widget build(BuildContext context) {
     return Scaffold(

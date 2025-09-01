@@ -1,4 +1,4 @@
-part of '../test_checkout_screen.dart';
+part of test_checkout_screen;
 
 mixin TestCheckoutScreenFunctions on State<TestCheckoutScreen> {
   List<Map<String, dynamic>> vouchers = const [];

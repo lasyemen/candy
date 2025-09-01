@@ -1,3 +1,4 @@
+// lib/screens/guest_user_input_screen.dart
 library guest_user_input_screen;
 
 import 'package:flutter/material.dart';
@@ -20,7 +21,7 @@ class GuestUserInputScreen extends StatefulWidget {
 }
 
 class _GuestUserInputScreenState extends State<GuestUserInputScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, GuestUserInputScreenFunctions {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();

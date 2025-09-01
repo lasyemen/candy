@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'blocs/app_bloc.dart';
 import 'core/services/app_settings.dart';
 import 'core/services/supabase_service.dart';
@@ -16,6 +17,13 @@ import 'core/services/auto_translator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ensure Firebase is initialized before any background services use it
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    // Log but do not block app startup; services will retry/log their own errors
+    print('main: Firebase initialization error: $e');
+  }
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -39,11 +47,11 @@ void main() async {
 
     try {
       // Initialize Firebase Messaging and local notifications (fire-and-forget)
-      await NotificationService.instance.init();
+      final notificationsReady = await NotificationService.instance.init();
       print('background init: NotificationService started');
 
       // Debug: schedule a one-minute test reminder so you can verify notifications
-      if (kDebugMode) {
+      if (notificationsReady && kDebugMode) {
         try {
           // schedule a quick test ~1 minute from now
           await NotificationService.instance.scheduleHourlyReminder(

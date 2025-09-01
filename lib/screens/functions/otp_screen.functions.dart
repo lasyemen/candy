@@ -1,4 +1,4 @@
-part of '../otp_screen.dart';
+part of otp_screen;
 
 mixin OtpScreenFunctions on State<OtpScreen> {
   Future<void> _sendOtp() async {
