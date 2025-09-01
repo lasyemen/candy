@@ -112,7 +112,13 @@ class AppRoutes {
       },
       // Reminder settings
       reminderSettings: (context) => const ReminderSettingsScreen(),
-      fullMap: (context) => const FullMapScreen(),
+      fullMap: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final initialLat = (args?['initialLat'] as num?)?.toDouble();
+        final initialLng = (args?['initialLng'] as num?)?.toDouble();
+        final isEditing = args?['isEditing'] == true;
+        return FullMapScreen(initialLat: initialLat, initialLng: initialLng, isEditing: isEditing);
+      },
       orderTracking: (context) {
         final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         final orderId = (args?['orderId'] ?? args?['id'] ?? '').toString();

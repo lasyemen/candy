@@ -12,7 +12,10 @@ import '../core/services/supabase_service.dart';
 import '../models/customer.dart';
 
 class FullMapScreen extends StatefulWidget {
-  const FullMapScreen({super.key});
+  final double? initialLat;
+  final double? initialLng;
+  final bool isEditing;
+  const FullMapScreen({super.key, this.initialLat, this.initialLng, this.isEditing = false});
 
   @override
   State<FullMapScreen> createState() => _FullMapScreenState();
@@ -21,6 +24,7 @@ class FullMapScreen extends StatefulWidget {
 class _FullMapScreenState extends State<FullMapScreen> {
   mb.MapboxMap? _mapboxMap;
   bool _locating = false;
+  bool _saving = false;
   mb.PointAnnotationManager? _pointAnnotationManager;
   mb.PointAnnotation? _selectedAnnotation;
   mb.Position? _selectedPosition;
@@ -39,12 +43,27 @@ class _FullMapScreenState extends State<FullMapScreen> {
       _pointAnnotationManager = manager;
     });
     // Ensure camera is centered once the map is ready
-    mapboxMap.setCamera(
-      mb.CameraOptions(
-        center: mb.Point(coordinates: mb.Position(46.6753, 24.7136)),
-        zoom: 12.0,
-      ),
-    );
+    final initLng = widget.initialLng;
+    final initLat = widget.initialLat;
+    if (initLat != null && initLng != null) {
+      // Center on provided coordinates and pre-place a pin
+      final pos = mb.Position(initLng, initLat);
+      _selectedPosition = pos;
+      mapboxMap.setCamera(
+        mb.CameraOptions(
+          center: mb.Point(coordinates: pos),
+          zoom: 16.0,
+        ),
+      );
+      _placePinAt(pos);
+    } else {
+      mapboxMap.setCamera(
+        mb.CameraOptions(
+          center: mb.Point(coordinates: mb.Position(46.6753, 24.7136)),
+          zoom: 12.0,
+        ),
+      );
+    }
 
     // Move Mapbox scale bar down so it doesn't overlap the phone app bar
     try {
@@ -86,8 +105,12 @@ class _FullMapScreenState extends State<FullMapScreen> {
           mb.MapWidget(
             key: const ValueKey('full_map'),
             cameraOptions: mb.CameraOptions(
-              center: mb.Point(coordinates: mb.Position(46.6753, 24.7136)),
-              zoom: 10.0,
+              center: mb.Point(
+                coordinates: widget.initialLat != null && widget.initialLng != null
+                    ? mb.Position(widget.initialLng!, widget.initialLat!)
+                    : mb.Position(46.6753, 24.7136),
+              ),
+              zoom: widget.initialLat != null && widget.initialLng != null ? 16.0 : 10.0,
             ),
             styleUri: MapboxConstants.styleUri,
             onMapCreated: _onMapCreated,
@@ -163,7 +186,7 @@ class _FullMapScreenState extends State<FullMapScreen> {
                 ],
               ),
               child: ElevatedButton(
-                onPressed: _handleSave,
+                onPressed: _saving ? null : _handleSave,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   elevation: 0,
@@ -171,10 +194,19 @@ class _FullMapScreenState extends State<FullMapScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'حفظ الموقع',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                          strokeWidth: 2.2,
+                        ),
+                      )
+                    : Text(
+                        widget.isEditing ? 'تحديث الموقع' : 'حفظ الموقع',
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                      ),
               ),
             ),
           ),
@@ -237,6 +269,7 @@ class _FullMapScreenState extends State<FullMapScreen> {
   Future<void> _handleSave() async {
     if (_mapboxMap == null) return;
     try {
+      setState(() => _saving = true);
       final pos =
           _selectedPosition ??
           (await _mapboxMap!.getCameraState()).center.coordinates;
@@ -255,6 +288,15 @@ class _FullMapScreenState extends State<FullMapScreen> {
               'updated_at': DateTime.now().toIso8601String(),
             },
           );
+          // Verify persisted values
+          final updatedRow =
+              await SupabaseService.instance.fetchById('customers', id);
+          final savedLat = (updatedRow?['lat'] as num?)?.toDouble();
+          final savedLng = (updatedRow?['lng'] as num?)?.toDouble();
+          final persisted = savedLat == lat && savedLng == lng;
+          if (!persisted) {
+            throw Exception('لم يتم تحديث الموقع في قاعدة البيانات');
+          }
           // Update local session model
           final current = CustomerSession.instance.currentCustomer;
           if (current != null) {
@@ -277,15 +319,32 @@ class _FullMapScreenState extends State<FullMapScreen> {
               ),
             );
           }
+      if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.isEditing ? 'تم تحديث الموقع بنجاح' : 'تم حفظ الموقع بنجاح')),
+            );
+          }
+        }
+      } else {
+        // Guest user: just inform and return coords
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم تحديد الموقع')),
+          );
         }
       }
       if (!mounted) return;
+      // Give the user a brief moment to see the snackbar
+      await Future.delayed(const Duration(milliseconds: 600));
       Navigator.of(context).pop({'lat': lat, 'lng': lng});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('تعذر حفظ الموقع: $e')));
+  ).showSnackBar(SnackBar(content: Text(widget.isEditing ? 'تعذر تحديث الموقع: $e' : 'تعذر حفظ الموقع: $e')));
+    }
+    finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../core/services/cart_session_manager.dart';
 import '../core/services/customer_session.dart';
 import '../core/services/supabase_service.dart';
+import '../core/services/geocoding_service.dart';
 import '../models/customer.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/design_system.dart';
@@ -30,6 +31,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
   late AnimationController _buttonAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  // ignore: unused_field
   late Animation<double> _buttonScaleAnimation;
 
   @override
@@ -320,7 +322,75 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           ),
           const SizedBox(height: 24),
 
-          // Recent / suggested addresses
+          // Saved location card (from user profile -> customers.lat/lng)
+          Builder(builder: (context) {
+            final current = CustomerSession.instance.currentCustomer;
+            final double? savedLat = current?.lat;
+            final double? savedLng = current?.lng;
+            final bool hasSaved = savedLat != null && savedLng != null;
+
+            String subtitle;
+            if (hasSaved) {
+              subtitle = 'جارِ جلب العنوان...';
+            } else {
+              subtitle = 'لم يتم حفظ موقع بعد';
+            }
+
+              Future<void> _openMapAndRefresh() async {
+              final result = await Navigator.of(context).pushNamed(
+                '/full-map',
+                arguments: hasSaved
+                    ? {
+                        'initialLat': savedLat,
+                        'initialLng': savedLng,
+                        'isEditing': true,
+                      }
+                    : null,
+              )
+                  as Map<String, dynamic>?;
+              if (result != null && mounted) {
+                setState(() {
+                  selectedDeliveryType = 'saved';
+                  final lat = result['lat'];
+                  final lng = result['lng'];
+                  _addressController.text = 'Lat: $lat, Lng: $lng';
+                });
+              } else if (mounted) {
+                setState(() {}); // trigger rebuild to reflect any session changes
+              }
+            }
+
+            return FutureBuilder<String?>(
+        future: hasSaved
+          ? GeocodingService.instance.reverseGeocode(savedLat, savedLng, language: 'ar')
+                  : Future.value(null),
+              builder: (context, snapshot) {
+                final subtitleFinal = snapshot.hasData && snapshot.data != null
+                    ? snapshot.data!
+                    : subtitle;
+                return _addressListItem(
+              id: 'saved',
+              title: 'الموقع المحفوظ',
+              subtitle: subtitleFinal,
+              onUse: _openMapAndRefresh,
+              onTap: () {
+    if (hasSaved) {
+                  setState(() {
+                    selectedDeliveryType = 'saved';
+                    _addressController.text = subtitleFinal;
+                  });
+                } else {
+                  _openMapAndRefresh();
+                }
+              },
+                );
+              },
+            );
+          }),
+
+          const SizedBox(height: 20),
+
+          // Recent / suggested addresses (static examples)
           _addressListItem(
             id: 'home',
             title: 'المنزل',
@@ -677,6 +747,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
 
   // Notes removed
 
+  // ignore: unused_element
   Widget _buildContinueButton() {
     final bool isActive = selectedDeliveryType != null;
     return AnimatedScale(
