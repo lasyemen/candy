@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
-import 'package:geolocator/geolocator.dart';
 import '../core/constants/mapbox_constants.dart';
 import '../core/constants/design_system.dart';
 import '../core/services/customer_session.dart';
 import '../core/services/supabase_service.dart';
 import '../models/customer.dart';
+import '../core/services/geocoding_service.dart';
+import '../core/services/android_search_bridge.dart';
 
 class FullMapScreen extends StatefulWidget {
   final double? initialLat;
@@ -23,12 +24,18 @@ class FullMapScreen extends StatefulWidget {
 
 class _FullMapScreenState extends State<FullMapScreen> {
   mb.MapboxMap? _mapboxMap;
-  bool _locating = false;
   bool _saving = false;
   mb.PointAnnotationManager? _pointAnnotationManager;
   mb.PointAnnotation? _selectedAnnotation;
   mb.Position? _selectedPosition;
   Uint8List? _pinImageBytes;
+  // Search state
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  // We’ll hold both searchbox and geocoder results in a common display model
+  List<_UiSuggestion> _searchResults = const [];
+  bool _searchLoading = false;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -89,11 +96,7 @@ class _FullMapScreenState extends State<FullMapScreen> {
     showAccuracyRing: false,
       ),
     );
-  }
 
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   @override
@@ -114,58 +117,135 @@ class _FullMapScreenState extends State<FullMapScreen> {
             ),
             styleUri: MapboxConstants.styleUri,
             onMapCreated: _onMapCreated,
+            // Tap anywhere to place/move the pin
+            onTapListener: (mb.MapContentGestureContext ctx) async {
+              final pos = ctx.point.coordinates;
+              _selectedPosition = pos;
+              await _placePinAt(pos);
+            },
           ),
 
-          // Title overlay (top-center), semi-transparent grey container
+          // Top bar: title + search in the same line
           Positioned(
             top: 36,
-            left: 0,
-            right: 0,
+            left: 16,
+            right: 16,
             child: SafeArea(
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.38),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'تحديد الموقع',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Rubik',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        shadows: [
+                          Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+                        ],
+                      ),
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.38),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'تحديد الموقع',
-                    style: TextStyle(
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: Material(
                       color: Colors.white,
-                      fontFamily: 'Rubik',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black54,
-                          blurRadius: 6,
-                          offset: Offset(0, 1),
+                      elevation: 2,
+                      borderRadius: BorderRadius.circular(28),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search, color: Colors.black54),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchCtrl,
+                                focusNode: _searchFocus,
+                                textDirection: TextDirection.rtl,
+                                decoration: const InputDecoration(
+                                  hintText: 'ابحث عن شارع أو مكان...',
+                                  border: InputBorder.none,
+                                ),
+                                onChanged: _onSearchChanged,
+                              ),
+                            ),
+                            if (_searchLoading)
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            if (_searchLoading) const SizedBox(width: 8),
+                            if (_searchCtrl.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: _clearSearch,
+                              )
+                          ],
                         ),
-                      ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Search suggestions dropdown
+          if (_searchResults.isNotEmpty)
+            Positioned(
+              top: 88,
+              left: 16,
+              right: 16,
+              child: SafeArea(
+                child: Material(
+                  color: Colors.white,
+                  elevation: 3,
+                  borderRadius: BorderRadius.circular(12),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shrinkWrap: true,
+                      itemCount: _searchResults.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final r = _searchResults[index];
+                        return ListTile(
+                          dense: true,
+                          title: Text(r.title, textDirection: TextDirection.rtl),
+                          subtitle: r.subtitle != null
+                              ? Text(
+                                  r.subtitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textDirection: TextDirection.rtl,
+                                )
+                              : null,
+                          onTap: () => _onSuggestionTap(r),
+                        );
+                      },
                     ),
                   ),
                 ),
               ),
             ),
-          ),
 
           // Note: No centered overlay pin; we use a map annotation anchored to coordinates
-
-      // Locate-me button (bottom-right, above save)
-          Positioned(
-            right: 16,
-            bottom: 92, // save button (52) + 24 margin + 16 gap
-            child: SafeArea(
-              child: _LocateButton(
-        locating: _locating,
-        onPressed: _handleLocateOnce,
-              ),
-            ),
-          ),
 
           // Save button (bottom full-width, gradient)
           Positioned(
@@ -210,61 +290,32 @@ class _FullMapScreenState extends State<FullMapScreen> {
               ),
             ),
           ),
+
+          // Delete address button (visible in edit mode)
+          if (widget.isEditing && CustomerSession.instance.isLoggedIn)
+            Positioned(
+              left: 16,
+              bottom: 92,
+              child: SafeArea(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade700,
+                    side: BorderSide(color: Colors.red.shade300),
+                  ),
+                  onPressed: _handleDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('حذف العنوان'),
+                ),
+              ),
+            ),
+
+          // No extra buttons; tap anywhere to drop the pin
         ],
       ),
     );
   }
 
-  Future<void> _handleLocateOnce() async {
-    if (_mapboxMap == null) return;
-    setState(() => _locating = true);
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
-        await Geolocator.openAppSettings();
-        throw Exception('تم رفض إذن الموقع');
-      }
-
-      // Ensure device location service is enabled
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        await Geolocator.openLocationSettings();
-        throw Exception('خدمة الموقع غير مفعلة');
-      }
-
-      // One-shot current position, center map only (no puck)
-  final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-  // Update selected position and place a red pin annotation at user's location
-  _selectedPosition = mb.Position(pos.longitude, pos.latitude);
-  await _placePinAt(_selectedPosition!);
-  await _centerCamera(pos.longitude, pos.latitude, zoom: 16.0);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر تحديد الموقع: $e')));
-    } finally {
-      if (mounted) setState(() => _locating = false);
-    }
-  }
-
-  Future<void> _centerCamera(double lng, double lat, {double? zoom}) async {
-    if (_mapboxMap == null) return;
-    await _mapboxMap!.setCamera(
-      mb.CameraOptions(
-        center: mb.Point(coordinates: mb.Position(lng, lat)),
-        zoom: zoom,
-      ),
-    );
-  }
+  // Center camera helper removed (not used with tap-to-drop)
 
   Future<void> _handleSave() async {
     if (_mapboxMap == null) return;
@@ -275,28 +326,99 @@ class _FullMapScreenState extends State<FullMapScreen> {
           (await _mapboxMap!.getCameraState()).center.coordinates;
   final double lat = pos.lat.toDouble();
   final double lng = pos.lng.toDouble();
-      // If user is logged in, persist to customers table
+    // If user is logged in, persist to customers table
       if (CustomerSession.instance.isLoggedIn) {
-        final id = CustomerSession.instance.currentCustomerId;
+        // Resolve customer ID; if missing, fetch by phone
+        String? id = CustomerSession.instance.currentCustomerId;
+        // Fallback 1: Supabase auth user id
+        try {
+          id ??= SupabaseService.instance.client.auth.currentUser?.id;
+        } catch (_) {}
+        if (id == null) {
+          final phone = CustomerSession.instance.currentCustomerPhone;
+          if (phone != null && phone.isNotEmpty) {
+            try {
+              final row = await SupabaseService.instance.client
+                  .from('customers')
+                  .select('id')
+                  .eq('phone', phone)
+                  .maybeSingle();
+              if (row != null) id = row['id'] as String;
+            } catch (_) {}
+          }
+        }
+
         if (id != null) {
-          await SupabaseService.instance.updateData(
-            'customers',
-            id,
-            {
-              'lat': lat,
-              'lng': lng,
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-          );
-          // Verify persisted values
-          final updatedRow =
-              await SupabaseService.instance.fetchById('customers', id);
-          final savedLat = (updatedRow?['lat'] as num?)?.toDouble();
-          final savedLng = (updatedRow?['lng'] as num?)?.toDouble();
-          final persisted = savedLat == lat && savedLng == lng;
+          // Try to resolve a readable Arabic address (street, area)
+          String? addressAr;
+          try {
+            addressAr = await GeocodingService.instance
+                .reverseGeocode(lat, lng, language: 'ar');
+          } catch (_) {
+            // Geocoding failure shouldn't block saving location
+            addressAr = null;
+          }
+
+          // Prefer update by id; if 0 rows, try update by phone; otherwise insert
+          final payload = <String, dynamic>{
+            'lat': lat,
+            'lng': lng,
+            'updated_at': DateTime.now().toIso8601String(),
+          };
+          if (addressAr != null && addressAr.isNotEmpty) {
+            payload['address'] = addressAr;
+          }
+
+          Map<String, dynamic>? updatedRow;
+          try {
+            final response = await SupabaseService.instance.client
+                .from('customers')
+                .update(payload)
+                .eq('id', id)
+                .select()
+                .maybeSingle();
+            if (response != null) {
+              updatedRow = response;
+            } else {
+              // Try update by phone as a fallback
+              final phone = CustomerSession.instance.currentCustomerPhone;
+              if (phone != null && phone.isNotEmpty) {
+                final resp2 = await SupabaseService.instance.client
+                    .from('customers')
+                    .update(payload)
+                    .eq('phone', phone)
+                    .select()
+                    .maybeSingle();
+                if (resp2 != null) {
+                  updatedRow = resp2;
+                }
+              }
+            }
+          } catch (_) {}
+          if (updatedRow == null) {
+            // Insert (id + payload) as a last resort
+            final insertData = {
+              'id': id,
+              ...payload,
+            };
+            updatedRow = await SupabaseService.instance.client
+                .from('customers')
+                .insert(insertData)
+                .select()
+                .single();
+          }
+
+          // Verify persisted values with tolerance
+          final savedLat = (updatedRow['lat'] as num?)?.toDouble();
+          final savedLng = (updatedRow['lng'] as num?)?.toDouble();
+          bool persisted = false;
+          if (savedLat != null && savedLng != null) {
+            persisted = (savedLat - lat).abs() < 1e-6 && (savedLng - lng).abs() < 1e-6;
+          }
           if (!persisted) {
             throw Exception('لم يتم تحديث الموقع في قاعدة البيانات');
           }
+
           // Update local session model
           final current = CustomerSession.instance.currentCustomer;
           if (current != null) {
@@ -305,7 +427,9 @@ class _FullMapScreenState extends State<FullMapScreen> {
                 id: current.id,
                 name: current.name,
                 phone: current.phone,
-                address: current.address,
+                address: (addressAr != null && addressAr.isNotEmpty)
+                    ? addressAr
+                    : current.address,
                 avatar: current.avatar,
                 isActive: current.isActive,
                 lastLogin: current.lastLogin,
@@ -319,11 +443,17 @@ class _FullMapScreenState extends State<FullMapScreen> {
               ),
             );
           }
-      if (mounted) {
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.isEditing ? 'تم تحديث الموقع بنجاح' : 'تم حفظ الموقع بنجاح')),
+              SnackBar(
+                content: Text(
+                  widget.isEditing ? 'تم تحديث الموقع بنجاح' : 'تم حفظ الموقع بنجاح',
+                ),
+              ),
             );
           }
+        } else {
+          throw Exception('مطلوب تسجيل الدخول لحفظ الموقع');
         }
       } else {
         // Guest user: just inform and return coords
@@ -348,6 +478,70 @@ class _FullMapScreenState extends State<FullMapScreen> {
     }
   }
 
+  Future<void> _handleDelete() async {
+    try {
+      final current = CustomerSession.instance.currentCustomer;
+      if (current == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('مطلوب تسجيل الدخول')), 
+        );
+        return;
+      }
+      // Update DB: set address and coords to null
+  await SupabaseService.instance.client
+          .from('customers')
+          .update({
+            'address': null,
+            'lat': null,
+            'lng': null,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', current.id)
+          .select()
+          .maybeSingle();
+
+      // Update session model
+      await CustomerSession.instance.setCurrentCustomer(
+        Customer(
+          id: current.id,
+          name: current.name,
+          phone: current.phone,
+          address: null,
+          avatar: current.avatar,
+          isActive: current.isActive,
+          lastLogin: current.lastLogin,
+          totalSpent: current.totalSpent,
+          ordersCount: current.ordersCount,
+          rating: current.rating,
+          lat: null,
+          lng: null,
+          createdAt: current.createdAt,
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      // Remove pin from map if shown
+      if (_selectedAnnotation != null && _pointAnnotationManager != null) {
+        await _pointAnnotationManager!.delete(_selectedAnnotation!);
+        _selectedAnnotation = null;
+        _selectedPosition = null;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف العنوان')),
+        );
+        await Future.delayed(const Duration(milliseconds: 500));
+        Navigator.of(context).pop({'deleted': true});
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف العنوان: $e')),
+      );
+    }
+  }
+
   // ignore: unused_element
   Future<void> _placePinAt(mb.Position pos) async {
     if (_mapboxMap == null) return;
@@ -363,17 +557,17 @@ class _FullMapScreenState extends State<FullMapScreen> {
     // Ensure we have pin image bytes (custom drawn red pin)
     _pinImageBytes ??= await _buildRedPinBytes();
     // Create new annotation at the provided position using the custom red pin
-    _selectedAnnotation = await _pointAnnotationManager!.create(
+  _selectedAnnotation = await _pointAnnotationManager!.create(
       mb.PointAnnotationOptions(
         geometry: mb.Point(coordinates: pos),
         image: _pinImageBytes!,
         iconAnchor: mb.IconAnchor.BOTTOM,
-        iconSize: 1.4,
+    iconSize: 1.8,
       ),
     );
   }
 
-  Future<Uint8List> _buildRedPinBytes({double size = 96}) async {
+  Future<Uint8List> _buildRedPinBytes({double size = 128}) async {
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder, ui.Rect.fromLTWH(0, 0, size, size));
     final red = Paint()..color = const Color(0xFFE53935);
@@ -400,39 +594,166 @@ class _FullMapScreenState extends State<FullMapScreen> {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     return bytes!.buffer.asUint8List();
   }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final q = value.trim();
+      if (q.isEmpty) {
+        setState(() => _searchResults = const []);
+        return;
+      }
+      setState(() => _searchLoading = true);
+      // Use proximity for better local relevance
+      double? proxLat;
+      double? proxLng;
+      try {
+        if (_selectedPosition != null) {
+          proxLat = _selectedPosition!.lat.toDouble();
+          proxLng = _selectedPosition!.lng.toDouble();
+        } else if (_mapboxMap != null) {
+          final center = (await _mapboxMap!.getCameraState()).center.coordinates;
+          proxLat = center.lat.toDouble();
+          proxLng = center.lng.toDouble();
+        }
+      } catch (_) {}
+      // Prefer Android native Search SDK if available
+      List<_UiSuggestion> ui;
+      if (AndroidSearchBridge.isAvailable) {
+        final native = await AndroidSearchBridge.suggest(q);
+        if (native.isNotEmpty) {
+          ui = native
+              .map((m) => _UiSuggestion.searchbox(
+                    mapboxId: (m['mapboxId'] as String?) ?? (m['id'] as String? ?? ''),
+                    title: (m['name'] as String?) ?? '',
+                    subtitle: (m['formattedAddress'] as String?),
+                  ))
+              .toList(growable: false);
+        } else {
+          // Fallback to Search Box HTTP suggest
+          final suggest = await GeocodingService.instance.searchboxSuggest(
+            q,
+            language: 'ar',
+            limit: 8,
+            proximityLat: proxLat,
+            proximityLng: proxLng,
+          );
+          if (suggest.isNotEmpty) {
+            ui = suggest
+                .map((s) => _UiSuggestion.searchbox(mapboxId: s.mapboxId, title: s.name, subtitle: s.description))
+                .toList(growable: false);
+          } else {
+            final results = await GeocodingService.instance.forwardGeocode(
+              q,
+              language: 'ar',
+              limit: 8,
+              proximityLat: proxLat,
+              proximityLng: proxLng,
+            );
+            ui = results
+                .map((g) => _UiSuggestion.geocoder(title: g.name, subtitle: g.placeName, lat: g.lat, lng: g.lng))
+                .toList(growable: false);
+          }
+        }
+      } else {
+        // Non-Android: use HTTP Search Box suggest, then geocoder
+        final suggest = await GeocodingService.instance.searchboxSuggest(
+          q,
+          language: 'ar',
+          limit: 8,
+          proximityLat: proxLat,
+          proximityLng: proxLng,
+        );
+        if (suggest.isNotEmpty) {
+          ui = suggest
+              .map((s) => _UiSuggestion.searchbox(mapboxId: s.mapboxId, title: s.name, subtitle: s.description))
+              .toList(growable: false);
+        } else {
+          final results = await GeocodingService.instance.forwardGeocode(
+            q,
+            language: 'ar',
+            limit: 8,
+            proximityLat: proxLat,
+            proximityLng: proxLng,
+          );
+          ui = results
+              .map((g) => _UiSuggestion.geocoder(title: g.name, subtitle: g.placeName, lat: g.lat, lng: g.lng))
+              .toList(growable: false);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _searchResults = ui;
+        _searchLoading = false;
+      });
+    });
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchCtrl.clear();
+      _searchResults = const [];
+    });
+  }
+
+  Future<void> _onSuggestionTap(_UiSuggestion s) async {
+    _clearSearch();
+    if (s.kind == _UiKind.searchbox && s.mapboxId != null) {
+      final res = await GeocodingService.instance.searchboxRetrieve(
+        s.mapboxId!,
+        language: 'ar',
+      );
+      if (res == null) return;
+      final pos = mb.Position(res.lng, res.lat);
+      _selectedPosition = pos;
+      await _placePinAt(pos);
+      await _mapboxMap?.setCamera(mb.CameraOptions(
+        center: mb.Point(coordinates: pos),
+        zoom: 16.0,
+      ));
+      return;
+    }
+    if (s.kind == _UiKind.geocoder && s.lat != null && s.lng != null) {
+      final pos = mb.Position(s.lng!, s.lat!);
+      _selectedPosition = pos;
+      await _placePinAt(pos);
+      await _mapboxMap?.setCamera(mb.CameraOptions(
+        center: mb.Point(coordinates: pos),
+        zoom: 16.0,
+      ));
+    }
+  }
+
 }
 
-class _LocateButton extends StatelessWidget {
-  final bool locating;
-  final VoidCallback onPressed;
-  const _LocateButton({required this.locating, required this.onPressed});
+enum _UiKind { searchbox, geocoder }
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 2,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: locating ? null : onPressed,
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: locating
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  Icons.my_location,
-                  size: 22,
-                  color: Colors.black87,
-                ),
-        ),
-      ),
-    );
-  }
+class _UiSuggestion {
+  final _UiKind kind;
+  final String title;
+  final String? subtitle;
+  final String? mapboxId;
+  final double? lat;
+  final double? lng;
+  const _UiSuggestion._({
+    required this.kind,
+    required this.title,
+    this.subtitle,
+    this.mapboxId,
+    this.lat,
+    this.lng,
+  });
+  factory _UiSuggestion.searchbox({
+    required String mapboxId,
+    required String title,
+    String? subtitle,
+  }) => _UiSuggestion._(kind: _UiKind.searchbox, mapboxId: mapboxId, title: title, subtitle: subtitle);
+  factory _UiSuggestion.geocoder({
+    required String title,
+    required String subtitle,
+    required double lat,
+    required double lng,
+  }) => _UiSuggestion._(kind: _UiKind.geocoder, title: title, subtitle: subtitle, lat: lat, lng: lng);
 }
 
 // (Center pin overlay removed; we use map annotations instead)

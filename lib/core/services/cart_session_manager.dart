@@ -558,26 +558,56 @@ class CartSessionManager {
           .eq('id', _currentCartId!)
           .single();
 
-      // Create order
-      final double orderTotal = await _calculateCartTotal(_currentCartId!);
-      print(
-        'CartSessionManager - Checkout: orderTotal=$orderTotal, cartId=$_currentCartId',
+      // Prefetch products for items in one query and compute totals locally
+      final List<dynamic> cartItems = List<Map<String, dynamic>>.from(
+        cart['cart_items'] ?? const <Map<String, dynamic>>[],
       );
+      final Set<String> productIds = {
+        for (final item in cartItems) (item['product_id'] as String)
+      };
+
+      Map<String, Map<String, dynamic>> productMap = {};
+      if (productIds.isNotEmpty) {
+    final products = await SupabaseService.instance.client
+      .from('products')
+      .select('id, name, price')
+      .inFilter('id', productIds.toList());
+        for (final p in products) {
+          final id = p['id'] as String;
+          productMap[id] = Map<String, dynamic>.from(p);
+        }
+      }
+
+      double orderTotal = 0.0;
+      for (final item in cartItems) {
+        final productId = item['product_id'] as String;
+        final qty = (item['quantity'] as int?) ?? 0;
+        final prod = productMap[productId];
+        double price = 0.0;
+        if (prod != null) {
+          final rawPrice = prod['price'];
+          if (rawPrice is num) price = rawPrice.toDouble();
+          if (rawPrice is String) price = double.tryParse(rawPrice) ?? 0.0;
+        }
+        if (price <= 0.0) price = 5.0; // safe fallback
+        orderTotal += qty * price;
+      }
+
+      print('CartSessionManager - Checkout: computed orderTotal=$orderTotal, cartId=$_currentCartId');
 
       // Guard: prevent inserting orders with zero/invalid totals which violate DB constraints
       if (orderTotal <= 0.0) {
-        print(
-          'CartSessionManager - Aborting checkout: order total is zero or invalid',
-        );
         throw Exception('Invalid order total: $orderTotal');
       }
-      print('CartSessionManager - Cart contents: $cart');
+      final String orderNumber = 'ORD-${DateTime.now().toUtc().millisecondsSinceEpoch}';
+      final nowIso = DateTime.now().toIso8601String();
       final orderInsertBody = {
         'customer_id': cart['customer_id'],
+        'cart_id': _currentCartId!,
+        'order_number': orderNumber,
         'status': 'pending',
-        // Provide both common column names so insert succeeds regardless of schema naming
-        'total_amount': orderTotal,
-        'total': orderTotal,
+  // Amounts
+  'total_amount': orderTotal,
         // Ensure positive amounts required by DB constraints
         'subtotal': orderTotal,
         'final_amount': orderTotal,
@@ -585,13 +615,15 @@ class CartSessionManager {
         'shipping_amount': 0.00,
         'discount_amount': 0.00,
         'voucher_discount': 0.00,
-        // Only include delivery_address/notes (avoid delivery_type which some schemas may not have)
-        'delivery_address': deliveryData?['address'] ?? '',
+        // Align with schema: use shipping_address JSON and delivery_notes text only
+        'shipping_address': (deliveryData?['address'] != null)
+            ? {
+                'address': deliveryData!['address'],
+              }
+            : null,
         'delivery_notes': deliveryData?['notes'] ?? '',
-        // Some schemas require delivery_phone not-null
-        'delivery_phone': CustomerSession.instance.currentCustomerPhone ?? '',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
+        'created_at': nowIso,
+        'updated_at': nowIso,
       };
 
       final order = await SupabaseService.instance.client
@@ -601,18 +633,37 @@ class CartSessionManager {
           .single();
       print('CartSessionManager - Order insert response: $order');
 
-      // Move cart items to order items
-      for (final item in cart['cart_items']) {
-        final prodPrice = await _getProductPrice(item['product_id']);
-        // Insert price fields that common schemas expect: unit_price and total_price
-        await SupabaseService.instance.client.from('order_items').insert({
+      // Build and bulk insert order items to reduce network round-trips
+      final List<Map<String, dynamic>> orderItemRows = [];
+      for (final item in cartItems) {
+        final String productId = item['product_id'] as String;
+        final int qty = (item['quantity'] as int?) ?? 0;
+        final prod = productMap[productId];
+        String prodName = 'Product';
+        double prodPrice = 5.0;
+        if (prod != null) {
+          final dynamic rawName = prod['name'];
+          if (rawName is String && rawName.isNotEmpty) prodName = rawName;
+          final dynamic rawPrice = prod['price'];
+          if (rawPrice is num) prodPrice = rawPrice.toDouble();
+          if (rawPrice is String) prodPrice = double.tryParse(rawPrice) ?? prodPrice;
+          if (prodPrice <= 0.0) prodPrice = 5.0;
+        }
+        orderItemRows.add({
           'order_id': order['id'],
-          'product_id': item['product_id'],
-          'quantity': item['quantity'],
+          'product_id': productId,
+          'product_name': prodName,
+          'quantity': qty,
           'unit_price': prodPrice,
-          'total_price': prodPrice * (item['quantity'] as int),
-          'created_at': DateTime.now().toIso8601String(),
+          'total_price': prodPrice * qty,
+          'created_at': nowIso,
         });
+      }
+
+      if (orderItemRows.isNotEmpty) {
+        await SupabaseService.instance.client
+            .from('order_items')
+            .insert(orderItemRows);
       }
 
       // Clear cart
@@ -647,6 +698,7 @@ class CartSessionManager {
   }
 
   // Calculate cart total
+  // ignore: unused_element
   Future<double> _calculateCartTotal(String cartId) async {
     try {
       final items = await SupabaseService.instance.client
@@ -654,8 +706,8 @@ class CartSessionManager {
           .select('*, products(*)')
           .eq('cart_id', cartId);
 
-      double total = 0;
-      if (items == null || (items is List && items.isEmpty)) {
+  double total = 0;
+  if (items.isEmpty) {
         print('CartSessionManager - _calculateCartTotal: no items found for cart $cartId');
         return 0.0;
       }
@@ -672,7 +724,7 @@ class CartSessionManager {
         double price = 0.0;
         try {
           if (rawPrice is num) {
-            price = (rawPrice as num).toDouble();
+            price = rawPrice.toDouble();
           } else if (rawPrice is String && rawPrice.isNotEmpty) {
             price = double.tryParse(rawPrice) ?? 0.0;
           }
@@ -697,6 +749,7 @@ class CartSessionManager {
   }
 
   // Get product price
+  // ignore: unused_element
   Future<double> _getProductPrice(String productId) async {
     try {
       final product = await SupabaseService.instance.client

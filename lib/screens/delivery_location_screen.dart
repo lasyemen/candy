@@ -26,6 +26,8 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
     with TickerProviderStateMixin, DeliveryLocationScreenFunctions {
   String? selectedDeliveryType;
   final TextEditingController _addressController = TextEditingController();
+  double? _prefetchedTotal;
+  bool _isNavigating = false;
 
   late AnimationController _animationController;
   late AnimationController _buttonAnimationController;
@@ -39,6 +41,17 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
     super.initState();
     _initAnimations();
     _animationController.forward();
+    _prefetchCartTotal();
+  }
+
+  Future<void> _prefetchCartTotal() async {
+    try {
+      final summary = await CartSessionManager.instance.getCartSummary();
+      if (!mounted) return;
+      setState(() => _prefetchedTotal = (summary['total'] as double?) ?? 0.0);
+    } catch (e) {
+      // Silent: we'll compute later if needed
+    }
   }
 
   void _showAddAddressSheet() {
@@ -329,9 +342,12 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
             final double? savedLng = current?.lng;
             final bool hasSaved = savedLat != null && savedLng != null;
 
+            final String? savedAddress = current?.address?.trim();
             String subtitle;
             if (hasSaved) {
-              subtitle = 'جارِ جلب العنوان...';
+              subtitle = (savedAddress != null && savedAddress.isNotEmpty)
+                  ? savedAddress
+                  : 'جارِ جلب العنوان...';
             } else {
               subtitle = 'لم يتم حفظ موقع بعد';
             }
@@ -360,29 +376,50 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
               }
             }
 
+            // If we already have a saved address in session, show it directly.
+            if (savedAddress != null && savedAddress.isNotEmpty) {
+              return _addressListItem(
+              id: 'saved',
+              title: 'الموقع المحفوظ',
+                subtitle: savedAddress,
+              onUse: _openMapAndRefresh,
+              onTap: () {
+    if (hasSaved) {
+                  setState(() {
+                    selectedDeliveryType = 'saved';
+                        _addressController.text = savedAddress;
+                  });
+                } else {
+                  _openMapAndRefresh();
+                }
+              },
+              );
+            }
+
+            // Otherwise, resolve via reverse geocoding and show street, area
             return FutureBuilder<String?>(
-        future: hasSaved
-          ? GeocodingService.instance.reverseGeocode(savedLat, savedLng, language: 'ar')
+              future: hasSaved
+                  ? GeocodingService.instance.reverseGeocode(savedLat, savedLng, language: 'ar')
                   : Future.value(null),
               builder: (context, snapshot) {
                 final subtitleFinal = snapshot.hasData && snapshot.data != null
                     ? snapshot.data!
                     : subtitle;
                 return _addressListItem(
-              id: 'saved',
-              title: 'الموقع المحفوظ',
-              subtitle: subtitleFinal,
-              onUse: _openMapAndRefresh,
-              onTap: () {
-    if (hasSaved) {
-                  setState(() {
-                    selectedDeliveryType = 'saved';
-                    _addressController.text = subtitleFinal;
-                  });
-                } else {
-                  _openMapAndRefresh();
-                }
-              },
+                  id: 'saved',
+                  title: 'الموقع المحفوظ',
+                  subtitle: subtitleFinal,
+                  onUse: _openMapAndRefresh,
+                  onTap: () {
+                    if (hasSaved) {
+                      setState(() {
+                        selectedDeliveryType = 'saved';
+                        _addressController.text = subtitleFinal;
+                      });
+                    } else {
+                      _openMapAndRefresh();
+                    }
+                  },
                 );
               },
             );
@@ -543,16 +580,11 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                       Container(
                         width: 48,
                         height: 48,
-                        decoration: BoxDecoration(
-                          gradient: DesignSystem.primaryGradient,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.place,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.place,
+                          color: Colors.red,
+                          size: 26,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -666,12 +698,11 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                     Container(
                       width: 48,
                       height: 48,
-                      decoration: BoxDecoration(
-                        gradient: DesignSystem.primaryGradient,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.place, color: Colors.white, size: 20),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.place,
+                        color: Colors.red,
+                        size: 26,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -823,6 +854,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
   }
 
   void _handleContinuePressed() {
+  if (_isNavigating) return;
     HapticFeedback.mediumImpact();
     _buttonAnimationController.forward().then((_) {
       _buttonAnimationController.reverse();
@@ -867,6 +899,9 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
       return;
     }
 
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+
     // Get delivery data
     final deliveryData = {
       'type': selectedDeliveryType,
@@ -877,18 +912,22 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
     };
 
     // Get cart total and pass it to payment methods
-    double total = 0.0;
-    try {
-      final cartSummary = await CartSessionManager.instance.getCartSummary();
-      total = (cartSummary['total'] as double?) ?? 0.0;
-    } catch (e) {
-      print('DeliveryLocationScreen - Error fetching cart total: $e');
+    double total = _prefetchedTotal ?? 0.0;
+    if (_prefetchedTotal == null) {
+      try {
+        final cartSummary = await CartSessionManager.instance.getCartSummary();
+        total = (cartSummary['total'] as double?) ?? 0.0;
+      } catch (e) {
+        print('DeliveryLocationScreen - Error fetching cart total: $e');
+      }
     }
 
     // Navigate to payment methods screen with the calculated total
-    Navigator.of(context).pushNamed(
+    if (!mounted) return;
+    await Navigator.of(context).pushNamed(
       '/payment-methods',
       arguments: {'total': total, 'deliveryData': deliveryData},
     );
+    if (mounted) setState(() => _isNavigating = false);
   }
 }
