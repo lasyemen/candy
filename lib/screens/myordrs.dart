@@ -10,7 +10,21 @@ import 'dart:math' as math;
 import '../core/services/supabase_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/constants/design_system.dart';
+import 'package:provider/provider.dart';
+import '../core/services/app_settings.dart';
+import '../core/constants/translations.dart';
 part 'functions/myordrs.functions.dart';
+
+// Map order status (enum/text) to a 0..3 step index for the timeline
+int _stepForStatus(String statusRaw) {
+  final s = statusRaw.toLowerCase();
+  if (s == 'delivery_done' || s.contains('تم التوصيل') || s.contains('delivered')) return 3;
+  if (s == 'delivering' || s.contains('التوصيل') || s.contains('out_for_delivery')) return 2;
+  if (s == 'choose_delivery_captain' || s.contains('اختيار') || s.contains('driver')) return 1;
+  if (s == 'review_order' || s.contains('review') || s.contains('مراجعة')) return 0;
+  if (s == 'accept' || s.contains('accept') || s.contains('قبول')) return 0;
+  return 0;
+}
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
@@ -119,6 +133,84 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             _driverVal = null;
         }
 
+    // attempt to extract driver phone from multiple possible shapes
+    dynamic _driverPhoneRaw =
+      r['driver_phone'] ??
+      r['driverPhone'] ??
+      r['driver_mobile'] ??
+      r['driverMobile'] ??
+      r['driver_number'] ??
+      r['driverNumber'] ??
+      r['phone'] ??
+      r['phone_number'] ??
+      r['phoneNumber'] ??
+      r['mobile'] ??
+      r['mobile_number'] ??
+      r['mobileNumber'] ??
+      r['contact_phone'] ??
+      r['contactPhone'] ??
+      r['contact_number'] ??
+      r['contactNumber'] ??
+      r['driver_phone_no'] ??
+      r['driverPhoneNo'] ??
+      r['driver_phone_number'] ??
+      r['driverPhoneNumber'] ??
+      r['driver_contact'] ??
+      r['driverContact'];
+        String? _driverPhoneVal;
+  if (_driverPhoneRaw == null && _driverRaw is Map) {
+    final m = _driverRaw;
+    _driverPhoneVal = (m['phone'] ??
+      m['phone_number'] ??
+      m['phoneNumber'] ??
+      m['mobile'] ??
+      m['mobile_number'] ??
+      m['mobileNumber'] ??
+      m['contact_phone'] ??
+      m['contactPhone'] ??
+      m['number'] ??
+      m['driver_phone'] ??
+      m['driverPhone'] ??
+      m['driver_mobile'] ??
+      m['driverMobile'])
+        ?.toString();
+        } else if (_driverPhoneRaw != null) {
+          _driverPhoneVal = _driverPhoneRaw.toString();
+        }
+        if (_driverPhoneVal != null && _driverPhoneVal.trim().isEmpty) {
+          _driverPhoneVal = null;
+        }
+        // Fallback: extract any phone-like pattern from available text fields
+        if (_driverPhoneVal == null) {
+          String concat = '';
+          void addText(dynamic v) {
+            if (v == null) return;
+            final s = v.toString().trim();
+            if (s.isNotEmpty) concat += ' $s';
+          }
+          addText(r['driver']);
+          addText(r['driver_name']);
+          addText(r['driverName']);
+          addText(r['notes']);
+          addText(r['description']);
+          // If nested driver map, add its fields
+          if (_driverRaw is Map) {
+            addText(_driverRaw['phone']);
+            addText(_driverRaw['mobile']);
+            addText(_driverRaw['number']);
+            addText(_driverRaw['contact']);
+          }
+          // Regex: match +966 XX XXX XXXX, 05XXXXXXXX, or 9-12 digit sequences
+          final reg = RegExp(r'(?:\+?966\s?\d{1,2}\s?\d{3}\s?\d{4}|05\d{8}|\d{9,12})');
+          final m = reg.firstMatch(concat);
+          if (m != null) {
+            _driverPhoneVal = m.group(0);
+          }
+        }
+  // Debug: surface detected driver phone for first few rows
+  // ignore: avoid_print
+  print('MyOrdersScreen - parsed driverPhone: \\u200E${_driverPhoneVal ?? '(none)'}');
+
         return {
           'id': r['id']?.toString() ?? '',
           'items': itemsList,
@@ -129,6 +221,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
           'date': r['date']?.toString() ?? r['created_at']?.toString() ?? '',
           'eta': r['eta']?.toString(),
           'driver': _driverVal,
+          'driverPhone': _driverPhoneVal,
           'vehicle': r['vehicle']?.toString(),
           'statusColor': statusColor ?? Colors.blue,
           'step': r['step'] is int
@@ -226,12 +319,13 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
         ? const Color(0xFF2A2A2A)
         : Colors.white;
 
-    final unfilteredCurrent = _allOrders
-        .where((o) => (o['status']?.toString() ?? '') != 'تم التوصيل')
-        .toList();
-    final unfilteredPrevious = _allOrders
-        .where((o) => (o['status']?.toString() ?? '') == 'تم التوصيل')
-        .toList();
+    // Use enum values when present; fallback to Arabic/English strings for legacy rows
+    bool isDelivered(Map<String, dynamic> o) {
+      final s = (o['status']?.toString() ?? '').toLowerCase();
+      return s == 'delivery_done' || s == 'تم التوصيل' || s == 'delivered';
+    }
+    final unfilteredCurrent = _allOrders.where((o) => !isDelivered(o)).toList();
+    final unfilteredPrevious = _allOrders.where(isDelivered).toList();
     final current = _filterList(unfilteredCurrent);
     final previous = _filterList(unfilteredPrevious);
 
@@ -262,7 +356,14 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
           edgeOffset: 8,
           child: ListView(
             controller: _scrollCtrl,
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 20),
+            padding: EdgeInsets.fromLTRB(
+              8,
+              12,
+              8,
+              20 +
+                  MediaQuery.of(context).viewPadding.bottom +
+                  kBottomNavigationBarHeight,
+            ),
             children: [
               // Search
               Padding(
@@ -552,9 +653,9 @@ class _FilterRow extends StatelessWidget {
           onTap: () => onStatus('الكل'),
         ),
         _ChipPill(
-          label: 'قيد التحضير',
-          selected: status == 'قيد التحضير',
-          onTap: () => onStatus('قيد التحضير'),
+          label: 'اختيار موصل',
+          selected: status == 'اختيار موصل',
+          onTap: () => onStatus('اختيار موصل'),
         ),
         _ChipPill(
           label: 'قيد التوصيل',
@@ -722,14 +823,11 @@ class _LiveOrderCard extends StatelessWidget {
     final rawDriver =
         order['driver'] ?? order['driver_name'] ?? order['driverName'];
     String? driver = rawDriver?.toString();
-    final rawVehicle = order['vehicle'];
-    String? vehicle = rawVehicle?.toString();
+  // vehicle omitted in the compact driver layout
     final String driverDisplay = (driver != null && driver.isNotEmpty)
         ? driver
         : 'سامي';
-    final String vehicleDisplay = (vehicle != null && vehicle.isNotEmpty)
-        ? vehicle
-        : 'تويوتا هايلكس • 1234';
+  // vehicle not shown in the new compact layout
 
     final cardWidth =
         double.infinity; // fill available width to match nav bar margins
@@ -737,16 +835,16 @@ class _LiveOrderCard extends StatelessWidget {
     return Center(
       child: Container(
         width: cardWidth,
-        // reduce the minimum height to make order cards more compact
-        constraints: const BoxConstraints(minHeight: 120),
+        // increase the minimum height slightly for breathing room
+        constraints: const BoxConstraints(minHeight: 140),
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: cardShadows,
         ),
         child: Padding(
-          // reduce vertical padding to make the card more compact
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          // slightly larger vertical padding
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -766,65 +864,48 @@ class _LiveOrderCard extends StatelessWidget {
                   Builder(
                     builder: (context) {
                       final statusRaw = status;
-                      final statusLower = statusRaw.toLowerCase();
-                      final isPending =
-                          statusLower.contains('pending') ||
-                          statusRaw.contains('قيد');
-                      final displayStatus = isPending
-                          ? 'قيد الانتظار'
-                          : statusRaw;
-                      if (isPending) {
-                        final grad = DesignSystem.getBrandGradient('primary');
-                        return Container(
-                          padding: const EdgeInsets.all(1.5),
-                          decoration: BoxDecoration(
-                            gradient: grad,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cardColor,
-                              borderRadius: BorderRadius.circular(10.5),
-                              border: Border.all(color: Colors.transparent),
-                            ),
-                            child: Text(
-                              displayStatus,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white
-                                        : Colors.black,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                        );
+                      final s = statusRaw.toString().toLowerCase();
+                      // Map enum -> translation keys
+                      String key;
+                      if (s == 'accept' || s == 'accepted' || s == 'قبول') {
+                        key = 'status_accept';
+                      } else if (s == 'review_order' || s.contains('review') || s.contains('مراجعة')) {
+                        key = 'status_review_order';
+                      } else if (s == 'choose_delivery_captain' || s.contains('choose') || s.contains('driver') || s.contains('اختيار')) {
+                        key = 'status_choose_delivery_captain';
+                      } else if (s == 'delivering' || s.contains('delivery') || s.contains('التوصيل')) {
+                        key = 'status_delivering';
+                      } else if (s == 'delivery_done' || s.contains('delivered') || s.contains('تم التوصيل')) {
+                        key = 'status_delivery_done';
+                      } else if (s.contains('pending') || statusRaw.contains('قيد')) {
+                        key = 'status_pending';
+                      } else {
+                        key = 'status_unknown';
                       }
-                      return Container(
+            final lang = Provider.of<AppSettings>(context, listen: false).currentLanguage;
+            final displayStatus = AppTranslations.getText(key, lang);
+            final isPending = (key == 'status_pending');
+            const red = Color(0xFFEF4444);
+            return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
+              color: isPending ? cardColor : color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: isPending ? Border.all(color: red, width: 1.5) : null,
                         ),
                         child: Text(
                           displayStatus,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: color,
+                color: isPending ? red : color,
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
                       );
-                    },
+          },
                   ),
                 ],
               ),
@@ -840,16 +921,16 @@ class _LiveOrderCard extends StatelessWidget {
               const SizedBox(height: 12),
 
               // Timeline with connected dots/lines + aligned labels
-              _OrderTimeline(step: (order['step'] as int?) ?? 0, accent: color),
-              // reduced spacing between timeline (progress dots) and driver row
-              const SizedBox(height: 6),
+              _OrderTimeline(step: _stepForStatus((order['status']?.toString() ?? '')), accent: color),
+              // spacing between timeline and driver row
+              const SizedBox(height: 10),
 
               // Single row: driver info and buttons on same line; buttons slightly wider
               Row(
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       gradient: DesignSystem.getBrandGradient('primary'),
                       shape: BoxShape.circle,
@@ -857,76 +938,95 @@ class _LiveOrderCard extends StatelessWidget {
                     child: const Center(
                       child: Icon(
                         FontAwesomeIcons.motorcycle,
-                        size: 14,
+                        size: 18,
                         color: Colors.white,
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      '$driverDisplay • $vehicleDisplay',
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          driverDisplay,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Builder(builder: (context) {
+                          final dp = (order['driverPhone']?.toString() ?? '').trim();
+                          final phoneToShow = dp.isEmpty ? '+966 55 123 4567' : dp;
+                          return Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: Text(
+                              phoneToShow,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: scheme.onSurface.withOpacity(0.7),
+                                  ),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Call (outlined) button — slightly wider
+                  const SizedBox(width: 6),
+                  // Call button — filled green, taller, no shadow
                   SizedBox(
-                    width: 56,
-                    height: 30,
+                    width: 64,
+                    height: 40,
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: DesignSystem.getBrandGradient('primary'),
-                        borderRadius: BorderRadius.circular(10),
+                        color: const Color(0xFF10B981), // green
+                        borderRadius: BorderRadius.circular(12),
+                        // intentionally no shadow
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(1.5),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => onCallDriver(id),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Center(
-                                child: Icon(
-                                  FontAwesomeIcons.phone,
-                                  size: 14,
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                              ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => onCallDriver(id),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Center(
+                            child: Icon(
+                              FontAwesomeIcons.phone,
+                              size: 16,
+                              color: Colors.white,
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Track (filled) button — slightly wider
+                  const SizedBox(width: 6),
+                  // Track (filled gradient) button — same width, taller
                   SizedBox(
-                    width: 56,
-                    height: 30,
+                    width: 64,
+                    height: 40,
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: DesignSystem.getBrandGradient('primary'),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: DesignSystem.getBrandShadow('medium'),
                       ),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () => onTrack(id),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: const Center(
                             child: Text(
                               'تتبُّع',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 fontSize: 12,
                               ),
                             ),
@@ -959,7 +1059,7 @@ class _OrderTimeline extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     const labels = [
       'مراجعة\nالطلب',
-      'تحضير\nالطلب',
+  'اختيار\nموصل',
       'جاري\nالتوصيل',
       'تم\nالتوصيل',
     ];

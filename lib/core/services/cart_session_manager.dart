@@ -609,6 +609,8 @@ class CartSessionManager {
         'customer_id': cart['customer_id'],
         // Keep status explicit
         'status': 'pending',
+  // New approval gate: default pending (removed automatically if column doesn't exist)
+  'approval_status': 'pending',
         // Amounts: provide both common variants for compatibility
         'total': orderTotal,
         'total_amount': orderTotal,
@@ -691,6 +693,10 @@ class CartSessionManager {
                   continue;
                 }
                 if (nm == 'status') {
+                  attemptBody[missing] = 'pending';
+                  continue;
+                }
+                if (nm == 'approval_status') {
                   attemptBody[missing] = 'pending';
                   continue;
                 }
