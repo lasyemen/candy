@@ -17,13 +17,18 @@ class SliverTitleAppBar extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           color: backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
-          child: Center(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground,
-                    fontWeight: FontWeight.bold,
-                  ),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                title,
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onBackground,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
             ),
           ),
         ),

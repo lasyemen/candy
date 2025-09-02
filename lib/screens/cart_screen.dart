@@ -1088,10 +1088,13 @@ class _CartScreenState extends State<CartScreen>
       }
     }
 
+    final dividerColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white12
+        : const Color(0xFFEDEDED);
+
     return Stack(
       children: [
-        ListView.builder(
-          // Changed from ListView.separated for better performance
+        ListView.separated(
           padding: EdgeInsets.fromLTRB(
             20,
             20,
@@ -1103,31 +1106,30 @@ class _CartScreenState extends State<CartScreen>
           physics: const BouncingScrollPhysics(),
           cacheExtent: 800,
           itemCount: _cartItemsWithProducts.length,
+          separatorBuilder: (context, index) =>
+              Divider(height: 1, thickness: 1, color: dividerColor),
           itemBuilder: (context, index) {
             final cartItem = _cartItemsWithProducts[index];
             return RepaintBoundary(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: index < _cartItemsWithProducts.length - 1 ? 16 : 0,
-                ),
-                child: SlideTransition(
-                  position:
-                      _itemAnimations.isNotEmpty &&
-                          index < _itemAnimations.length
-                      ? _itemAnimations[index]
-                      : AlwaysStoppedAnimation(Offset.zero),
-                  child: FadeTransition(
-                    opacity:
-                        _itemFadeAnimations.isNotEmpty &&
-                            index < _itemFadeAnimations.length
-                        ? _itemFadeAnimations[index]
+              child: SlideTransition(
+                position:
+                    _itemAnimations.isNotEmpty && index < _itemAnimations.length
+                    ? _itemAnimations[index]
+                    : AlwaysStoppedAnimation(Offset.zero),
+                child: FadeTransition(
+                  opacity:
+                      _itemFadeAnimations.isNotEmpty &&
+                          index < _itemFadeAnimations.length
+                      ? _itemFadeAnimations[index]
+                      : AlwaysStoppedAnimation(1.0),
+                  child: ScaleTransition(
+                    scale:
+                        _itemScaleAnimations.isNotEmpty &&
+                            index < _itemScaleAnimations.length
+                        ? _itemScaleAnimations[index]
                         : AlwaysStoppedAnimation(1.0),
-                    child: ScaleTransition(
-                      scale:
-                          _itemScaleAnimations.isNotEmpty &&
-                              index < _itemScaleAnimations.length
-                          ? _itemScaleAnimations[index]
-                          : AlwaysStoppedAnimation(1.0),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       child: _buildCartItemFromMap(cartItem, index),
                     ),
                   ),
@@ -1138,13 +1140,13 @@ class _CartScreenState extends State<CartScreen>
         ),
         // Floating total card with slide-up animation
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 200), // Faster animation
-          curve: Curves.easeOutQuart, // More responsive curve
-          bottom: _showSummaryCard ? 100 : -200, // Slide up from bottom
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutQuart,
+          bottom: _showSummaryCard ? 100 : -200,
           left: 10,
           right: 10,
           child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 200), // Faster opacity
+            duration: const Duration(milliseconds: 200),
             opacity: _showSummaryCard ? 1.0 : 0.0,
             child: _buildSummaryCardContentFromItems(cartTotal),
           ),
@@ -1154,11 +1156,15 @@ class _CartScreenState extends State<CartScreen>
   }
 
   Widget _buildCartContent(List<CartItem> cartItems, double cartTotal) {
+    final dividerColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white12
+        : const Color(0xFFEDEDED);
     return ListView.separated(
       padding: const EdgeInsets.all(20),
       physics: const BouncingScrollPhysics(),
       itemCount: cartItems.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      separatorBuilder: (context, index) =>
+          Divider(height: 1, thickness: 1, color: dividerColor),
       itemBuilder: (context, index) {
         final cartItem = cartItems[index];
         return SlideTransition(
@@ -1517,89 +1523,68 @@ class _CartScreenState extends State<CartScreen>
     );
     print('Cart item structure: ${cartItem.keys.toList()}');
 
-    return AnimatedContainer(
-      // Added AnimatedContainer for smooth transitions
-      duration: const Duration(
-        milliseconds: 300,
-      ), // Slightly longer for smoother feel
-      curve: Curves.easeOutCubic,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF2A2A2A)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    return Dismissible(
+      key: Key(itemId),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete, color: Colors.white, size: 30),
       ),
-      child: Dismissible(
-        key: Key(itemId),
-        direction: DismissDirection.endToStart,
-        background: Container(
-          decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(30),
-          ),
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 20),
-          child: const Icon(Icons.delete, color: Colors.white, size: 30),
-        ),
-        confirmDismiss: (direction) async {
-          return await showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text(
-                  'حذف المنتج',
-                  style: TextStyle(
-                    fontFamily: 'Rubik',
-                    fontWeight: FontWeight.bold,
+      confirmDismiss: (direction) async {
+        return await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(
+                'حذف المنتج',
+                style: TextStyle(
+                  fontFamily: 'Rubik',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Text(
+                'هل أنت متأكد من حذف هذا المنتج من السلة؟',
+                style: TextStyle(fontFamily: 'Rubik'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'إلغاء',
+                    style: TextStyle(fontFamily: 'Rubik', color: Colors.grey),
                   ),
                 ),
-                content: Text(
-                  'هل أنت متأكد من حذف هذا المنتج من السلة؟',
-                  style: TextStyle(fontFamily: 'Rubik'),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(
+                    'حذف',
+                    style: TextStyle(
+                      fontFamily: 'Rubik',
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: Text(
-                      'إلغاء',
-                      style: TextStyle(fontFamily: 'Rubik', color: Colors.grey),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: Text(
-                      'حذف',
-                      style: TextStyle(
-                        fontFamily: 'Rubik',
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-        onDismissed: (direction) {
-          _removeItem(itemId);
-        },
+              ],
+            );
+          },
+        );
+      },
+      onDismissed: (direction) {
+        _removeItem(itemId);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
             // Product Image (kept in original place)
             Container(
-              width: 85,
-              height: 85,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
@@ -1609,12 +1594,12 @@ class _CartScreenState extends State<CartScreen>
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(18),
                 child: productImage != null && productImage.isNotEmpty
                     ? Image.network(
                         productImage,
-                        width: 85,
-                        height: 85,
+                        width: 96,
+                        height: 96,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -1622,13 +1607,13 @@ class _CartScreenState extends State<CartScreen>
                               gradient: DesignSystem.getBrandGradient(
                                 'primary',
                               ),
-                              borderRadius: BorderRadius.circular(15),
+                              borderRadius: BorderRadius.circular(18),
                             ),
                             child: Center(
                               child: Icon(
                                 FontAwesomeIcons.droplet,
                                 color: Colors.white,
-                                size: 28,
+                                size: 32,
                               ),
                             ),
                           );
@@ -1637,13 +1622,13 @@ class _CartScreenState extends State<CartScreen>
                     : Container(
                         decoration: BoxDecoration(
                           gradient: DesignSystem.getBrandGradient('primary'),
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(18),
                         ),
                         child: Center(
                           child: Icon(
                             FontAwesomeIcons.droplet,
                             color: Colors.white,
-                            size: 28,
+                            size: 32,
                           ),
                         ),
                       ),
@@ -1680,6 +1665,7 @@ class _CartScreenState extends State<CartScreen>
                         child: Text(
                           productPrice.toStringAsFixed(2),
                           style: DesignSystem.bodyLarge.copyWith(
+                            fontSize: 13,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Rubik',
@@ -1876,28 +1862,17 @@ class _CartScreenState extends State<CartScreen>
   }
 
   Widget _buildCartItem(CartItem cartItem, int index) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Product Image
           Container(
-            width: 70,
-            height: 70,
+            width: 84,
+            height: 84,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(25),
+              borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
@@ -1907,17 +1882,17 @@ class _CartScreenState extends State<CartScreen>
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(25),
+              borderRadius: BorderRadius.circular(22),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: DesignSystem.getBrandGradient('primary'),
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(22),
                 ),
                 child: Center(
                   child: Icon(
                     FontAwesomeIcons.droplet,
                     color: Colors.white,
-                    size: 28,
+                    size: 32,
                   ),
                 ),
               ),
@@ -1960,6 +1935,7 @@ class _CartScreenState extends State<CartScreen>
                       child: Text(
                         _getProductPrice(cartItem.productId).toStringAsFixed(2),
                         style: DesignSystem.bodyLarge.copyWith(
+                          fontSize: 13,
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Rubik',

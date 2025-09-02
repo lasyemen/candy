@@ -80,8 +80,8 @@ class AppRoutes {
       healthTracker: (context) => const RewardsScreen(),
       rewards: (context) => const RewardsScreen(),
 
-      // Delivery and Payment Routes
-      deliveryLocation: (context) => const DeliveryLocationScreen(),
+  // Delivery and Payment Routes
+  deliveryLocation: (context) => const DeliveryLocationScreen(),
       // Removed old payment tracking flow
 
       // Rewards testing route
@@ -91,7 +91,8 @@ class AppRoutes {
         final args =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         final total = (args?['total'] as num?)?.toDouble();
-        return CardPaymentScreen(orderTotal: total);
+        final method = args?['method'] as String?;
+        return CardPaymentScreen(orderTotal: total, initialMethod: method);
       },
       paymentMethods: (context) {
         final args =
@@ -113,18 +114,28 @@ class AppRoutes {
       // Reminder settings
       reminderSettings: (context) => const ReminderSettingsScreen(),
       fullMap: (context) {
-        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         final initialLat = (args?['initialLat'] as num?)?.toDouble();
         final initialLng = (args?['initialLng'] as num?)?.toDouble();
         final isEditing = args?['isEditing'] == true;
-        return FullMapScreen(initialLat: initialLat, initialLng: initialLng, isEditing: isEditing);
+        return FullMapScreen(
+          initialLat: initialLat,
+          initialLng: initialLng,
+          isEditing: isEditing,
+        );
       },
       orderTracking: (context) {
-        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         final orderId = (args?['orderId'] ?? args?['id'] ?? '').toString();
         final userLat = (args?['userLat'] as num?)?.toDouble();
         final userLng = (args?['userLng'] as num?)?.toDouble();
-        return LiveOrderTrackingScreen(orderId: orderId, userLat: userLat, userLng: userLng);
+        return LiveOrderTrackingScreen(
+          orderId: orderId,
+          userLat: userLat,
+          userLng: userLng,
+        );
       },
 
       // Product Routes

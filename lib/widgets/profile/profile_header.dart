@@ -11,17 +11,48 @@ class ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isLoggedIn = CustomerSession.instance.isLoggedIn;
     final String displayName = CustomerSession.instance.customerName;
-    final String displayPhone =
+    final String rawPhone =
         CustomerSession.instance.currentCustomerPhone ?? '—';
+    String displayPhone = rawPhone;
+    // Always display with country code (+966) when it's a Saudi number
+    final digits = rawPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digits.startsWith('+966')) {
+      // e.g. +9665XXXXXXXX -> +966 5X XXX XXXX
+      final tail = digits.substring(4); // after +966
+      final national = tail.replaceFirst(RegExp(r'^0+'), '');
+      if (national.length >= 9) {
+        final op = national.substring(0, 2); // operator (e.g. 50, 53, ...)
+        final mid = national.substring(2, 5);
+        final last = national.substring(5, 9);
+        displayPhone = '+966 $op $mid $last';
+      } else {
+        displayPhone = '+966 $national';
+      }
+    } else if (digits.startsWith('05')) {
+      // Local format 05XXXXXXXX -> convert to +966 5X XXX XXXX
+      final national = digits.substring(1); // drop leading 0
+      if (national.length >= 9) {
+        final op = national.substring(0, 2);
+        final mid = national.substring(2, 5);
+        final last = national.substring(5, 9);
+        displayPhone = '+966 $op $mid $last';
+      } else {
+        displayPhone = '+966 $national';
+      }
+    } else {
+      displayPhone = rawPhone;
+    }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 1, 1, 20),
       color: Colors.transparent,
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Avatar first: in RTL it will appear on the right side
           Container(
-            width: 90,
-            height: 90,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: DesignSystem.getBrandGradient('primary'),
@@ -32,46 +63,45 @@ class ProfileHeader extends StatelessWidget {
                 (displayName.isNotEmpty
                     ? displayName.trim().substring(0, 1).toUpperCase()
                     : '👤'),
-                style: const TextStyle(fontSize: 36),
+                style: const TextStyle(fontSize: 30),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            displayName,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-              color: Theme.of(context).colorScheme.onBackground,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white.withOpacity(0.06)
-                  : Colors.black.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withOpacity(0.2),
-              ),
-            ),
-            child: Row(
+          const SizedBox(width: 12),
+          // Name and phone next to avatar
+          Expanded(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.phone, size: 14, color: Theme.of(context).hintColor),
-                const SizedBox(width: 6),
                 Text(
-                  isLoggedIn
-                      ? displayPhone
-                      : AppTranslations.getText('guest', language),
-                  style: DesignSystem.labelLarge.copyWith(
-                    color: Theme.of(context).hintColor,
-                    fontWeight: FontWeight.w600,
+                  displayName,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontFamily: 'Rubik',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.onBackground,
                   ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        isLoggedIn
+                            ? displayPhone
+                            : AppTranslations.getText('guest', language),
+                        style: DesignSystem.labelLarge.copyWith(
+                          fontSize: 13,
+                          color: Theme.of(context).hintColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -50,7 +50,7 @@ class AppTranslations {
       'no_orders_message': 'لم يتم العثور على طلبات كاندي',
 
       // Profile
-      'profile_title': 'الملف الشخصي',
+  'profile_title': 'حسابي',
       'member_since': 'عضو كاندي منذ',
       'my_statistics': 'إحصائيات كاندي',
       'total_orders': 'إجمالي الطلبات',

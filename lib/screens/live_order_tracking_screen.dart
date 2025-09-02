@@ -12,10 +12,16 @@ class LiveOrderTrackingScreen extends StatefulWidget {
   final String orderId;
   final double? userLat;
   final double? userLng;
-  const LiveOrderTrackingScreen({super.key, required this.orderId, this.userLat, this.userLng});
+  const LiveOrderTrackingScreen({
+    super.key,
+    required this.orderId,
+    this.userLat,
+    this.userLng,
+  });
 
   @override
-  State<LiveOrderTrackingScreen> createState() => _LiveOrderTrackingScreenState();
+  State<LiveOrderTrackingScreen> createState() =>
+      _LiveOrderTrackingScreenState();
 }
 
 class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
@@ -54,7 +60,9 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
     if (widget.userLat != null && widget.userLng != null) {
       _userAnn = await _annManager!.create(
         mb.PointAnnotationOptions(
-          geometry: mb.Point(coordinates: mb.Position(widget.userLng!, widget.userLat!)),
+          geometry: mb.Point(
+            coordinates: mb.Position(widget.userLng!, widget.userLat!),
+          ),
           image: _userIcon!,
           iconAnchor: mb.IconAnchor.BOTTOM,
           iconSize: 1.2,
@@ -93,7 +101,13 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
         final lat = (res['lat'] as num).toDouble();
         final lng = (res['lng'] as num).toDouble();
         final heading = (res['heading'] as num?)?.toDouble();
-        await _updateDriver(lat, lng, heading: heading, centerCamera: true, zoom: 14.5);
+        await _updateDriver(
+          lat,
+          lng,
+          heading: heading,
+          centerCamera: true,
+          zoom: 14.5,
+        );
       }
     } catch (_) {
       // ignore — table may not exist yet
@@ -103,36 +117,37 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
   void _subscribeRealtime() {
     try {
       final client = SupabaseService.instance.client;
-      _channel = client.channel('public:driver_locations:order:${widget.orderId}')
-        ..onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'driver_locations',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'order_id',
-            value: widget.orderId,
-          ),
-          callback: (payload) {
-            final row = payload.newRecord;
-            _handleRealtimeRow(row);
-          },
-        )
-        ..onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'driver_locations',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'order_id',
-            value: widget.orderId,
-          ),
-          callback: (payload) {
-            final row = payload.newRecord;
-            _handleRealtimeRow(row);
-          },
-        )
-        ..subscribe();
+      _channel =
+          client.channel('public:driver_locations:order:${widget.orderId}')
+            ..onPostgresChanges(
+              event: PostgresChangeEvent.insert,
+              schema: 'public',
+              table: 'driver_locations',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'order_id',
+                value: widget.orderId,
+              ),
+              callback: (payload) {
+                final row = payload.newRecord;
+                _handleRealtimeRow(row);
+              },
+            )
+            ..onPostgresChanges(
+              event: PostgresChangeEvent.update,
+              schema: 'public',
+              table: 'driver_locations',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'order_id',
+                value: widget.orderId,
+              ),
+              callback: (payload) {
+                final row = payload.newRecord;
+                _handleRealtimeRow(row);
+              },
+            )
+            ..subscribe();
     } catch (_) {
       // ignore — fallback polling will handle updates
     }
@@ -167,7 +182,13 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
     } catch (_) {}
   }
 
-  Future<void> _updateDriver(double lat, double lng, {double? heading, bool centerCamera = true, double? zoom}) async {
+  Future<void> _updateDriver(
+    double lat,
+    double lng, {
+    double? heading,
+    bool centerCamera = true,
+    double? zoom,
+  }) async {
     if (_map == null || _annManager == null) return;
     if (_driverIcon == null) _driverIcon = await _buildDriverIcon();
 
@@ -177,7 +198,9 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
 
     // Recreate driver annotation (simple & compatible across SDK versions)
     if (_driverAnn != null) {
-      try { await _annManager!.delete(_driverAnn!); } catch (_) {}
+      try {
+        await _annManager!.delete(_driverAnn!);
+      } catch (_) {}
       _driverAnn = null;
     }
     _driverAnn = await _annManager!.create(
@@ -224,7 +247,10 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
             child: SafeArea(
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.withOpacity(0.38),
                     borderRadius: BorderRadius.circular(12),
@@ -237,7 +263,11 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
                       shadows: [
-                        Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+                        Shadow(
+                          color: Colors.black54,
+                          blurRadius: 6,
+                          offset: Offset(0, 1),
+                        ),
                       ],
                     ),
                   ),
@@ -282,7 +312,9 @@ class _LiveOrderTrackingScreenState extends State<LiveOrderTrackingScreen> {
                     if (_driverLat != null && _driverLng != null) {
                       await _map?.setCamera(
                         mb.CameraOptions(
-                          center: mb.Point(coordinates: mb.Position(_driverLng!, _driverLat!)),
+                          center: mb.Point(
+                            coordinates: mb.Position(_driverLng!, _driverLat!),
+                          ),
                           zoom: 15.0,
                         ),
                       );

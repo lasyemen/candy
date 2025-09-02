@@ -2,11 +2,10 @@
 library payment_method_selection_screen;
 
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/constants/design_system.dart';
-import '../core/constants/app_colors.dart';
 import '../core/routes/app_routes.dart';
+import '../core/services/cart_session_manager.dart';
 
 part 'functions/payment_method_selection_screen.functions.dart';
 
@@ -29,12 +28,38 @@ class _PaymentMethodSelectionScreenState
     extends State<PaymentMethodSelectionScreen>
     with PaymentMethodSelectionScreenFunctions {
   String? selectedMethodId;
+  double? _resolvedTotal;
+  bool _loadingTotal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeResolveTotal();
+  }
+
+  Future<void> _maybeResolveTotal() async {
+    if (widget.orderTotal != null) {
+      setState(() => _resolvedTotal = widget.orderTotal);
+      return;
+    }
+    setState(() => _loadingTotal = true);
+    try {
+      final summary = await CartSessionManager.instance.getCartSummary();
+      final total = (summary['total'] as double?) ?? 0.0;
+      if (mounted) setState(() => _resolvedTotal = total);
+    } catch (e) {
+      // Fallback to 0 if cannot resolve
+      if (mounted) setState(() => _resolvedTotal = 0.0);
+    } finally {
+      if (mounted) setState(() => _loadingTotal = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double amount = (widget.orderTotal ?? 0) > 0
-        ? widget.orderTotal!
-        : 120;
+  final double amount = (_resolvedTotal ?? widget.orderTotal ?? 0) > 0
+    ? (_resolvedTotal ?? widget.orderTotal)!
+    : 120;
 
     final bool isAr = Localizations.localeOf(context).languageCode == 'ar';
     final String titleText = isAr
@@ -111,13 +136,22 @@ class _PaymentMethodSelectionScreenState
                                 color: Colors.white,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                '${amount.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              _loadingTotal
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      '${amount.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ],
                           ),
                         ),
@@ -148,75 +182,6 @@ class _PaymentMethodSelectionScreenState
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white10
-                                : Colors.transparent,
-                            child: Builder(
-                              builder: (context) {
-                                try {
-                                  if (m.id == 'visa') {
-                                    return Image.asset(
-                                      'assets/icon/visa-brandmark-blue-1960x622.webp',
-                                      width: 28,
-                                      height: 28,
-                                      fit: BoxFit.contain,
-                                    );
-                                  }
-
-                                  if (m.id == 'apple_pay') {
-                                    return SvgPicture.asset(
-                                      'assets/icon/Apple_Pay_Mark_RGB_041619.svg',
-                                      width: 28,
-                                      height: 28,
-                                    );
-                                  }
-
-                                  if (m.id == 'mada') {
-                                    return SvgPicture.asset(
-                                      'assets/icon/شعار مدى – SVG.svg',
-                                      width: 28,
-                                      height: 28,
-                                      fit: BoxFit.contain,
-                                    );
-                                  }
-
-                                  if (m.id == 'mastercard') {
-                                    return SvgPicture.asset(
-                                      'assets/icon/mc_symbol.svg',
-                                      width: 28,
-                                      height: 28,
-                                      fit: BoxFit.contain,
-                                    );
-                                  }
-
-                                  if (m.id == 'cod') {
-                                    return Icon(
-                                      Icons.money,
-                                      color: AppColors.primary,
-                                    );
-                                  }
-
-                                  // Default fallback: try generic asset path in assets/icon by id
-                                  return Image.asset(
-                                    'assets/icon/${m.id}.png',
-                                    width: 28,
-                                    height: 28,
-                                    errorBuilder:
-                                        (context, error, stackTrace) => Icon(
-                                          m.icon,
-                                          color: AppColors.primary,
-                                        ),
-                                  );
-                                } catch (_) {
-                                  return Icon(m.icon, color: AppColors.primary);
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,11 +256,47 @@ class _PaymentMethodSelectionScreenState
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          final method = selectedMethodId;
+                          if (method == null) return;
+
+                          // If Cash on Delivery, perform checkout immediately and go to Thank You
+                          if (method == 'cod') {
+                            try {
+                              final summary = await CartSessionManager.instance
+                                  .getCartSummary();
+                              final total = (summary['total'] as double?) ??
+                                  (_resolvedTotal ?? 0.0);
+                              final orderId = await CartSessionManager.instance
+                                  .checkout(
+                                deliveryData: widget.deliveryData,
+                                paymentMethod: 'cod',
+                              );
+                              if (!mounted) return;
+                              Navigator.of(context).pushReplacementNamed(
+                                AppRoutes.thankYou,
+                                arguments: {
+                                  'total': total,
+                                  'orderId': orderId,
+                                },
+                              );
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('تعذر إتمام العملية: $e'),
+                                  ),
+                                );
+                              }
+                            }
+                            return;
+                          }
+
+                          // Otherwise go to card payment screen with the selected method
                           final args = {
                             'total': amount,
                             'deliveryData': widget.deliveryData,
-                            'method': selectedMethodId,
+                            'method': method,
                           };
                           Navigator.of(
                             context,

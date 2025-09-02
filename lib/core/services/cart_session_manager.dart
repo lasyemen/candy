@@ -545,7 +545,10 @@ class CartSessionManager {
   }
 
   // Checkout cart
-  Future<String> checkout({Map<String, dynamic>? deliveryData}) async {
+  Future<String> checkout({
+    Map<String, dynamic>? deliveryData,
+    String? paymentMethod,
+  }) async {
     try {
       if (_currentCartId == null) {
         throw Exception('No active cart');
@@ -563,15 +566,15 @@ class CartSessionManager {
         cart['cart_items'] ?? const <Map<String, dynamic>>[],
       );
       final Set<String> productIds = {
-        for (final item in cartItems) (item['product_id'] as String)
+        for (final item in cartItems) (item['product_id'] as String),
       };
 
       Map<String, Map<String, dynamic>> productMap = {};
       if (productIds.isNotEmpty) {
-    final products = await SupabaseService.instance.client
-      .from('products')
-      .select('id, name, price')
-      .inFilter('id', productIds.toList());
+        final products = await SupabaseService.instance.client
+            .from('products')
+            .select('id, name, price')
+            .inFilter('id', productIds.toList());
         for (final p in products) {
           final id = p['id'] as String;
           productMap[id] = Map<String, dynamic>.from(p);
@@ -593,44 +596,144 @@ class CartSessionManager {
         orderTotal += qty * price;
       }
 
-      print('CartSessionManager - Checkout: computed orderTotal=$orderTotal, cartId=$_currentCartId');
+      print(
+        'CartSessionManager - Checkout: computed orderTotal=$orderTotal, cartId=$_currentCartId',
+      );
 
       // Guard: prevent inserting orders with zero/invalid totals which violate DB constraints
       if (orderTotal <= 0.0) {
         throw Exception('Invalid order total: $orderTotal');
       }
-      final String orderNumber = 'ORD-${DateTime.now().toUtc().millisecondsSinceEpoch}';
       final nowIso = DateTime.now().toIso8601String();
-      final orderInsertBody = {
+      final Map<String, dynamic> orderInsertBody = {
         'customer_id': cart['customer_id'],
-        'cart_id': _currentCartId!,
-        'order_number': orderNumber,
+        // Keep status explicit
         'status': 'pending',
-  // Amounts
-  'total_amount': orderTotal,
-        // Ensure positive amounts required by DB constraints
-        'subtotal': orderTotal,
-        'final_amount': orderTotal,
-        'tax_amount': 0.00,
-        'shipping_amount': 0.00,
-        'discount_amount': 0.00,
-        'voucher_discount': 0.00,
-        // Align with schema: use shipping_address JSON and delivery_notes text only
+        // Amounts: provide both common variants for compatibility
+        'total': orderTotal,
+        'total_amount': orderTotal,
+        if (paymentMethod != null && paymentMethod.isNotEmpty)
+          'payment_method': paymentMethod,
+        // Shipping info
         'shipping_address': (deliveryData?['address'] != null)
-            ? {
-                'address': deliveryData!['address'],
-              }
+            ? {'address': deliveryData!['address']}
             : null,
         'delivery_notes': deliveryData?['notes'] ?? '',
         'created_at': nowIso,
         'updated_at': nowIso,
       };
 
-      final order = await SupabaseService.instance.client
-          .from('orders')
-          .insert(orderInsertBody)
-          .select()
-          .single();
+      Future<Map<String, dynamic>> _insertOrderWithFallback(
+        Map<String, dynamic> body,
+      ) async {
+        // Do not remove these critical fields; if they are missing in DB, fail fast
+        const nonRemovable = {
+          'customer_id',
+          'total',
+          'total_amount',
+        };
+
+        Map<String, dynamic> attemptBody = Map<String, dynamic>.from(body);
+        String _norm(String s) => s.replaceAll(RegExp(r'_+'), '_');
+        String? _matchKeyByNormalized(Map<String, dynamic> m, String missing) {
+          final nm = _norm(missing);
+          for (final k in m.keys) {
+            if (_norm(k) == nm) return k;
+          }
+          return null;
+        }
+        for (int i = 0; i < 8; i++) {
+          try {
+            final inserted = await SupabaseService.instance.client
+                .from('orders')
+                .insert(attemptBody)
+                .select()
+                .single();
+            return inserted;
+          } catch (e) {
+            final msg = e.toString();
+            // If a NOT NULL constraint fails, try to populate sensible defaults
+            final nullRegex = RegExp(
+                "null value in column '([^']+)' of relation 'orders'",
+                caseSensitive: false);
+            final nullMatch = nullRegex.firstMatch(msg);
+            if (nullMatch != null) {
+              final missing = nullMatch.group(1);
+              if (missing != null) {
+                final nm = _norm(missing);
+                // Map common amount columns
+                if (nm == 'total' || nm == 'total_amount') {
+                  attemptBody[missing] = orderTotal;
+                  continue;
+                }
+                if (nm == 'subtotal') {
+                  attemptBody[missing] = orderTotal;
+                  continue;
+                }
+                if (nm == 'final' || nm == 'final_amount') {
+                  attemptBody[missing] = orderTotal;
+                  continue;
+                }
+                if (nm == 'tax' || nm == 'tax_amount') {
+                  attemptBody[missing] = 0.00;
+                  continue;
+                }
+                if (nm == 'shipping' || nm == 'shipping_amount') {
+                  attemptBody[missing] = 0.00;
+                  continue;
+                }
+                if (nm == 'discount' || nm == 'discount_amount') {
+                  attemptBody[missing] = 0.00;
+                  continue;
+                }
+                if (nm == 'voucher_discount') {
+                  attemptBody[missing] = 0.00;
+                  continue;
+                }
+                if (nm == 'status') {
+                  attemptBody[missing] = 'pending';
+                  continue;
+                }
+              }
+            }
+            // Try to extract missing column name pattern from Postgrest error
+            final regex = RegExp("'([^']+)' column of 'orders'");
+            final match = regex.firstMatch(msg);
+            if (match == null) {
+              // Also handle variant: Could not find the '<name>' column of 'orders'
+              final regex2 =
+                  RegExp("Could not find the '([^']+)' column of 'orders'");
+              final match2 = regex2.firstMatch(msg);
+              final col2 = match2 != null ? match2.group(1) : null;
+              if (col2 != null && !nonRemovable.contains(_norm(col2))) {
+                final key = attemptBody.containsKey(col2)
+                    ? col2
+                    : _matchKeyByNormalized(attemptBody, col2);
+                if (key != null) {
+                  attemptBody.remove(key);
+                  continue;
+                }
+              }
+              rethrow;
+            }
+            final col = match.group(1);
+            if (col != null && !nonRemovable.contains(_norm(col))) {
+              final key = attemptBody.containsKey(col)
+                  ? col
+                  : _matchKeyByNormalized(attemptBody, col);
+              if (key != null) {
+                attemptBody.remove(key);
+                continue;
+              }
+            }
+            rethrow;
+          }
+        }
+        // If we reach here, give up
+        throw Exception('Failed to insert order after resolving columns');
+      }
+
+      final order = await _insertOrderWithFallback(orderInsertBody);
       print('CartSessionManager - Order insert response: $order');
 
       // Build and bulk insert order items to reduce network round-trips
@@ -646,7 +749,8 @@ class CartSessionManager {
           if (rawName is String && rawName.isNotEmpty) prodName = rawName;
           final dynamic rawPrice = prod['price'];
           if (rawPrice is num) prodPrice = rawPrice.toDouble();
-          if (rawPrice is String) prodPrice = double.tryParse(rawPrice) ?? prodPrice;
+          if (rawPrice is String)
+            prodPrice = double.tryParse(rawPrice) ?? prodPrice;
           if (prodPrice <= 0.0) prodPrice = 5.0;
         }
         orderItemRows.add({
@@ -661,9 +765,44 @@ class CartSessionManager {
       }
 
       if (orderItemRows.isNotEmpty) {
-        await SupabaseService.instance.client
-            .from('order_items')
-            .insert(orderItemRows);
+        Future<void> _insertOrderItemsWithFallback(
+          List<Map<String, dynamic>> rows,
+        ) async {
+          // Non-removable core fields for an order item
+          const core = {'order_id', 'product_id', 'quantity'};
+
+          // Attempt insert with retries by removing unknown columns
+          var attemptRows = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+          for (int i = 0; i < 6; i++) {
+            try {
+              await SupabaseService.instance.client
+                  .from('order_items')
+                  .insert(attemptRows);
+              return;
+            } catch (e) {
+              final msg = e.toString();
+              // Missing column patterns
+              final re1 = RegExp("'([^']+)' column of 'order_items'");
+              final re2 = RegExp("Could not find the '([^']+)' column of 'order_items'");
+              String? missing;
+              final m1 = re1.firstMatch(msg);
+              if (m1 != null) missing = m1.group(1);
+              final m2 = re2.firstMatch(msg);
+              if (missing == null && m2 != null) missing = m2.group(1);
+              if (missing != null && !core.contains(missing)) {
+                for (final r in attemptRows) {
+                  r.remove(missing);
+                }
+                // Retry without this column
+                continue;
+              }
+              rethrow;
+            }
+          }
+          throw Exception('Failed to insert order items after resolving columns');
+        }
+
+        await _insertOrderItemsWithFallback(orderItemRows);
       }
 
       // Clear cart
@@ -706,9 +845,11 @@ class CartSessionManager {
           .select('*, products(*)')
           .eq('cart_id', cartId);
 
-  double total = 0;
-  if (items.isEmpty) {
-        print('CartSessionManager - _calculateCartTotal: no items found for cart $cartId');
+      double total = 0;
+      if (items.isEmpty) {
+        print(
+          'CartSessionManager - _calculateCartTotal: no items found for cart $cartId',
+        );
         return 0.0;
       }
 
@@ -716,7 +857,9 @@ class CartSessionManager {
         final quantity = item['quantity'] as int? ?? 0;
         final product = item['products'] as Map<String, dynamic>?;
         if (product == null) {
-          print('CartSessionManager - _calculateCartTotal: product data missing for item $item');
+          print(
+            'CartSessionManager - _calculateCartTotal: product data missing for item $item',
+          );
           continue;
         }
 
@@ -729,18 +872,26 @@ class CartSessionManager {
             price = double.tryParse(rawPrice) ?? 0.0;
           }
         } catch (e) {
-          print('CartSessionManager - _calculateCartTotal: error parsing price for product ${product['id']}: $e');
+          print(
+            'CartSessionManager - _calculateCartTotal: error parsing price for product ${product['id']}: $e',
+          );
         }
 
         if (price <= 0.0) {
-          print('CartSessionManager - _calculateCartTotal: price is zero or missing for product ${product['id']}, rawPrice=$rawPrice');
+          print(
+            'CartSessionManager - _calculateCartTotal: price is zero or missing for product ${product['id']}, rawPrice=$rawPrice',
+          );
         }
 
         total += quantity * price;
-        print('CartSessionManager - _calculateCartTotal: item product=${product['id']}, qty=$quantity, unitPrice=$price');
+        print(
+          'CartSessionManager - _calculateCartTotal: item product=${product['id']}, qty=$quantity, unitPrice=$price',
+        );
       }
 
-      print('CartSessionManager - _calculateCartTotal: computed total=$total for cart $cartId');
+      print(
+        'CartSessionManager - _calculateCartTotal: computed total=$total for cart $cartId',
+      );
       return total;
     } catch (e) {
       print('CartSessionManager - Error calculating cart total: $e');

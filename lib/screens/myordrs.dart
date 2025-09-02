@@ -1,5 +1,6 @@
 // lib/screens/myordrs.dart
 library my_orders_screen;
+
 import '../core/routes/app_routes.dart';
 
 import 'package:flutter/material.dart';
@@ -95,7 +96,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
         }
 
         // attempt to extract driver name from multiple possible shapes
-        dynamic _driverRaw = r['driver'] ??
+        dynamic _driverRaw =
+            r['driver'] ??
             r['driver_name'] ??
             r['driverName'] ??
             r['driver_id'] ??
@@ -105,10 +107,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
         String? _driverVal;
         if (_driverRaw != null) {
           if (_driverRaw is Map) {
-            _driverVal = (_driverRaw['name'] ??
-                    _driverRaw['full_name'] ??
-                    _driverRaw['driver_name'])
-                ?.toString();
+            _driverVal =
+                (_driverRaw['name'] ??
+                        _driverRaw['full_name'] ??
+                        _driverRaw['driver_name'])
+                    ?.toString();
           } else {
             _driverVal = _driverRaw.toString();
           }
@@ -166,9 +169,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
       final matchesQuery = _query.isEmpty
           ? true
           : (o['id'].toString().contains(_query) ||
-              (o['items'] as List).join(' ').contains(_query));
-      final matchesStatus =
-          _statusFilter == 'الكل' ? true : (o['status'] == _statusFilter);
+                (o['items'] as List).join(' ').contains(_query));
+      final matchesStatus = _statusFilter == 'الكل'
+          ? true
+          : (o['status'] == _statusFilter);
 
       bool matchesTime = true;
       if (_timeFilter != 'الكل') {
@@ -216,7 +220,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
 
   @override
   Widget build(BuildContext context) {
-  // final scheme = Theme.of(context).colorScheme; // not needed at this scope
+    // final scheme = Theme.of(context).colorScheme; // not needed at this scope
     // Match product card background: white in light mode, 0xFF2A2A2A in dark mode
     final cardColor = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF2A2A2A)
@@ -352,9 +356,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     AppRoutes.navigateTo(
       context,
       AppRoutes.orderTracking,
-      arguments: {
-        'orderId': orderId,
-      },
+      arguments: {'orderId': orderId},
     );
   }
 
@@ -469,10 +471,12 @@ class _SearchField extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     // Let parent control width (we wrap _SearchField with padding where used)
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final searchFillColor =
-        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0);
-    final searchIconColor =
-        isDark ? scheme.onSurface.withOpacity(0.7) : Colors.black;
+    final searchFillColor = isDark
+        ? const Color(0xFF2A2A2A)
+        : const Color(0xFFF0F0F0);
+    final searchIconColor = isDark
+        ? scheme.onSurface.withOpacity(0.7)
+        : Colors.black;
     return TextField(
       controller: controller,
       textInputAction: TextInputAction.search,
@@ -713,15 +717,16 @@ class _LiveOrderCard extends StatelessWidget {
     final items = (order['items'] as List).cast<String>();
     final status = order['status']?.toString() ?? '';
     final id = order['id']?.toString() ?? '';
-  // final eta = order['eta']?.toString();
+    // final eta = order['eta']?.toString();
     // Prefer backend driver if present, otherwise show a realistic assigned mock
     final rawDriver =
         order['driver'] ?? order['driver_name'] ?? order['driverName'];
     String? driver = rawDriver?.toString();
     final rawVehicle = order['vehicle'];
     String? vehicle = rawVehicle?.toString();
-    final String driverDisplay =
-        (driver != null && driver.isNotEmpty) ? driver : 'سامي';
+    final String driverDisplay = (driver != null && driver.isNotEmpty)
+        ? driver
+        : 'سامي';
     final String vehicleDisplay = (vehicle != null && vehicle.isNotEmpty)
         ? vehicle
         : 'تويوتا هايلكس • 1234';
@@ -752,8 +757,8 @@ class _LiveOrderCard extends StatelessWidget {
                     child: Text(
                       'طلب رقم: $id',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -762,10 +767,12 @@ class _LiveOrderCard extends StatelessWidget {
                     builder: (context) {
                       final statusRaw = status;
                       final statusLower = statusRaw.toLowerCase();
-                      final isPending = statusLower.contains('pending') ||
+                      final isPending =
+                          statusLower.contains('pending') ||
                           statusRaw.contains('قيد');
-                      final displayStatus =
-                          isPending ? 'قيد الانتظار' : statusRaw;
+                      final displayStatus = isPending
+                          ? 'قيد الانتظار'
+                          : statusRaw;
                       if (isPending) {
                         final grad = DesignSystem.getBrandGradient('primary');
                         return Container(
@@ -786,11 +793,10 @@ class _LiveOrderCard extends StatelessWidget {
                             ),
                             child: Text(
                               displayStatus,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Theme.of(context).brightness ==
+                                    color:
+                                        Theme.of(context).brightness ==
                                             Brightness.dark
                                         ? Colors.white
                                         : Colors.black,
@@ -811,11 +817,11 @@ class _LiveOrderCard extends StatelessWidget {
                         ),
                         child: Text(
                           displayStatus,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: color,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: color,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       );
                     },
@@ -828,8 +834,8 @@ class _LiveOrderCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurface.withOpacity(0.75),
-                    ),
+                  color: scheme.onSurface.withOpacity(0.75),
+                ),
               ),
               const SizedBox(height: 12),
 
@@ -1013,8 +1019,8 @@ class _OrderTimeline extends StatelessWidget {
                         child: ShaderMask(
                           shaderCallback: (bounds) =>
                               DesignSystem.getBrandGradient(
-                            'primary',
-                          ).createShader(bounds),
+                                'primary',
+                              ).createShader(bounds),
                           blendMode: BlendMode.srcIn,
                           child: _DotStep(
                             filled: (3 - i) <= step,
@@ -1048,12 +1054,12 @@ class _OrderTimeline extends StatelessWidget {
                           maxLines: 2,
                           softWrap: true,
                           overflow: TextOverflow.visible,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontSize: 10,
-                                    color: scheme.onSurface.withOpacity(0.72),
-                                    height: 1.05,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontSize: 10,
+                                color: scheme.onSurface.withOpacity(0.72),
+                                height: 1.05,
+                              ),
                         ),
                       ),
                     );
@@ -1123,12 +1129,14 @@ class _ConnectorPainter extends CustomPainter {
       final angle = (to - from).direction;
 
       // start/end near the dot edge, slightly under the dot
-      var p1 = from +
+      var p1 =
+          from +
           Offset(
             math.cos(angle) * edgeWithUnderlap,
             math.sin(angle) * edgeWithUnderlap,
           );
-      var p2 = to -
+      var p2 =
+          to -
           Offset(
             math.cos(angle) * edgeWithUnderlap,
             math.sin(angle) * edgeWithUnderlap,
@@ -1232,8 +1240,8 @@ class _PastOrderTile extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurface.withOpacity(0.7),
-              ),
+            color: scheme.onSurface.withOpacity(0.7),
+          ),
         ),
       ),
       trailing: FilledButton.tonal(

@@ -20,7 +20,8 @@ class GeocodingService {
   String _ensureSearchSession() {
     final now = DateTime.now().millisecondsSinceEpoch;
     // refresh session token every ~10 minutes
-    if (_searchSessionToken == null || now - _searchSessionStartedAtMs > 10 * 60 * 1000) {
+    if (_searchSessionToken == null ||
+        now - _searchSessionStartedAtMs > 10 * 60 * 1000) {
       final bytes = List<int>.generate(16, (_) => _rand.nextInt(256));
       _searchSessionToken = base64Url.encode(bytes);
       _searchSessionStartedAtMs = now;
@@ -45,13 +46,16 @@ class GeocodingService {
       final features = data['features'] as List<dynamic>?;
       if (features == null || features.isEmpty) return null;
       final f = features.first as Map<String, dynamic>;
-      final String primary = ((f['text_ar'] ?? f['text']) as String? ?? '').trim();
+      final String primary = ((f['text_ar'] ?? f['text']) as String? ?? '')
+          .trim();
       final List<dynamic> ctx = (f['context'] as List<dynamic>?) ?? const [];
       String area = '';
       for (final c in ctx) {
         final m = (c as Map).cast<String, dynamic>();
         final id = (m['id'] as String?) ?? '';
-        if (id.startsWith('neighborhood') || id.startsWith('locality') || id.startsWith('place')) {
+        if (id.startsWith('neighborhood') ||
+            id.startsWith('locality') ||
+            id.startsWith('place')) {
           area = ((m['text_ar'] ?? m['text']) as String? ?? '').trim();
           if (area.isNotEmpty) break;
         }
@@ -65,7 +69,8 @@ class GeocodingService {
         composed = area;
       }
       if (composed.isNotEmpty) return composed;
-      final String? placeName = (f['place_name_ar'] ?? f['place_name']) as String?;
+      final String? placeName =
+          (f['place_name_ar'] ?? f['place_name']) as String?;
       return placeName;
     } catch (_) {
       return null;
@@ -94,7 +99,8 @@ class GeocodingService {
       'access_token': token,
     };
     if (proximityLat != null && proximityLng != null) {
-      params['proximity'] = '${proximityLng.toStringAsFixed(6)},${proximityLat.toStringAsFixed(6)}';
+      params['proximity'] =
+          '${proximityLng.toStringAsFixed(6)},${proximityLat.toStringAsFixed(6)}';
     }
     if (country != null && country.isNotEmpty) {
       params['country'] = country;
@@ -116,13 +122,16 @@ class GeocodingService {
         final lng = center[0].toDouble();
         final lat = center[1].toDouble();
         final name = ((f['text_ar'] ?? f['text']) as String? ?? '').trim();
-        final placeName = ((f['place_name_ar'] ?? f['place_name']) as String?)?.trim();
-        results.add(GeocodeResult(
-          name: name.isNotEmpty ? name : (placeName ?? ''),
-          placeName: placeName ?? name,
-          lat: lat,
-          lng: lng,
-        ));
+        final placeName = ((f['place_name_ar'] ?? f['place_name']) as String?)
+            ?.trim();
+        results.add(
+          GeocodeResult(
+            name: name.isNotEmpty ? name : (placeName ?? ''),
+            placeName: placeName ?? name,
+            lat: lat,
+            lng: lng,
+          ),
+        );
       }
       return results;
     } catch (_) {
@@ -153,12 +162,17 @@ class GeocodingService {
       'access_token': token,
     };
     if (proximityLat != null && proximityLng != null) {
-      params['proximity'] = '${proximityLng.toStringAsFixed(6)},${proximityLat.toStringAsFixed(6)}';
+      params['proximity'] =
+          '${proximityLng.toStringAsFixed(6)},${proximityLat.toStringAsFixed(6)}';
     }
     if (country != null && country.isNotEmpty) {
       params['country'] = country;
     }
-    final uri = Uri.https('api.mapbox.com', '/search/searchbox/v1/suggest', params);
+    final uri = Uri.https(
+      'api.mapbox.com',
+      '/search/searchbox/v1/suggest',
+      params,
+    );
     try {
       final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode != 200) return const [];
@@ -170,11 +184,19 @@ class GeocodingService {
         final id = (it['mapbox_id'] as String?) ?? (it['id'] as String?);
         if (id == null) continue;
         // Prefer name + place_formatted/description
-        final props = (it['place'] as Map<String, dynamic>?) ?? (it['feature'] as Map<String, dynamic>?);
+        final props =
+            (it['place'] as Map<String, dynamic>?) ??
+            (it['feature'] as Map<String, dynamic>?);
         String name = it['name'] as String? ?? props?['name'] as String? ?? '';
-        final desc = it['place_formatted'] as String? ?? it['description'] as String? ?? props?['full_address'] as String? ?? '';
+        final desc =
+            it['place_formatted'] as String? ??
+            it['description'] as String? ??
+            props?['full_address'] as String? ??
+            '';
         if (name.isEmpty) name = desc;
-  out.add(SearchboxSuggestion(mapboxId: id, name: name, description: desc));
+        out.add(
+          SearchboxSuggestion(mapboxId: id, name: name, description: desc),
+        );
       }
       return out;
     } catch (_) {
@@ -211,8 +233,17 @@ class GeocodingService {
       final lat = coords[1].toDouble();
       final props = (f['properties'] as Map<String, dynamic>?);
       final name = (props?['name'] as String?) ?? (f['text'] as String?) ?? '';
-      final placeName = (props?['full_address'] as String?) ?? (props?['place_formatted'] as String?) ?? (f['place_name'] as String?) ?? name;
-  return GeocodeResult(name: name, placeName: placeName, lat: lat, lng: lng);
+      final placeName =
+          (props?['full_address'] as String?) ??
+          (props?['place_formatted'] as String?) ??
+          (f['place_name'] as String?) ??
+          name;
+      return GeocodeResult(
+        name: name,
+        placeName: placeName,
+        lat: lat,
+        lng: lng,
+      );
     } catch (_) {
       return null;
     }

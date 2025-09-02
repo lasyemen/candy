@@ -10,13 +10,17 @@ import '../core/services/customer_session.dart';
 import '../core/services/supabase_service.dart';
 import '../models/customer.dart';
 import '../core/services/geocoding_service.dart';
-import '../core/services/android_search_bridge.dart';
 
 class FullMapScreen extends StatefulWidget {
   final double? initialLat;
   final double? initialLng;
   final bool isEditing;
-  const FullMapScreen({super.key, this.initialLat, this.initialLng, this.isEditing = false});
+  const FullMapScreen({
+    super.key,
+    this.initialLat,
+    this.initialLng,
+    this.isEditing = false,
+  });
 
   @override
   State<FullMapScreen> createState() => _FullMapScreenState();
@@ -29,13 +33,7 @@ class _FullMapScreenState extends State<FullMapScreen> {
   mb.PointAnnotation? _selectedAnnotation;
   mb.Position? _selectedPosition;
   Uint8List? _pinImageBytes;
-  // Search state
-  final TextEditingController _searchCtrl = TextEditingController();
-  final FocusNode _searchFocus = FocusNode();
-  // We’ll hold both searchbox and geocoder results in a common display model
-  List<_UiSuggestion> _searchResults = const [];
-  bool _searchLoading = false;
-  Timer? _searchDebounce;
+  // No search state (removed)
 
   @override
   void initState() {
@@ -57,10 +55,7 @@ class _FullMapScreenState extends State<FullMapScreen> {
       final pos = mb.Position(initLng, initLat);
       _selectedPosition = pos;
       mapboxMap.setCamera(
-        mb.CameraOptions(
-          center: mb.Point(coordinates: pos),
-          zoom: 16.0,
-        ),
+        mb.CameraOptions(center: mb.Point(coordinates: pos), zoom: 16.0),
       );
       _placePinAt(pos);
     } else {
@@ -87,16 +82,15 @@ class _FullMapScreenState extends State<FullMapScreen> {
       // Ignore if ornaments API is unavailable; not critical
     }
 
-  // Ensure location puck is disabled (selection screen only)
+    // Ensure location puck is disabled (selection screen only)
     _mapboxMap?.location.updateSettings(
       mb.LocationComponentSettings(
-    enabled: false,
-    puckBearingEnabled: false,
-    pulsingEnabled: false,
-    showAccuracyRing: false,
+        enabled: false,
+        puckBearingEnabled: false,
+        pulsingEnabled: false,
+        showAccuracyRing: false,
       ),
     );
-
   }
 
   @override
@@ -109,11 +103,14 @@ class _FullMapScreenState extends State<FullMapScreen> {
             key: const ValueKey('full_map'),
             cameraOptions: mb.CameraOptions(
               center: mb.Point(
-                coordinates: widget.initialLat != null && widget.initialLng != null
+                coordinates:
+                    widget.initialLat != null && widget.initialLng != null
                     ? mb.Position(widget.initialLng!, widget.initialLat!)
                     : mb.Position(46.6753, 24.7136),
               ),
-              zoom: widget.initialLat != null && widget.initialLng != null ? 16.0 : 10.0,
+              zoom: widget.initialLat != null && widget.initialLng != null
+                  ? 16.0
+                  : 10.0,
             ),
             styleUri: MapboxConstants.styleUri,
             onMapCreated: _onMapCreated,
@@ -125,125 +122,41 @@ class _FullMapScreenState extends State<FullMapScreen> {
             },
           ),
 
-          // Top bar: title + search in the same line
+          // Title pill only (search removed)
           Positioned(
             top: 36,
-            left: 16,
             right: 16,
             child: SafeArea(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.38),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'تحديد الموقع',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'Rubik',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 18,
-                        shadows: [
-                          Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 360),
-                        child: Material(
-                      color: Colors.white,
-                      elevation: 2,
-                      borderRadius: BorderRadius.circular(28),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, color: Colors.black54),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchCtrl,
-                                focusNode: _searchFocus,
-                                textDirection: TextDirection.rtl,
-                                decoration: const InputDecoration(
-                                  hintText: 'ابحث عن شارع أو مكان...',
-                                  border: InputBorder.none,
-                                ),
-                                onChanged: _onSearchChanged,
-                              ),
-                            ),
-                            if (_searchLoading)
-                              const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            if (_searchLoading) const SizedBox(width: 8),
-                            if (_searchCtrl.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                onPressed: _clearSearch,
-                              )
-                          ],
-                        ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Search suggestions dropdown
-          if (_searchResults.isNotEmpty)
-            Positioned(
-              top: 88,
-              left: 16,
-              right: 16,
-              child: SafeArea(
-                child: Material(
-                  color: Colors.white,
-                  elevation: 3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.38),
                   borderRadius: BorderRadius.circular(12),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 260),
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shrinkWrap: true,
-                      itemCount: _searchResults.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final r = _searchResults[index];
-                        return ListTile(
-                          dense: true,
-                          title: Text(r.title, textDirection: TextDirection.rtl),
-                          subtitle: r.subtitle != null
-                              ? Text(
-                                  r.subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textDirection: TextDirection.rtl,
-                                )
-                              : null,
-                          onTap: () => _onSuggestionTap(r),
-                        );
-                      },
-                    ),
+                ),
+                child: const Text(
+                  'تحديد الموقع',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Rubik',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 6,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
+          ),
+
+          // No search suggestions (removed)
 
           // Note: No centered overlay pin; we use a map annotation anchored to coordinates
 
@@ -285,7 +198,10 @@ class _FullMapScreenState extends State<FullMapScreen> {
                       )
                     : Text(
                         widget.isEditing ? 'تحديث الموقع' : 'حفظ الموقع',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
               ),
             ),
@@ -324,9 +240,9 @@ class _FullMapScreenState extends State<FullMapScreen> {
       final pos =
           _selectedPosition ??
           (await _mapboxMap!.getCameraState()).center.coordinates;
-  final double lat = pos.lat.toDouble();
-  final double lng = pos.lng.toDouble();
-    // If user is logged in, persist to customers table
+      final double lat = pos.lat.toDouble();
+      final double lng = pos.lng.toDouble();
+      // If user is logged in, persist to customers table
       if (CustomerSession.instance.isLoggedIn) {
         // Resolve customer ID; if missing, fetch by phone
         String? id = CustomerSession.instance.currentCustomerId;
@@ -352,8 +268,11 @@ class _FullMapScreenState extends State<FullMapScreen> {
           // Try to resolve a readable Arabic address (street, area)
           String? addressAr;
           try {
-            addressAr = await GeocodingService.instance
-                .reverseGeocode(lat, lng, language: 'ar');
+            addressAr = await GeocodingService.instance.reverseGeocode(
+              lat,
+              lng,
+              language: 'ar',
+            );
           } catch (_) {
             // Geocoding failure shouldn't block saving location
             addressAr = null;
@@ -397,10 +316,7 @@ class _FullMapScreenState extends State<FullMapScreen> {
           } catch (_) {}
           if (updatedRow == null) {
             // Insert (id + payload) as a last resort
-            final insertData = {
-              'id': id,
-              ...payload,
-            };
+            final insertData = {'id': id, ...payload};
             updatedRow = await SupabaseService.instance.client
                 .from('customers')
                 .insert(insertData)
@@ -413,7 +329,8 @@ class _FullMapScreenState extends State<FullMapScreen> {
           final savedLng = (updatedRow['lng'] as num?)?.toDouble();
           bool persisted = false;
           if (savedLat != null && savedLng != null) {
-            persisted = (savedLat - lat).abs() < 1e-6 && (savedLng - lng).abs() < 1e-6;
+            persisted =
+                (savedLat - lat).abs() < 1e-6 && (savedLng - lng).abs() < 1e-6;
           }
           if (!persisted) {
             throw Exception('لم يتم تحديث الموقع في قاعدة البيانات');
@@ -447,7 +364,9 @@ class _FullMapScreenState extends State<FullMapScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  widget.isEditing ? 'تم تحديث الموقع بنجاح' : 'تم حفظ الموقع بنجاح',
+                  widget.isEditing
+                      ? 'تم تحديث الموقع بنجاح'
+                      : 'تم حفظ الموقع بنجاح',
                 ),
               ),
             );
@@ -458,9 +377,9 @@ class _FullMapScreenState extends State<FullMapScreen> {
       } else {
         // Guest user: just inform and return coords
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم تحديد الموقع')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('تم تحديد الموقع')));
         }
       }
       if (!mounted) return;
@@ -469,11 +388,14 @@ class _FullMapScreenState extends State<FullMapScreen> {
       Navigator.of(context).pop({'lat': lat, 'lng': lng});
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-  ).showSnackBar(SnackBar(content: Text(widget.isEditing ? 'تعذر تحديث الموقع: $e' : 'تعذر حفظ الموقع: $e')));
-    }
-    finally {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isEditing ? 'تعذر تحديث الموقع: $e' : 'تعذر حفظ الموقع: $e',
+          ),
+        ),
+      );
+    } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
@@ -482,13 +404,13 @@ class _FullMapScreenState extends State<FullMapScreen> {
     try {
       final current = CustomerSession.instance.currentCustomer;
       if (current == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('مطلوب تسجيل الدخول')), 
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('مطلوب تسجيل الدخول')));
         return;
       }
       // Update DB: set address and coords to null
-  await SupabaseService.instance.client
+      await SupabaseService.instance.client
           .from('customers')
           .update({
             'address': null,
@@ -528,17 +450,17 @@ class _FullMapScreenState extends State<FullMapScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حذف العنوان')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم حذف العنوان')));
         await Future.delayed(const Duration(milliseconds: 500));
         Navigator.of(context).pop({'deleted': true});
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حذف العنوان: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر حذف العنوان: $e')));
     }
   }
 
@@ -557,12 +479,12 @@ class _FullMapScreenState extends State<FullMapScreen> {
     // Ensure we have pin image bytes (custom drawn red pin)
     _pinImageBytes ??= await _buildRedPinBytes();
     // Create new annotation at the provided position using the custom red pin
-  _selectedAnnotation = await _pointAnnotationManager!.create(
+    _selectedAnnotation = await _pointAnnotationManager!.create(
       mb.PointAnnotationOptions(
         geometry: mb.Point(coordinates: pos),
         image: _pinImageBytes!,
         iconAnchor: mb.IconAnchor.BOTTOM,
-    iconSize: 1.8,
+        iconSize: 1.8,
       ),
     );
   }
@@ -594,166 +516,6 @@ class _FullMapScreenState extends State<FullMapScreen> {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     return bytes!.buffer.asUint8List();
   }
-
-  void _onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
-      final q = value.trim();
-      if (q.isEmpty) {
-        setState(() => _searchResults = const []);
-        return;
-      }
-      setState(() => _searchLoading = true);
-      // Use proximity for better local relevance
-      double? proxLat;
-      double? proxLng;
-      try {
-        if (_selectedPosition != null) {
-          proxLat = _selectedPosition!.lat.toDouble();
-          proxLng = _selectedPosition!.lng.toDouble();
-        } else if (_mapboxMap != null) {
-          final center = (await _mapboxMap!.getCameraState()).center.coordinates;
-          proxLat = center.lat.toDouble();
-          proxLng = center.lng.toDouble();
-        }
-      } catch (_) {}
-      // Prefer Android native Search SDK if available
-      List<_UiSuggestion> ui;
-      if (AndroidSearchBridge.isAvailable) {
-        final native = await AndroidSearchBridge.suggest(q);
-        if (native.isNotEmpty) {
-          ui = native
-              .map((m) => _UiSuggestion.searchbox(
-                    mapboxId: (m['mapboxId'] as String?) ?? (m['id'] as String? ?? ''),
-                    title: (m['name'] as String?) ?? '',
-                    subtitle: (m['formattedAddress'] as String?),
-                  ))
-              .toList(growable: false);
-        } else {
-          // Fallback to Search Box HTTP suggest
-          final suggest = await GeocodingService.instance.searchboxSuggest(
-            q,
-            language: 'ar',
-            limit: 8,
-            proximityLat: proxLat,
-            proximityLng: proxLng,
-          );
-          if (suggest.isNotEmpty) {
-            ui = suggest
-                .map((s) => _UiSuggestion.searchbox(mapboxId: s.mapboxId, title: s.name, subtitle: s.description))
-                .toList(growable: false);
-          } else {
-            final results = await GeocodingService.instance.forwardGeocode(
-              q,
-              language: 'ar',
-              limit: 8,
-              proximityLat: proxLat,
-              proximityLng: proxLng,
-            );
-            ui = results
-                .map((g) => _UiSuggestion.geocoder(title: g.name, subtitle: g.placeName, lat: g.lat, lng: g.lng))
-                .toList(growable: false);
-          }
-        }
-      } else {
-        // Non-Android: use HTTP Search Box suggest, then geocoder
-        final suggest = await GeocodingService.instance.searchboxSuggest(
-          q,
-          language: 'ar',
-          limit: 8,
-          proximityLat: proxLat,
-          proximityLng: proxLng,
-        );
-        if (suggest.isNotEmpty) {
-          ui = suggest
-              .map((s) => _UiSuggestion.searchbox(mapboxId: s.mapboxId, title: s.name, subtitle: s.description))
-              .toList(growable: false);
-        } else {
-          final results = await GeocodingService.instance.forwardGeocode(
-            q,
-            language: 'ar',
-            limit: 8,
-            proximityLat: proxLat,
-            proximityLng: proxLng,
-          );
-          ui = results
-              .map((g) => _UiSuggestion.geocoder(title: g.name, subtitle: g.placeName, lat: g.lat, lng: g.lng))
-              .toList(growable: false);
-        }
-      }
-      if (!mounted) return;
-      setState(() {
-        _searchResults = ui;
-        _searchLoading = false;
-      });
-    });
-  }
-
-  void _clearSearch() {
-    setState(() {
-      _searchCtrl.clear();
-      _searchResults = const [];
-    });
-  }
-
-  Future<void> _onSuggestionTap(_UiSuggestion s) async {
-    _clearSearch();
-    if (s.kind == _UiKind.searchbox && s.mapboxId != null) {
-      final res = await GeocodingService.instance.searchboxRetrieve(
-        s.mapboxId!,
-        language: 'ar',
-      );
-      if (res == null) return;
-      final pos = mb.Position(res.lng, res.lat);
-      _selectedPosition = pos;
-      await _placePinAt(pos);
-      await _mapboxMap?.setCamera(mb.CameraOptions(
-        center: mb.Point(coordinates: pos),
-        zoom: 16.0,
-      ));
-      return;
-    }
-    if (s.kind == _UiKind.geocoder && s.lat != null && s.lng != null) {
-      final pos = mb.Position(s.lng!, s.lat!);
-      _selectedPosition = pos;
-      await _placePinAt(pos);
-      await _mapboxMap?.setCamera(mb.CameraOptions(
-        center: mb.Point(coordinates: pos),
-        zoom: 16.0,
-      ));
-    }
-  }
-
-}
-
-enum _UiKind { searchbox, geocoder }
-
-class _UiSuggestion {
-  final _UiKind kind;
-  final String title;
-  final String? subtitle;
-  final String? mapboxId;
-  final double? lat;
-  final double? lng;
-  const _UiSuggestion._({
-    required this.kind,
-    required this.title,
-    this.subtitle,
-    this.mapboxId,
-    this.lat,
-    this.lng,
-  });
-  factory _UiSuggestion.searchbox({
-    required String mapboxId,
-    required String title,
-    String? subtitle,
-  }) => _UiSuggestion._(kind: _UiKind.searchbox, mapboxId: mapboxId, title: title, subtitle: subtitle);
-  factory _UiSuggestion.geocoder({
-    required String title,
-    required String subtitle,
-    required double lat,
-    required double lng,
-  }) => _UiSuggestion._(kind: _UiKind.geocoder, title: title, subtitle: subtitle, lat: lat, lng: lng);
 }
 
 // (Center pin overlay removed; we use map annotations instead)

@@ -221,6 +221,18 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
             ],
           ),
 
+          // Simple loading overlay while navigating
+          if (_isNavigating)
+            Positioned.fill(
+              child: AbsorbPointer(
+                absorbing: true,
+                child: Container(
+                  color: Colors.black.withOpacity(0.25),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            ),
+
           // Floating Add Address Button
           Positioned(
             right: 16,
@@ -288,16 +300,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                     });
                   }
                 },
-                icon: ShaderMask(
-                  shaderCallback: (bounds) =>
-                      DesignSystem.primaryGradient.createShader(bounds),
-                  blendMode: BlendMode.srcIn,
-                  child: const Icon(
-                    Icons.add_location_alt,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
+                icon: const Icon(Icons.add_location_alt, size: 22),
                 iconSize: 22,
                 splashRadius: 22,
               ),
@@ -336,94 +339,104 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           const SizedBox(height: 24),
 
           // Saved location card (from user profile -> customers.lat/lng)
-          Builder(builder: (context) {
-            final current = CustomerSession.instance.currentCustomer;
-            final double? savedLat = current?.lat;
-            final double? savedLng = current?.lng;
-            final bool hasSaved = savedLat != null && savedLng != null;
+          Builder(
+            builder: (context) {
+              final current = CustomerSession.instance.currentCustomer;
+              final double? savedLat = current?.lat;
+              final double? savedLng = current?.lng;
+              final bool hasSaved = savedLat != null && savedLng != null;
 
-            final String? savedAddress = current?.address?.trim();
-            String subtitle;
-            if (hasSaved) {
-              subtitle = (savedAddress != null && savedAddress.isNotEmpty)
-                  ? savedAddress
-                  : 'جارِ جلب العنوان...';
-            } else {
-              subtitle = 'لم يتم حفظ موقع بعد';
-            }
+              final String? savedAddress = current?.address?.trim();
+              String subtitle;
+              if (hasSaved) {
+                subtitle = (savedAddress != null && savedAddress.isNotEmpty)
+                    ? savedAddress
+                    : 'جارِ جلب العنوان...';
+              } else {
+                subtitle = 'لم يتم حفظ موقع بعد';
+              }
 
               Future<void> _openMapAndRefresh() async {
-              final result = await Navigator.of(context).pushNamed(
-                '/full-map',
-                arguments: hasSaved
-                    ? {
-                        'initialLat': savedLat,
-                        'initialLng': savedLng,
-                        'isEditing': true,
-                      }
-                    : null,
-              )
-                  as Map<String, dynamic>?;
-              if (result != null && mounted) {
-                setState(() {
-                  selectedDeliveryType = 'saved';
-                  final lat = result['lat'];
-                  final lng = result['lng'];
-                  _addressController.text = 'Lat: $lat, Lng: $lng';
-                });
-              } else if (mounted) {
-                setState(() {}); // trigger rebuild to reflect any session changes
-              }
-            }
-
-            // If we already have a saved address in session, show it directly.
-            if (savedAddress != null && savedAddress.isNotEmpty) {
-              return _addressListItem(
-              id: 'saved',
-              title: 'الموقع المحفوظ',
-                subtitle: savedAddress,
-              onUse: _openMapAndRefresh,
-              onTap: () {
-    if (hasSaved) {
+                final result =
+                    await Navigator.of(context).pushNamed(
+                          '/full-map',
+                          arguments: hasSaved
+                              ? {
+                                  'initialLat': savedLat,
+                                  'initialLng': savedLng,
+                                  'isEditing': true,
+                                }
+                              : null,
+                        )
+                        as Map<String, dynamic>?;
+                if (result != null && mounted) {
                   setState(() {
                     selectedDeliveryType = 'saved';
-                        _addressController.text = savedAddress;
+                    final lat = result['lat'];
+                    final lng = result['lng'];
+                    _addressController.text = 'Lat: $lat, Lng: $lng';
                   });
-                } else {
-                  _openMapAndRefresh();
+                } else if (mounted) {
+                  setState(
+                    () {},
+                  ); // trigger rebuild to reflect any session changes
                 }
-              },
-              );
-            }
+              }
 
-            // Otherwise, resolve via reverse geocoding and show street, area
-            return FutureBuilder<String?>(
-              future: hasSaved
-                  ? GeocodingService.instance.reverseGeocode(savedLat, savedLng, language: 'ar')
-                  : Future.value(null),
-              builder: (context, snapshot) {
-                final subtitleFinal = snapshot.hasData && snapshot.data != null
-                    ? snapshot.data!
-                    : subtitle;
+              // If we already have a saved address in session, show it directly.
+              if (savedAddress != null && savedAddress.isNotEmpty) {
                 return _addressListItem(
                   id: 'saved',
                   title: 'الموقع المحفوظ',
-                  subtitle: subtitleFinal,
+                  subtitle: savedAddress,
                   onUse: _openMapAndRefresh,
                   onTap: () {
                     if (hasSaved) {
                       setState(() {
                         selectedDeliveryType = 'saved';
-                        _addressController.text = subtitleFinal;
+                        _addressController.text = savedAddress;
                       });
                     } else {
                       _openMapAndRefresh();
                     }
                   },
                 );
-              },
-            );
-          }),
+              }
+
+              // Otherwise, resolve via reverse geocoding and show street, area
+              return FutureBuilder<String?>(
+                future: hasSaved
+                    ? GeocodingService.instance.reverseGeocode(
+                        savedLat,
+                        savedLng,
+                        language: 'ar',
+                      )
+                    : Future.value(null),
+                builder: (context, snapshot) {
+                  final subtitleFinal =
+                      snapshot.hasData && snapshot.data != null
+                      ? snapshot.data!
+                      : subtitle;
+                  return _addressListItem(
+                    id: 'saved',
+                    title: 'الموقع المحفوظ',
+                    subtitle: subtitleFinal,
+                    onUse: _openMapAndRefresh,
+                    onTap: () {
+                      if (hasSaved) {
+                        setState(() {
+                          selectedDeliveryType = 'saved';
+                          _addressController.text = subtitleFinal;
+                        });
+                      } else {
+                        _openMapAndRefresh();
+                      }
+                    },
+                  );
+                },
+              );
+            },
+          ),
 
           const SizedBox(height: 20),
 
@@ -577,17 +590,6 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.place,
-                          color: Colors.red,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,17 +697,6 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.place,
-                        color: Colors.red,
-                        size: 26,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -854,15 +845,17 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
   }
 
   void _handleContinuePressed() {
-  if (_isNavigating) return;
+    if (_isNavigating) return;
+    // Lock immediately to avoid multi-press jank
+    setState(() => _isNavigating = true);
+
     HapticFeedback.mediumImpact();
     _buttonAnimationController.forward().then((_) {
       _buttonAnimationController.reverse();
     });
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _continueToPayment();
-    });
+  // Call without artificial delay to reduce perceived lag
+  _continueToPayment();
   }
 
   Future<void> _continueToPayment() async {
@@ -896,11 +889,11 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           margin: const EdgeInsets.all(20),
         ),
       );
+      if (mounted) setState(() => _isNavigating = false);
       return;
     }
 
-    if (_isNavigating) return;
-    setState(() => _isNavigating = true);
+    // Already locked in _handleContinuePressed
 
     // Get delivery data
     final deliveryData = {
@@ -911,23 +904,26 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
       'notes': null,
     };
 
-    // Get cart total and pass it to payment methods
-    double total = _prefetchedTotal ?? 0.0;
-    if (_prefetchedTotal == null) {
-      try {
-        final cartSummary = await CartSessionManager.instance.getCartSummary();
-        total = (cartSummary['total'] as double?) ?? 0.0;
-      } catch (e) {
-        print('DeliveryLocationScreen - Error fetching cart total: $e');
+    // Navigate to payment methods screen immediately; let it fetch total if needed
+    try {
+      if (!mounted) return;
+      Navigator.of(context).pushNamed(
+        '/payment-methods',
+        arguments: {
+          // Prefer prefetched total; can be null and payment screen will resolve it
+          'total': _prefetchedTotal,
+          'deliveryData': deliveryData,
+        },
+      );
+    } catch (e) {
+      // Surface navigation errors gracefully
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('تعذر المتابعة: $e')));
       }
+    } finally {
+      if (mounted) setState(() => _isNavigating = false);
     }
-
-    // Navigate to payment methods screen with the calculated total
-    if (!mounted) return;
-    await Navigator.of(context).pushNamed(
-      '/payment-methods',
-      arguments: {'total': total, 'deliveryData': deliveryData},
-    );
-    if (mounted) setState(() => _isNavigating = false);
   }
 }
