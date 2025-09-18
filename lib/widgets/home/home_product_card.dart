@@ -5,7 +5,7 @@ import '../../models/products.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
-import '../../core/i18n/product_dictionary.dart';
+import '../../core/i18n/product_localizations.dart';
 import '../../core/services/app_settings.dart';
 import 'package:provider/provider.dart';
 import '../riyal_icon.dart';
@@ -167,15 +167,15 @@ class _HomeProductCardState extends State<HomeProductCard>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          ProductDictionary.translateName(
-                            product.name,
+                          ProductLocalizations.nameFor(
+                            product,
                             language,
                           ),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             fontFamily: language == 'en'
-                                ? 'SFProDisplay'
+                                ? 'Inter'
                                 : null,
                           ),
                           maxLines: 2,

@@ -80,8 +80,8 @@ class AppRoutes {
       healthTracker: (context) => const RewardsScreen(),
       rewards: (context) => const RewardsScreen(),
 
-  // Delivery and Payment Routes
-  deliveryLocation: (context) => const DeliveryLocationScreen(),
+      // Delivery and Payment Routes
+      deliveryLocation: (context) => const DeliveryLocationScreen(),
       // Removed old payment tracking flow
 
       // Rewards testing route

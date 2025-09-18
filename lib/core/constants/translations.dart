@@ -35,6 +35,10 @@ class AppTranslations {
       'proceed_checkout': 'إتمام الشراء',
       'remove': 'إزالة',
       'add': 'إضافة',
+      'clear_cart_title': 'مسح جميع المنتجات',
+      'clear_cart_confirm':
+          'هل أنت متأكد من رغبتك في حذف جميع المنتجات من السلة؟ لا يمكن التراجع عن هذا الإجراء.',
+      'delete_all': 'حذف الكل',
 
       // Orders
       'orders_title': 'طلبات كاندي',
@@ -158,6 +162,15 @@ class AppTranslations {
       'success': 'نجح',
       'warning': 'تحذير',
       'info': 'معلومات',
+      // Product names & descriptions (hard-coded)
+      'product_name_1': 'مياه كاندي 330 مل',
+      'product_desc_1': 'كرتون واحد - 40 عبوة بلاستيكية',
+      'product_name_2': 'مياه كاندي 200 مل',
+      'product_desc_2': 'كرتون واحد - 48 عبوة بلاستيكية',
+      'product_name_3': 'مياه كاندي 500 مل',
+      'product_desc_3': 'كرتون واحد - 24 عبوة بلاستيكية',
+      'product_name_4': 'مياه كاندي 1 لتر',
+      'product_desc_4': 'كرتون واحد - 12 عبوة بلاستيكية',
     },
     'en': {
       'app_name': 'Candy Water',
@@ -185,8 +198,18 @@ class AppTranslations {
       'grid_view': 'Grid View',
       'list_view': 'List View',
 
+      // Product names & descriptions (hard-coded)
+      'product_name_1': 'Candy 330ml',
+      'product_desc_1': '1 Carton - 40 Plastic Bottles',
+      'product_name_2': 'Candy 200ml',
+      'product_desc_2': '1 Carton - 48 Plastic Bottles',
+      'product_name_3': 'Candy 500ml',
+      'product_desc_3': '1 Carton - 24 Plastic Bottles',
+      'product_name_4': 'Candy 1L',
+      'product_desc_4': '1 Carton - 12 Plastic Bottles',
+
       // Cart
-      'cart_title': 'Candy Cart',
+      'cart_title': 'Cart',
       'empty_cart': 'Cart is Empty',
       'empty_cart_message': 'You haven\'t added any products yet',
       'browse_products': 'Browse Products',
@@ -194,6 +217,10 @@ class AppTranslations {
       'proceed_checkout': 'Proceed to Checkout',
       'remove': 'Remove',
       'add': 'Add',
+      'clear_cart_title': 'Clear All Products',
+      'clear_cart_confirm':
+          'Are you sure you want to delete all products from the cart? This action cannot be undone.',
+      'delete_all': 'Delete All',
 
       // Orders
       'orders_title': 'Candy Orders',
@@ -352,6 +379,14 @@ class AppTranslations {
       'success': 'Success',
       'warning': 'Warning',
       'info': 'Info',
+
+      // Product alias translations (match by raw Arabic name)
+      // Used when items come from DB with Arabic-only names
+      'product_alias_مياه_كاندي_صغير': 'Candy Water Small',
+      'product_alias_مياه_كاندي_وسط': 'Candy Water Medium',
+      'product_alias_مياه_كاندي_قليل_الصوديوم': 'Candy Water Low Sodium',
+      'product_alias_مياه_كاندي_كبير': 'Candy Water Large',
+      'product_alias_مياه_كاندي_بطعم_بالكولاجين': 'Candy Water with Collagen',
     },
     'ur': {
       'app_name': 'کینڈی واٹر',

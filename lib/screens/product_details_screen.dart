@@ -4,7 +4,7 @@ library product_details_screen;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/services/app_settings.dart';
-import '../core/i18n/product_dictionary.dart';
+import '../core/i18n/product_localizations.dart';
 import 'package:flutter/services.dart';
 import '../models/products.dart';
 import '../models/product_rating.dart';
@@ -235,8 +235,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Text(
-                                    ProductDictionary.translateName(
-                                      widget.product.name,
+                                    ProductLocalizations.nameFor(
+                                      widget.product,
                                       language,
                                     ),
                                     textAlign: TextAlign.right,
@@ -251,7 +251,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                           ? Colors.white
                                           : Colors.black87,
                                       fontFamily: language == 'en'
-                                          ? 'SFProDisplay'
+                                          ? 'Inter'
                                           : 'Rubik',
                                     ),
                                   ),
@@ -295,7 +295,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              widget.product.description ??
+                              ProductLocalizations.descriptionFor(
+                                    widget.product,
+                                    language,
+                                  ) ??
                                   AppTranslations.getText(
                                     'no_description',
                                     Provider.of<AppSettings>(

@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../core/services/app_settings.dart';
+import '../core/constants/translations.dart';
+import '../core/i18n/product_localizations.dart';
 import '../core/i18n/product_dictionary.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
@@ -76,10 +78,18 @@ class _CartScreenState extends State<CartScreen>
 
     _animationController.forward();
 
-    // Load cart data on init - use cached data if available and valid
-    _loadCartData();
+    // Always invalidate cache and reload cart data on init
+    CartCacheManager.instance.invalidateCache();
+    _loadCartData(forceRefresh: true);
 
     _animationsInitialized = true;
+  }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Invalidate cache and reload cart data when language changes
+    CartCacheManager.instance.invalidateCache();
+    _loadCartData(forceRefresh: true);
   }
 
   @override
@@ -216,8 +226,12 @@ class _CartScreenState extends State<CartScreen>
       print('Error: Invalid item ID provided');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('خطأ: معرف المنتج غير صحيح'),
+          SnackBar(
+            content: Text(
+              Localizations.localeOf(context).languageCode == 'en'
+                  ? 'Error: invalid product id'
+                  : 'خطأ: معرف المنتج غير صحيح',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -308,7 +322,11 @@ class _CartScreenState extends State<CartScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطأ في تحديث الكمية: $e'),
+            content: Text(
+              Localizations.localeOf(context).languageCode == 'en'
+                  ? 'Error updating quantity: $e'
+                  : 'خطأ في تحديث الكمية: $e',
+            ),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -368,27 +386,7 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _loadCartData({bool forceRefresh = false}) async {
     if (_isLoading && !forceRefresh) return;
-
-    // Use cached data if available and valid, unless force refresh is requested
-    if (!forceRefresh) {
-      final isCacheValid = await _isCacheValid();
-      final cachedItems = await CartCacheManager.instance.getCachedCartItems();
-
-      if (isCacheValid && cachedItems.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _cartItemsWithProducts = cachedItems;
-            _hasLoadedOnce = true;
-            _isLoading = false;
-          });
-
-          if (_cartItemsWithProducts.isNotEmpty) {
-            _triggerItemAnimations();
-          }
-        }
-        return;
-      }
-    }
+    // Always fetch fresh data from backend to ensure localization
 
     if (mounted) {
       setState(() {
@@ -487,9 +485,15 @@ class _CartScreenState extends State<CartScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'لا يمكن تحميل السلة حالياً. تحقق من اتصالك بالإنترنت.',
+                        Localizations.localeOf(context).languageCode == 'en'
+                            ? 'Unable to load cart right now. Check your internet connection.'
+                            : 'لا يمكن تحميل السلة حالياً. تحقق من اتصالك بالإنترنت.',
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily:
+                              Localizations.localeOf(context).languageCode ==
+                                  'en'
+                              ? 'Inter'
+                              : 'Rubik',
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -618,9 +622,14 @@ class _CartScreenState extends State<CartScreen>
               ),
               const SizedBox(width: 12),
               Text(
-                'تفاصيل السلة',
+                Localizations.localeOf(context).languageCode == 'en'
+                    ? 'Cart Details'
+                    : 'تفاصيل السلة',
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily:
+                      Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Inter'
+                      : 'Rubik',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -641,9 +650,15 @@ class _CartScreenState extends State<CartScreen>
                         children: [
                           Expanded(
                             child: Text(
-                              'مياه ${item.productId}',
+                              _getProductName(item.productId),
                               style: TextStyle(
-                                fontFamily: 'Rubik',
+                                fontFamily:
+                                    Localizations.localeOf(
+                                          context,
+                                        ).languageCode ==
+                                        'en'
+                                    ? 'Inter'
+                                    : 'Rubik',
                                 fontSize: 14,
                                 color: Colors.grey[700],
                               ),
@@ -654,7 +669,13 @@ class _CartScreenState extends State<CartScreen>
                               Text(
                                 '${item.quantity} × 5.00',
                                 style: TextStyle(
-                                  fontFamily: 'Rubik',
+                                  fontFamily:
+                                      Localizations.localeOf(
+                                            context,
+                                          ).languageCode ==
+                                          'en'
+                                      ? 'Inter'
+                                      : 'Rubik',
                                   fontSize: 14,
                                   color: Colors.grey[600],
                                 ),
@@ -674,9 +695,15 @@ class _CartScreenState extends State<CartScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'المجموع الكلي',
+                    AppTranslations.getText(
+                      'total',
+                      context.watch<AppSettings>().currentLanguage,
+                    ),
                     style: TextStyle(
-                      fontFamily: 'Rubik',
+                      fontFamily:
+                          Localizations.localeOf(context).languageCode == 'en'
+                          ? 'Inter'
+                          : 'Rubik',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -687,7 +714,7 @@ class _CartScreenState extends State<CartScreen>
                       Text(
                         cartTotal.toStringAsFixed(2),
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: DesignSystem.primary,
@@ -705,9 +732,14 @@ class _CartScreenState extends State<CartScreen>
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
-                'إغلاق',
+                Localizations.localeOf(context).languageCode == 'en'
+                    ? 'Close'
+                    : 'إغلاق',
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily:
+                      Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Inter'
+                      : 'Rubik',
                   color: Colors.grey[600],
                   fontSize: 14,
                 ),
@@ -729,8 +761,12 @@ class _CartScreenState extends State<CartScreen>
       print('Error: Invalid item ID provided for removal');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('خطأ: معرف المنتج غير صحيح'),
+          SnackBar(
+            content: Text(
+              Localizations.localeOf(context).languageCode == 'en'
+                  ? 'Error: invalid product id'
+                  : 'خطأ: معرف المنتج غير صحيح',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -778,9 +814,11 @@ class _CartScreenState extends State<CartScreen>
               Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
               const SizedBox(width: 12),
               Text(
-                'تم حذف المنتج من السلة',
+                Localizations.localeOf(context).languageCode == 'en'
+                    ? 'Item removed from cart'
+                    : 'تم حذف المنتج من السلة',
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -801,7 +839,11 @@ class _CartScreenState extends State<CartScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطأ في إزالة المنتج: $e'),
+            content: Text(
+              Localizations.localeOf(context).languageCode == 'en'
+                  ? 'Error removing item: $e'
+                  : 'خطأ في إزالة المنتج: $e',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -831,12 +873,28 @@ class _CartScreenState extends State<CartScreen>
     final item = _cartItemsWithProducts.firstWhere(
       (item) => item['product_id'] == productId,
       orElse: () => {
-        'products': {'name': 'مياه كاندي'},
+        'products': {
+          'name': AppTranslations.getText('default_product_name', context.watch<AppSettings>().currentLanguage),
+        },
       },
     );
-    final raw = item['products']?['name'] ?? 'مياه كاندي';
-    final language = context.read<AppSettings>().currentLanguage;
-    return ProductDictionary.translateName(raw, language);
+    final language = context.watch<AppSettings>().currentLanguage;
+    final product = item['products'] ?? {};
+    final translationKey = product['translation_key'] as String?;
+    if (translationKey != null && translationKey.isNotEmpty) {
+      final translated = AppTranslations.getText(translationKey, language);
+      if (translated != translationKey) return translated;
+    }
+    // Heuristic: If language is English and name is Arabic, try to guess translation key
+    final raw = product['name'] ?? AppTranslations.getText('default_product_name', language);
+    if (language == 'en') {
+      // Try to match product name to known keys
+      if (raw.contains('330')) return AppTranslations.getText('product_name_1', language);
+      if (raw.contains('200')) return AppTranslations.getText('product_name_2', language);
+      if (raw.contains('500')) return AppTranslations.getText('product_name_3', language);
+      if (raw.contains('1')) return AppTranslations.getText('product_name_4', language);
+    }
+    return raw;
   }
 
   // Helper method to get product price
@@ -890,18 +948,28 @@ class _CartScreenState extends State<CartScreen>
             ),
             const SizedBox(height: 20),
             Text(
-              'مسح جميع المنتجات',
+              AppTranslations.getText(
+                'clear_cart_title',
+                context.watch<AppSettings>().currentLanguage,
+              ),
               style: DesignSystem.headlineSmall.copyWith(
-                fontFamily: 'Rubik',
+                fontFamily: context.watch<AppSettings>().currentLanguage == 'en'
+                    ? 'Inter'
+                    : 'Rubik',
                 fontWeight: FontWeight.bold,
                 color: DesignSystem.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'هل أنت متأكد من رغبتك في حذف جميع المنتجات من السلة؟ لا يمكن التراجع عن هذا الإجراء.',
+              AppTranslations.getText(
+                'clear_cart_confirm',
+                context.watch<AppSettings>().currentLanguage,
+              ),
               style: DesignSystem.bodyMedium.copyWith(
-                fontFamily: 'Rubik',
+                fontFamily: context.watch<AppSettings>().currentLanguage == 'en'
+                    ? 'Inter'
+                    : 'Rubik',
                 color: DesignSystem.textSecondary,
                 height: 1.5,
               ),
@@ -923,9 +991,15 @@ class _CartScreenState extends State<CartScreen>
                       ),
                     ),
                     child: Text(
-                      'إلغاء',
+                      AppTranslations.getText(
+                        'cancel',
+                        context.watch<AppSettings>().currentLanguage,
+                      ),
                       style: TextStyle(
-                        fontFamily: 'Rubik',
+                        fontFamily:
+                            context.watch<AppSettings>().currentLanguage == 'en'
+                            ? 'Inter'
+                            : 'Rubik',
                         fontWeight: FontWeight.w600,
                         color: DesignSystem.textSecondary,
                       ),
@@ -951,9 +1025,15 @@ class _CartScreenState extends State<CartScreen>
                       elevation: 0,
                     ),
                     child: Text(
-                      'حذف الكل',
+                      AppTranslations.getText(
+                        'delete_all',
+                        context.watch<AppSettings>().currentLanguage,
+                      ),
                       style: TextStyle(
-                        fontFamily: 'Rubik',
+                        fontFamily:
+                            context.watch<AppSettings>().currentLanguage == 'en'
+                            ? 'Inter'
+                            : 'Rubik',
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1007,7 +1087,10 @@ class _CartScreenState extends State<CartScreen>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'سلة التسوق',
+                              AppTranslations.getText(
+                                'cart_title',
+                                context.watch<AppSettings>().currentLanguage,
+                              ),
                               style: DesignSystem.headlineSmall.copyWith(
                                 color:
                                     Theme.of(context).brightness ==
@@ -1015,7 +1098,7 @@ class _CartScreenState extends State<CartScreen>
                                     ? Colors.white
                                     : DesignSystem.textPrimary,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'Rubik',
+                                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                               ),
                             ),
                             if (_cartItemsWithProducts.isNotEmpty)
@@ -1024,10 +1107,15 @@ class _CartScreenState extends State<CartScreen>
                                     .primaryGradient
                                     .createShader(bounds),
                                 child: Text(
-                                  '${_cartItemsWithProducts.length} منتج',
+                                  context
+                                              .watch<AppSettings>()
+                                              .currentLanguage ==
+                                          'en'
+                                      ? '${_cartItemsWithProducts.length} items'
+                                      : '${_cartItemsWithProducts.length} منتج',
                                   style: DesignSystem.bodySmall.copyWith(
                                     color: Colors.white,
-                                    fontFamily: 'Rubik',
+                                    fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1187,10 +1275,13 @@ class _CartScreenState extends State<CartScreen>
               shaderCallback: (bounds) =>
                   DesignSystem.primaryGradient.createShader(bounds),
               child: Text(
-                'المجموع الكلي',
+                AppTranslations.getText(
+                  'total',
+                  context.watch<AppSettings>().currentLanguage,
+                ),
                 style: TextStyle(
                   color: Colors.white,
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontWeight: FontWeight.w500,
                   fontSize: 14,
                 ),
@@ -1203,10 +1294,12 @@ class _CartScreenState extends State<CartScreen>
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '${cartItems.length} منتج',
+                (Localizations.localeOf(context).languageCode == 'en')
+                    ? '${cartItems.length} items'
+                    : '${cartItems.length} منتج',
                 style: TextStyle(
                   color: Colors.white,
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontWeight: FontWeight.w500,
                   fontSize: 10,
                 ),
@@ -1223,7 +1316,7 @@ class _CartScreenState extends State<CartScreen>
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'Rubik',
+                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                 fontSize: 20,
               ),
             ),
@@ -1263,11 +1356,14 @@ class _CartScreenState extends State<CartScreen>
               shaderCallback: (bounds) =>
                   DesignSystem.primaryGradient.createShader(bounds),
               child: Text(
-                'المتابعة للدفع',
+                AppTranslations.getText(
+                  'proceed_checkout',
+                  context.watch<AppSettings>().currentLanguage,
+                ),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   color: Colors.white,
                 ),
               ),
@@ -1432,20 +1528,25 @@ class _CartScreenState extends State<CartScreen>
             ),
             const SizedBox(height: 32),
             Text(
-              'السلة فارغة',
+              AppTranslations.getText(
+                'empty_cart',
+                context.watch<AppSettings>().currentLanguage,
+              ),
               style: DesignSystem.headlineMedium.copyWith(
                 color: DesignSystem.textPrimary,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'Rubik',
+                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
-              'ابدأ بإضافة منتجات المياه المفضلة لديك\nإلى سلة التسوق',
+              context.watch<AppSettings>().currentLanguage == 'en'
+                  ? 'Start adding your favorite water products\ninto the cart'
+                  : 'ابدأ بإضافة منتجات المياه المفضلة لديك\nإلى سلة التسوق',
               style: DesignSystem.bodyLarge.copyWith(
                 color: DesignSystem.textSecondary,
-                fontFamily: 'Rubik',
+                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                 height: 1.6,
               ),
               textAlign: TextAlign.center,
@@ -1471,9 +1572,12 @@ class _CartScreenState extends State<CartScreen>
                 },
                 icon: Icon(FontAwesomeIcons.magnifyingGlass, size: 18),
                 label: Text(
-                  'تصفح المنتجات',
+                  AppTranslations.getText(
+                    'browse_products',
+                    context.watch<AppSettings>().currentLanguage,
+                  ),
                   style: TextStyle(
-                    fontFamily: 'Rubik',
+                    fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -1536,32 +1640,33 @@ class _CartScreenState extends State<CartScreen>
         return await showDialog(
           context: context,
           builder: (BuildContext context) {
+            final lang = context.watch<AppSettings>().currentLanguage;
             return AlertDialog(
               title: Text(
-                'حذف المنتج',
+                AppTranslations.getText('delete_product', lang),
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontWeight: FontWeight.bold,
                 ),
               ),
               content: Text(
-                'هل أنت متأكد من حذف هذا المنتج من السلة؟',
-                style: TextStyle(fontFamily: 'Rubik'),
+                AppTranslations.getText('confirm_delete_product', lang),
+                style: TextStyle(fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik'),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
                   child: Text(
-                    'إلغاء',
-                    style: TextStyle(fontFamily: 'Rubik', color: Colors.grey),
+                    AppTranslations.getText('cancel', lang),
+                    style: TextStyle(fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik', color: Colors.grey),
                   ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   child: Text(
-                    'حذف',
+                    AppTranslations.getText('delete', lang),
                     style: TextStyle(
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       color: Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1650,8 +1755,8 @@ class _CartScreenState extends State<CartScreen>
                           : DesignSystem.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontFamily:
-                          context.read<AppSettings>().currentLanguage == 'en'
-                          ? 'SFProDisplay'
+                          context.watch<AppSettings>().currentLanguage == 'en'
+                          ? 'Inter'
                           : 'Rubik',
                     ),
                   ),
@@ -1668,7 +1773,7 @@ class _CartScreenState extends State<CartScreen>
                             fontSize: 13,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
-                            fontFamily: 'Rubik',
+                            fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                           ),
                         ),
                       ),
@@ -1713,7 +1818,7 @@ class _CartScreenState extends State<CartScreen>
                     quantity.toString(),
                     style: DesignSystem.bodyMedium.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                     ),
                   ),
                 ),
@@ -1759,10 +1864,13 @@ class _CartScreenState extends State<CartScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'المجموع الكلي',
+                AppTranslations.getText(
+                  'total',
+                  context.watch<AppSettings>().currentLanguage,
+                ),
                 style: TextStyle(
                   color: Colors.white,
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -1777,10 +1885,12 @@ class _CartScreenState extends State<CartScreen>
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${_cartItemsWithProducts.length} منتج',
+                  context.watch<AppSettings>().currentLanguage == 'en'
+                      ? '${_cartItemsWithProducts.length} items'
+                      : '${_cartItemsWithProducts.length} منتج',
                   style: TextStyle(
                     color: Colors.white,
-                    fontFamily: 'Rubik',
+                    fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                     fontWeight: FontWeight.w500,
                     fontSize: 10,
                   ),
@@ -1797,7 +1907,7 @@ class _CartScreenState extends State<CartScreen>
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontSize: 24,
                 ),
               ),
@@ -1836,12 +1946,15 @@ class _CartScreenState extends State<CartScreen>
                 shaderCallback: (bounds) =>
                     DesignSystem.primaryGradient.createShader(bounds),
                 child: Text(
-                  'المتابعة للدفع',
+                  AppTranslations.getText(
+                    'proceed_checkout',
+                    context.watch<AppSettings>().currentLanguage,
+                  ),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
-                    fontFamily: 'Rubik',
+                    fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   ),
                 ),
               ),
@@ -1909,16 +2022,14 @@ class _CartScreenState extends State<CartScreen>
                 Builder(
                   builder: (context) {
                     final language = context
-                        .read<AppSettings>()
+                        .watch<AppSettings>()
                         .currentLanguage;
                     return Text(
                       _getProductName(cartItem.productId),
                       style: DesignSystem.titleMedium.copyWith(
                         color: DesignSystem.textPrimary,
                         fontWeight: FontWeight.bold,
-                        fontFamily: language == 'en'
-                            ? 'SFProDisplay'
-                            : 'SFArabic',
+                        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 2,
@@ -1938,7 +2049,7 @@ class _CartScreenState extends State<CartScreen>
                           fontSize: 13,
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
-                          fontFamily: 'Rubik',
+                          fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                         ),
                       ),
                     ),
@@ -1986,7 +2097,7 @@ class _CartScreenState extends State<CartScreen>
                         style: DesignSystem.titleMedium.copyWith(
                           color: DesignSystem.primary,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'Rubik',
+                          fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                         ),
                       ),
                     ),
@@ -2048,7 +2159,7 @@ class _CartScreenState extends State<CartScreen>
                             ? Colors.white
                             : DesignSystem.primary,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'Rubik',
+                        fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       ),
                     ),
                     const SizedBox(width: 2),
@@ -2129,9 +2240,11 @@ class _CartScreenState extends State<CartScreen>
               ),
               const SizedBox(width: 12),
               Text(
-                'تفاصيل المنتج',
+                context.watch<AppSettings>().currentLanguage == 'en'
+                    ? 'Product Details'
+                    : 'تفاصيل المنتج',
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -2171,9 +2284,9 @@ class _CartScreenState extends State<CartScreen>
               const SizedBox(height: 16),
               // Product Name
               Text(
-                'مياه ${cartItem.productId}', // Using productId since we don't have product details
+                _getProductName(cartItem.productId), // Using productId since we don't have product details
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -2185,9 +2298,11 @@ class _CartScreenState extends State<CartScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'السعر:',
+                    (context.watch<AppSettings>().currentLanguage == 'en')
+                        ? 'Price:'
+                        : 'السعر:',
                     style: TextStyle(
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[700],
@@ -2198,7 +2313,7 @@ class _CartScreenState extends State<CartScreen>
                       Text(
                         '5.00', // Mock price since we don't have product details
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: DesignSystem.primary,
@@ -2216,9 +2331,11 @@ class _CartScreenState extends State<CartScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'الكمية المطلوبة:',
+                    (context.watch<AppSettings>().currentLanguage == 'en')
+                        ? 'Requested quantity:'
+                        : 'الكمية المطلوبة:',
                     style: TextStyle(
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[700],
@@ -2227,7 +2344,7 @@ class _CartScreenState extends State<CartScreen>
                   Text(
                     '${cartItem.quantity}',
                     style: TextStyle(
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: DesignSystem.primary,
@@ -2241,9 +2358,11 @@ class _CartScreenState extends State<CartScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'المجموع:',
+                    (context.watch<AppSettings>().currentLanguage == 'en')
+                        ? 'Total:'
+                        : 'المجموع:',
                     style: TextStyle(
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[700],
@@ -2254,7 +2373,7 @@ class _CartScreenState extends State<CartScreen>
                       Text(
                         '${(cartItem.quantity * 5.0).toStringAsFixed(2)}', // Calculate total price
                         style: TextStyle(
-                          fontFamily: 'Rubik',
+                          fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: DesignSystem.primary,
@@ -2272,9 +2391,11 @@ class _CartScreenState extends State<CartScreen>
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
-                'إغلاق',
+                context.watch<AppSettings>().currentLanguage == 'en'
+                    ? 'Close'
+                    : 'إغلاق',
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   color: Colors.grey[600],
                   fontSize: 14,
                 ),

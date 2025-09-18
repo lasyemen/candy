@@ -1,23 +1,45 @@
 class ProductDictionary {
+  // Exact Arabic-to-English names for known items (seen in your catalog)
   static const Map<String, String> _exactArabicToEnglish = {
-    // Add exact known product name translations here for highest accuracy
     'مياه معدنية 500مل': 'Mineral Water 500ml',
-    'مياه معدنية 1لتر': 'Mineral Water 1L',
-    'مياه غازية 330مل': 'Sparkling Water 330ml',
-    'مياه فوارة 500مل': 'Carbonated Water 500ml',
-    'مياه نقية 5لتر': 'Pure Water 5L',
-    'مياه قلوية 1لتر': 'Alkaline Water 1L',
+    'مياه معدنية 1ل': 'Mineral Water 1L',
+    'مياه فوارة 330مل': 'Sparkling Water 330ml',
+    'مياه غازية 500مل': 'Carbonated Water 500ml',
+    'مياه نقية 5ل': 'Pure Water 5L',
+    'مياه قلوية 1ل': 'Alkaline Water 1L',
+
+    'مياه كاندي صغير': 'Candy Water Small',
+    'مياه كاندي كبير': 'Candy Water Large',
+    'مياه كاندي وسط': 'Candy Water Medium',
+    'مياه كاندي قليل الصوديوم': 'Candy Water Low Sodium',
+    'مياه كاندي بطعم بالكولاجين': 'Candy Water with Collagen',
   };
 
-  static const Map<String, String> _fragmentArabicToEnglish = {
+  // Fragment replacements for heuristic conversion
+  static final Map<String, String> _fragmentArabicToEnglish = {
+    // Brand/common words
+    'كاندي': 'Candy',
     'مياه': 'Water',
-    'غازية': 'Sparkling',
-    'فوارة': 'Carbonated',
+
+    // Sizes/qualifiers
+    'صغير': 'Small',
+    'وسط': 'Medium',
+    'كبير': 'Large',
+    'قليل الصوديوم': 'Low Sodium',
+    'بطعم': '',
+    'بالكولاجين': 'with Collagen',
+    'بالتكولوجين': 'with Collagen', // common misspelling
+
+    // Types
+    'فوارة': 'Sparkling',
+    'غازية': 'Carbonated',
     'معدنية': 'Mineral',
     'نقية': 'Pure',
     'قلوية': 'Alkaline',
+
+    // Units
     'مل': 'ml',
-    'لتر': 'L',
+    'ل': 'L',
   };
 
   static const Map<String, String> _arabicDigitsToLatin = {
@@ -36,42 +58,82 @@ class ProductDictionary {
   static String translateName(String rawName, String language) {
     if (language != 'en') return rawName;
 
-    final trimmed = rawName.trim();
-    final normalized = _normalizeArabic(trimmed);
+    var name = _normalizeArabic(rawName.trim());
 
-    final exact =
-        _exactArabicToEnglish[normalized] ?? _exactArabicToEnglish[trimmed];
+    // 1) exact matches first
+    final exact = _exactArabicToEnglish[name];
     if (exact != null) return exact;
 
-    String converted = _convertArabicDigits(normalized);
+    // 2) replace digits and fragments
+    name = _convertArabicDigits(name);
     _fragmentArabicToEnglish.forEach((ar, en) {
-      converted = converted.replaceAll(ar, en);
+      name = name.replaceAll(ar, en);
     });
 
-    converted = _normalizeWhitespace(converted);
-    converted = _reorderDescriptorBeforeWater(converted);
-    return converted;
+    // 3) tidy whitespace and reorder terms
+    name = _normalizeWhitespace(name);
+    name = _reorderDescriptorBeforeWater(name);
+    name = _fixBrandOrder(name);
+    return name;
   }
 
-  static String _normalizeArabic(String input) {
-    // Remove diacritics and tatweel
-    final withoutDiacritics = input.replaceAll(
-      RegExp('[\u064B-\u0652\u0670\u0640]'),
-      '',
+  static String translateDescription(String rawDesc, String language) {
+    if (language != 'en') return rawDesc;
+
+    var text = _normalizeArabic(rawDesc.trim());
+
+    // Digits first
+    text = _convertArabicDigits(text);
+
+    // Term replacements
+    final replacements = <String, String>{
+      'كرتون': 'Carton',
+      'علبة': 'Carton',
+      'حزمة': 'Pack',
+      'واحد': '1',
+      'واحدة': '1',
+      'عبوة': 'Bottles',
+      'زجاجية': 'Glass',
+      'بلاستيكية': 'Plastic',
+      'عدد': 'Qty',
+      '–': '-',
+      '−': '-',
+    };
+    replacements.forEach((k, v) => text = text.replaceAll(k, v));
+
+    // Reorder: "Carton 1" -> "1 Carton"
+    text = text.replaceAllMapped(
+      RegExp(r'\bCarton\s+(\d+)\b'),
+      (m) => '${m.group(1)} Carton',
     );
-    // Normalize alef/hamza variants and alef maqsura
-    final normalizedAlef = withoutDiacritics
+
+    // Reorder: "Bottles Plastic" -> "Plastic Bottles"
+    text = text.replaceAllMapped(
+      RegExp(r'\b(Bottles)\s+(Plastic|Glass)\b', caseSensitive: false),
+      (m) => '${m.group(2)} ${m.group(1)}',
+    );
+
+    // Clean multi-spaces
+    text = _normalizeWhitespace(text);
+    return text;
+  }
+
+  // Remove diacritics/tatweel and normalize common variants
+  static String _normalizeArabic(String input) {
+    // Remove harakat and tatweel
+    final withoutMarks = input.replaceAll(RegExp('[\u064B-\u0652\u0670\u0640]'), '');
+    // Normalize Alef variants and Alef Maqsura
+    return withoutMarks
         .replaceAll('أ', 'ا')
         .replaceAll('إ', 'ا')
         .replaceAll('آ', 'ا')
         .replaceAll('ى', 'ي');
-    return normalizedAlef;
   }
 
   static String _convertArabicDigits(String input) {
     final buffer = StringBuffer();
-    for (final char in input.split('')) {
-      buffer.write(_arabicDigitsToLatin[char] ?? char);
+    for (final ch in input.split('')) {
+      buffer.write(_arabicDigitsToLatin[ch] ?? ch);
     }
     return buffer.toString();
   }
@@ -88,15 +150,32 @@ class ProductDictionary {
       'Mineral',
       'Pure',
       'Alkaline',
+      'Small',
+      'Medium',
+      'Large',
+      'Low Sodium',
+      'with Collagen',
     ];
     for (final descriptor in descriptors) {
-      final pattern = RegExp(
-        '(?:Water\s+$descriptor|$descriptor\s+Water)',
-        caseSensitive: false,
-      );
+      final pattern = RegExp('(?:Water\\s+$descriptor|$descriptor\\s+Water)',
+          caseSensitive: false);
       if (pattern.hasMatch(input)) {
         return '$descriptor Water' + input.replaceAll(pattern, '');
       }
+    }
+    return input;
+  }
+
+  static String _fixBrandOrder(String input) {
+    // Ensure brand appears before base type for readability: "Candy Water ..."
+    final hasCandy = RegExp(r'(?i)\bcandy\b').hasMatch(input);
+    final hasWater = RegExp(r'(?i)\bwater\b').hasMatch(input);
+    if (hasCandy && hasWater) {
+      var rest = input
+          .replaceFirst(RegExp(r'(?i)\bcandy\b'), '')
+          .replaceFirst(RegExp(r'(?i)\bwater\b'), '');
+      rest = _normalizeWhitespace(rest);
+      return ('Candy Water ' + rest).trim();
     }
     return input;
   }

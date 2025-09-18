@@ -91,13 +91,13 @@ class _UserDashboardState extends State<UserDashboard>
         title: Text(
           AppTranslations.getText(
             'logout',
-            context.read<AppSettings>().currentLanguage,
+            context.watch<AppSettings>().currentLanguage,
           ),
         ),
         content: Text(
           AppTranslations.getText(
             'confirm',
-            context.read<AppSettings>().currentLanguage,
+            context.watch<AppSettings>().currentLanguage,
           ),
         ),
         actions: [
@@ -106,7 +106,7 @@ class _UserDashboardState extends State<UserDashboard>
             child: Text(
               AppTranslations.getText(
                 'cancel',
-                context.read<AppSettings>().currentLanguage,
+                context.watch<AppSettings>().currentLanguage,
               ),
             ),
           ),

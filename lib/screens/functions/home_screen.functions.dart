@@ -189,8 +189,39 @@ mixin HomeScreenFunctions on State<HomeScreen> {
     if (mounted) {
       _showCartNotification(product);
     }
-    appBloc.add(AddToCartEvent(product));
-    _addToCartAsync(product);
+    // Set translationKey if not present
+    String? translationKey = product.translationKey;
+    if (translationKey == null || translationKey.isEmpty) {
+      translationKey = _getTranslationKeyForProduct(product);
+    }
+    final Products productWithKey = Products(
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      category: product.category,
+      imageUrl: product.imageUrl,
+      stockQuantity: product.stockQuantity,
+      rating: product.rating,
+      totalSold: product.totalSold,
+      status: product.status,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      translationKey: translationKey,
+    );
+    appBloc.add(AddToCartEvent(productWithKey));
+    _addToCartAsync(productWithKey);
+
+  }
+
+  String? _getTranslationKeyForProduct(Products product) {
+    // Heuristic: match product name to translation keys
+    final name = product.name;
+    if (name.contains('330')) return 'product_name_1';
+    if (name.contains('200')) return 'product_name_2';
+    if (name.contains('500')) return 'product_name_3';
+    if (name.contains('1')) return 'product_name_4';
+    return null;
   }
 
   void _addToCartAsync(Products product) async {
@@ -279,7 +310,10 @@ mixin HomeScreenFunctions on State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          product.name,
+                          ProductLocalizations.nameFor(
+                            product,
+                            context.watch<AppSettings>().currentLanguage,
+                          ),
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.white.withOpacity(0.9),

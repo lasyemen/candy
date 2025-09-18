@@ -74,7 +74,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                 Text(
                   'أضف عنواناً جديداً',
                   style: TextStyle(
-                    fontFamily: 'Rubik',
+                    fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                     color: DesignSystem.textPrimary,
@@ -83,8 +83,12 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                 const SizedBox(height: 12),
                 DesignSystem.gradientTextFormField(
                   controller: _addressController,
-                  labelText: 'العنوان',
-                  hintText: 'أدخل العنوان التفصيلي...',
+                  labelText: Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Address'
+                      : 'العنوان',
+                  hintText: Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Enter detailed address...'
+                      : 'أدخل العنوان التفصيلي...',
                   prefixIcon: Icons.edit_location_alt,
                   maxLines: 3,
                 ),
@@ -142,7 +146,11 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                     Navigator.of(context).pop();
                     setState(() {});
                   },
-                  child: const Text('حفظ العنوان'),
+                  child: Text(
+                    Localizations.localeOf(context).languageCode == 'en'
+                        ? 'Save Address'
+                        : 'حفظ العنوان',
+                  ),
                 ),
               ],
             ),
@@ -278,7 +286,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
-                      fontFamily: 'Rubik',
+                      fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                       color: DesignSystem.textPrimary,
                     ),
                   ),
@@ -325,11 +333,13 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           // Header above location cards
           const SizedBox(height: 8),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: Localizations.localeOf(context).languageCode == 'en'
+                ? Alignment.centerLeft
+                : Alignment.centerRight,
             child: Text(
               'اختار موقع التوصيل',
               style: TextStyle(
-                fontFamily: 'Rubik',
+                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: DesignSystem.textPrimary,
@@ -387,7 +397,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
               if (savedAddress != null && savedAddress.isNotEmpty) {
                 return _addressListItem(
                   id: 'saved',
-                  title: 'الموقع المحفوظ',
+                  title: Localizations.localeOf(context).languageCode == 'en' ? 'Saved Location' : 'الموقع المحفوظ',
                   subtitle: savedAddress,
                   onUse: _openMapAndRefresh,
                   onTap: () {
@@ -419,7 +429,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                       : subtitle;
                   return _addressListItem(
                     id: 'saved',
-                    title: 'الموقع المحفوظ',
+                    title: Localizations.localeOf(context).languageCode == 'en' ? 'Saved Location' : 'الموقع المحفوظ',
                     subtitle: subtitleFinal,
                     onUse: _openMapAndRefresh,
                     onTap: () {
@@ -443,7 +453,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
           // Recent / suggested addresses (static examples)
           _addressListItem(
             id: 'home',
-            title: 'المنزل',
+            title: Localizations.localeOf(context).languageCode == 'en' ? 'Home' : 'المنزل',
             subtitle: 'شارع الملك فيصل، حي العليا، الرياض',
             // onUse -> edit action, should NOT select the address
             onUse: () => _showAddAddressSheet(),
@@ -461,7 +471,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
 
           _addressListItem(
             id: 'work',
-            title: 'العمل',
+            title: Localizations.localeOf(context).languageCode == 'en' ? 'Work' : 'العمل',
             subtitle: 'شارع التحلية، الظهران',
             onUse: () => _showAddAddressSheet(),
             onTap: () {
@@ -504,7 +514,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'متابعة الدفع',
                         style: TextStyle(color: Colors.white),
                       ),
@@ -597,7 +607,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                             Text(
                               title,
                               style: TextStyle(
-                                fontFamily: 'Rubik',
+                                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                                 color: DesignSystem.textPrimary.withOpacity(
@@ -609,7 +619,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                             Text(
                               subtitle,
                               style: TextStyle(
-                                fontFamily: 'Rubik',
+                                fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                                 fontSize: 12,
                                 color: Colors.grey[600],
                               ),
@@ -704,7 +714,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                           Text(
                             title,
                             style: TextStyle(
-                              fontFamily: 'Rubik',
+                              fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
                               color: DesignSystem.textPrimary.withOpacity(0.9),
@@ -714,7 +724,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                           Text(
                             subtitle,
                             style: TextStyle(
-                              fontFamily: 'Rubik',
+                              fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                               fontSize: 12,
                               color: Colors.grey[600],
                             ),
@@ -831,7 +841,7 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   color: isActive
                       ? Colors.white
                       : DesignSystem.textSecondary.withOpacity(0.6),
@@ -854,8 +864,8 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
       _buttonAnimationController.reverse();
     });
 
-  // Call without artificial delay to reduce perceived lag
-  _continueToPayment();
+    // Call without artificial delay to reduce perceived lag
+    _continueToPayment();
   }
 
   Future<void> _continueToPayment() async {
@@ -872,10 +882,10 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen>
                 size: 20,
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'يرجى إدخال العنوان التفصيلي',
                 style: TextStyle(
-                  fontFamily: 'Rubik',
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontWeight: FontWeight.w500,
                 ),
               ),

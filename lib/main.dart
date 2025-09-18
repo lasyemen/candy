@@ -120,8 +120,10 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkFor(appSettings.currentLanguage),
             themeMode: appSettings.currentTheme,
             builder: (context, child) {
-              final defaultStyle = const TextStyle(
-                fontFamily: 'Rubik',
+              final defaultStyle = TextStyle(
+                fontFamily: appSettings.currentLanguage == 'en'
+                    ? 'Inter'
+                    : 'Rubik',
                 fontWeight: FontWeight.w700,
               );
               return DefaultTextStyle.merge(

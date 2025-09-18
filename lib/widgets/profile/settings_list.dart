@@ -12,10 +12,10 @@ class SettingsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-  final appSettings = context.watch<AppSettings>();
-  // Use effective theme brightness (covers ThemeMode.system as well)
-  final bool isDark = Theme.of(context).brightness == Brightness.dark;
-  final Color titleColor = isDark ? Colors.white : Colors.black;
+    final appSettings = context.watch<AppSettings>();
+    // Use effective theme brightness (covers ThemeMode.system as well)
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color titleColor = isDark ? Colors.white : Colors.black;
     final Color subtitleColor = Theme.of(context).hintColor;
     final Color dividerColor = Theme.of(context).dividerColor.withOpacity(0.12);
 
@@ -31,11 +31,7 @@ class SettingsList extends StatelessWidget {
             shaderCallback: (bounds) =>
                 DesignSystem.primaryGradient.createShader(bounds),
             blendMode: BlendMode.srcIn,
-            child: const Icon(
-              Icons.color_lens,
-              color: Colors.white,
-              size: 22,
-            ),
+            child: const Icon(Icons.color_lens, color: Colors.white, size: 22),
           ),
           title: Text(
             AppTranslations.getText('theme', language),
@@ -62,8 +58,8 @@ class SettingsList extends StatelessWidget {
               appSettings.isSystemMode
                   ? AppTranslations.getText('system', language)
                   : (appSettings.isDarkMode
-                      ? AppTranslations.getText('dark_mode', language)
-                      : AppTranslations.getText('light_mode', language)),
+                        ? AppTranslations.getText('dark_mode', language)
+                        : AppTranslations.getText('light_mode', language)),
               style: DesignSystem.bodySmall.copyWith(
                 color: subtitleColor,
                 fontWeight: FontWeight.w600,
@@ -104,9 +100,9 @@ class SettingsList extends StatelessWidget {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Theme.of(sheetContext)
-                              .dividerColor
-                              .withOpacity(0.3),
+                          color: Theme.of(
+                            sheetContext,
+                          ).dividerColor.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -132,9 +128,9 @@ class SettingsList extends StatelessWidget {
                             ),
                           ),
                           onTap: () async {
-                            await rootContext
-                                .read<AppSettings>()
-                                .setTheme(mode);
+                            await rootContext.read<AppSettings>().setTheme(
+                              mode,
+                            );
                             Navigator.pop(sheetContext);
                             // Confirmation popup
                             ScaffoldMessenger.of(rootContext).showSnackBar(
@@ -176,7 +172,7 @@ class SettingsList extends StatelessWidget {
             style: DesignSystem.bodyMedium.copyWith(
               color: titleColor,
               fontWeight: FontWeight.w600,
-              fontSize: 16
+              fontSize: 16,
             ),
           ),
           subtitle: Text(
@@ -250,7 +246,7 @@ class SettingsList extends StatelessWidget {
           padding: const EdgeInsetsDirectional.only(start: 50),
           child: Divider(height: 1, color: dividerColor),
         ),
-  ...items.asMap().entries.map((entry) {
+        ...items.asMap().entries.map((entry) {
           final index = entry.key;
           final item = entry.value;
           final isLast = index == items.length - 1;
@@ -287,7 +283,8 @@ class SettingsList extends StatelessWidget {
                 onTap: () {
                   final title = (item['title'] as String?) ?? '';
                   // If this is the Saved Addresses item, show the saved address
-                  if (title == AppTranslations.getText('saved_addresses', language)) {
+                  if (title ==
+                      AppTranslations.getText('saved_addresses', language)) {
                     final current = CustomerSession.instance.currentCustomer;
                     final saved = current?.address?.trim();
                     final msg = (saved != null && saved.isNotEmpty)

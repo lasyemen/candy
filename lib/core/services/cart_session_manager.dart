@@ -609,8 +609,8 @@ class CartSessionManager {
         'customer_id': cart['customer_id'],
         // Keep status explicit
         'status': 'pending',
-  // New approval gate: default pending (removed automatically if column doesn't exist)
-  'approval_status': 'pending',
+        // New approval gate: default pending (removed automatically if column doesn't exist)
+        'approval_status': 'pending',
         // Amounts: provide both common variants for compatibility
         'total': orderTotal,
         'total_amount': orderTotal,
@@ -629,11 +629,7 @@ class CartSessionManager {
         Map<String, dynamic> body,
       ) async {
         // Do not remove these critical fields; if they are missing in DB, fail fast
-        const nonRemovable = {
-          'customer_id',
-          'total',
-          'total_amount',
-        };
+        const nonRemovable = {'customer_id', 'total', 'total_amount'};
 
         Map<String, dynamic> attemptBody = Map<String, dynamic>.from(body);
         String _norm(String s) => s.replaceAll(RegExp(r'_+'), '_');
@@ -644,6 +640,7 @@ class CartSessionManager {
           }
           return null;
         }
+
         for (int i = 0; i < 8; i++) {
           try {
             final inserted = await SupabaseService.instance.client
@@ -656,8 +653,9 @@ class CartSessionManager {
             final msg = e.toString();
             // If a NOT NULL constraint fails, try to populate sensible defaults
             final nullRegex = RegExp(
-                "null value in column '([^']+)' of relation 'orders'",
-                caseSensitive: false);
+              "null value in column '([^']+)' of relation 'orders'",
+              caseSensitive: false,
+            );
             final nullMatch = nullRegex.firstMatch(msg);
             if (nullMatch != null) {
               final missing = nullMatch.group(1);
@@ -707,8 +705,9 @@ class CartSessionManager {
             final match = regex.firstMatch(msg);
             if (match == null) {
               // Also handle variant: Could not find the '<name>' column of 'orders'
-              final regex2 =
-                  RegExp("Could not find the '([^']+)' column of 'orders'");
+              final regex2 = RegExp(
+                "Could not find the '([^']+)' column of 'orders'",
+              );
               final match2 = regex2.firstMatch(msg);
               final col2 = match2 != null ? match2.group(1) : null;
               if (col2 != null && !nonRemovable.contains(_norm(col2))) {
@@ -778,7 +777,9 @@ class CartSessionManager {
           const core = {'order_id', 'product_id', 'quantity'};
 
           // Attempt insert with retries by removing unknown columns
-          var attemptRows = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+          var attemptRows = rows
+              .map((r) => Map<String, dynamic>.from(r))
+              .toList();
           for (int i = 0; i < 6; i++) {
             try {
               await SupabaseService.instance.client
@@ -789,7 +790,9 @@ class CartSessionManager {
               final msg = e.toString();
               // Missing column patterns
               final re1 = RegExp("'([^']+)' column of 'order_items'");
-              final re2 = RegExp("Could not find the '([^']+)' column of 'order_items'");
+              final re2 = RegExp(
+                "Could not find the '([^']+)' column of 'order_items'",
+              );
               String? missing;
               final m1 = re1.firstMatch(msg);
               if (m1 != null) missing = m1.group(1);
@@ -805,7 +808,9 @@ class CartSessionManager {
               rethrow;
             }
           }
-          throw Exception('Failed to insert order items after resolving columns');
+          throw Exception(
+            'Failed to insert order items after resolving columns',
+          );
         }
 
         await _insertOrderItemsWithFallback(orderItemRows);

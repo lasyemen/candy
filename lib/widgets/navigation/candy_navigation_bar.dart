@@ -214,7 +214,7 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                             vertical: 4,
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: (widget.items ?? defaultItems).map((
                               item,
                             ) {
@@ -233,6 +233,7 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
                                 onTap: () => _onNavTap(item.pageIndex),
                                 badge: badge,
                                 isHome: item.isHome,
+                                language: language,
                               );
                             }).toList(),
                           ),
@@ -256,140 +257,154 @@ class _CandyNavigationBarState extends State<CandyNavigationBar>
     required VoidCallback onTap,
     int? badge,
     bool isHome = false,
+    String language = 'en',
   }) {
-    return RepaintBoundary(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Enhanced active background for home
-                  if (isHome)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      width: 56,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: DesignSystem.primaryGradient,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  // Icon with enhanced micro-interactions
-                  isHome
-                      ? Container(
-                          width: 56,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            gradient: DesignSystem.primaryGradient,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Center(
-                            child: AnimatedScale(
-                              scale: isActive ? 1.05 : 1.0,
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeOutCubic,
-                              child: Icon(icon, color: Colors.white, size: 20),
-                            ),
-                          ),
-                        )
-                      : isActive
-                      ? AnimatedScale(
-                          scale: isActive ? 1.05 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          child: Theme.of(context).brightness == Brightness.dark
-                              ? Icon(icon, color: Colors.white, size: 20)
-                              : ShaderMask(
-                                  shaderCallback: (Rect bounds) {
-                                    return DesignSystem.primaryGradient
-                                        .createShader(bounds);
-                                  },
-                                  blendMode: BlendMode.srcIn,
-                                  child: Icon(
-                                    icon,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                        )
-                      : AnimatedScale(
-                          scale: isActive ? 1.05 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          child: Icon(
-                            icon,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.grey[600],
-                            size: 24,
-                          ),
-                        ),
-                  // Enhanced badge with animation
-                  if (badge != null)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: AnimatedContainer(
+    return SizedBox(
+      width: 70, // Fixed width for all nav items for visual centering
+      child: RepaintBoundary(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Enhanced active background for home
+                    if (isHome)
+                      AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
+                        width: 56,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.red[500],
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red[500]!.withOpacity(0.3),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                          gradient: DesignSystem.primaryGradient,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    // Icon with enhanced micro-interactions
+                    isHome
+                        ? Container(
+                            width: 56,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: DesignSystem.primaryGradient,
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ],
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        child: Center(
-                          child: Text(
-                            badge.toString(),
-                            style: const TextStyle(
-                              fontFamily: 'Rubik',
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                            child: Center(
+                              child: AnimatedScale(
+                                scale: isActive ? 1.05 : 1.0,
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeOutCubic,
+                                child: Icon(
+                                  icon,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          )
+                        : isActive
+                        ? AnimatedScale(
+                            scale: isActive ? 1.05 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
+                            child:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Icon(icon, color: Colors.white, size: 20)
+                                : ShaderMask(
+                                    shaderCallback: (Rect bounds) {
+                                      return DesignSystem.primaryGradient
+                                          .createShader(bounds);
+                                    },
+                                    blendMode: BlendMode.srcIn,
+                                    child: Icon(
+                                      icon,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                          )
+                        : AnimatedScale(
+                            scale: isActive ? 1.05 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
+                            child: Icon(
+                              icon,
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.grey[600],
+                              size: 24,
+                            ),
+                          ),
+                    // Enhanced badge with animation
+                    if (badge != null)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red[500],
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red[500]!.withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Center(
+                            child: Consumer<AppSettings>(
+                              builder: (context, settings, _) => Text(
+                                badge.toString(),
+                                style: TextStyle(
+                                  fontFamily: settings.currentLanguage == 'en'
+                                      ? 'Inter'
+                                      : 'Rubik',
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                style: TextStyle(
-                  fontFamily: 'Rubik',
-                  fontSize: 10,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : (isActive ? DesignSystem.primary : Colors.grey[600]),
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  ],
                 ),
-                child: Text(label),
-              ),
-            ],
+                const SizedBox(height: 2),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  style: TextStyle(
+                    fontFamily: language == 'en' ? 'Inter' : 'Rubik',
+                    fontSize: 10,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : (isActive ? DesignSystem.primary : Colors.grey[600]),
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                  child: Text(label),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -84,7 +84,7 @@ mixin ProductDetailsScreenFunctions on State<ProductDetailsScreen> {
           child: Text(
             AppTranslations.getText(
               'add_to_cart',
-              Provider.of<AppSettings>(context, listen: false).currentLanguage,
+              Provider.of<AppSettings>(context).currentLanguage,
             ),
             style: const TextStyle(
               fontSize: 16,

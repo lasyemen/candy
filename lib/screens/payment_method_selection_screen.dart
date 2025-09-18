@@ -57,9 +57,9 @@ class _PaymentMethodSelectionScreenState
 
   @override
   Widget build(BuildContext context) {
-  final double amount = (_resolvedTotal ?? widget.orderTotal ?? 0) > 0
-    ? (_resolvedTotal ?? widget.orderTotal)!
-    : 120;
+    final double amount = (_resolvedTotal ?? widget.orderTotal ?? 0) > 0
+        ? (_resolvedTotal ?? widget.orderTotal)!
+        : 120;
 
     final bool isAr = Localizations.localeOf(context).languageCode == 'ar';
     final String titleText = isAr
@@ -265,20 +265,18 @@ class _PaymentMethodSelectionScreenState
                             try {
                               final summary = await CartSessionManager.instance
                                   .getCartSummary();
-                              final total = (summary['total'] as double?) ??
+                              final total =
+                                  (summary['total'] as double?) ??
                                   (_resolvedTotal ?? 0.0);
                               final orderId = await CartSessionManager.instance
                                   .checkout(
-                                deliveryData: widget.deliveryData,
-                                paymentMethod: 'cod',
-                              );
+                                    deliveryData: widget.deliveryData,
+                                    paymentMethod: 'cod',
+                                  );
                               if (!mounted) return;
                               Navigator.of(context).pushReplacementNamed(
                                 AppRoutes.thankYou,
-                                arguments: {
-                                  'total': total,
-                                  'orderId': orderId,
-                                },
+                                arguments: {'total': total, 'orderId': orderId},
                               );
                             } catch (e) {
                               if (mounted) {

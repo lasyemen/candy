@@ -6,6 +6,7 @@ part 'products.g.dart';
 class Products {
   final String id;
   final String name;
+  final String? translationKey;
   final String? description;
   final double price;
   final String category;
@@ -23,8 +24,9 @@ class Products {
   final DateTime updatedAt;
 
   Products({
-    required this.id,
-    required this.name,
+  required this.id,
+  required this.name,
+  this.translationKey,
     this.description,
     required this.price,
     required this.category,
@@ -38,6 +40,6 @@ class Products {
   });
 
   factory Products.fromJson(Map<String, dynamic> json) =>
-      _$ProductsFromJson(json);
+    _$ProductsFromJson(json);
   Map<String, dynamic> toJson() => _$ProductsToJson(this);
 }

@@ -303,12 +303,12 @@ class _CardPaymentScreenState extends State<CardPaymentScreen>
                   // Use authoritative cart total from server before checkout
                   final cartSummary = await CartSessionManager.instance
                       .getCartSummary();
-                  final cartTotal =
-                      (cartSummary['total'] as double?) ?? amount;
+                  final cartTotal = (cartSummary['total'] as double?) ?? amount;
 
                   // get deliveryData from route args if available
-                  final args = ModalRoute.of(context)?.settings.arguments
-                      as Map<String, dynamic>?;
+                  final args =
+                      ModalRoute.of(context)?.settings.arguments
+                          as Map<String, dynamic>?;
                   final deliveryData =
                       args?['deliveryData'] as Map<String, dynamic>?;
 

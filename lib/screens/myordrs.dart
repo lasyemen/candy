@@ -12,16 +12,27 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/constants/design_system.dart';
 import 'package:provider/provider.dart';
 import '../core/services/app_settings.dart';
+import '../core/i18n/product_dictionary.dart';
 import '../core/constants/translations.dart';
 part 'functions/myordrs.functions.dart';
 
 // Map order status (enum/text) to a 0..3 step index for the timeline
 int _stepForStatus(String statusRaw) {
   final s = statusRaw.toLowerCase();
-  if (s == 'delivery_done' || s.contains('تم التوصيل') || s.contains('delivered')) return 3;
-  if (s == 'delivering' || s.contains('التوصيل') || s.contains('out_for_delivery')) return 2;
-  if (s == 'choose_delivery_captain' || s.contains('اختيار') || s.contains('driver')) return 1;
-  if (s == 'review_order' || s.contains('review') || s.contains('مراجعة')) return 0;
+  if (s == 'delivery_done' ||
+      s.contains('تم التوصيل') ||
+      s.contains('delivered'))
+    return 3;
+  if (s == 'delivering' ||
+      s.contains('التوصيل') ||
+      s.contains('out_for_delivery'))
+    return 2;
+  if (s == 'choose_delivery_captain' ||
+      s.contains('اختيار') ||
+      s.contains('driver'))
+    return 1;
+  if (s == 'review_order' || s.contains('review') || s.contains('مراجعة'))
+    return 0;
   if (s == 'accept' || s.contains('accept') || s.contains('قبول')) return 0;
   return 0;
 }
@@ -97,6 +108,16 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
           itemsList = itemsRaw.map((e) => e.toString()).toList();
         }
 
+        // Ensure item names reflect selected language (convert AR -> EN when needed)
+        try {
+          final lang = Provider.of<AppSettings>(context, listen: false).currentLanguage;
+          if (lang == 'en') {
+            itemsList = itemsList
+                .map((s) => ProductDictionary.translateName(s, 'en'))
+                .toList();
+          }
+        } catch (_) {}
+
         Color? statusColor;
         final sc = r['status_color'] ?? r['statusColor'];
         if (sc != null) {
@@ -133,47 +154,48 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             _driverVal = null;
         }
 
-    // attempt to extract driver phone from multiple possible shapes
-    dynamic _driverPhoneRaw =
-      r['driver_phone'] ??
-      r['driverPhone'] ??
-      r['driver_mobile'] ??
-      r['driverMobile'] ??
-      r['driver_number'] ??
-      r['driverNumber'] ??
-      r['phone'] ??
-      r['phone_number'] ??
-      r['phoneNumber'] ??
-      r['mobile'] ??
-      r['mobile_number'] ??
-      r['mobileNumber'] ??
-      r['contact_phone'] ??
-      r['contactPhone'] ??
-      r['contact_number'] ??
-      r['contactNumber'] ??
-      r['driver_phone_no'] ??
-      r['driverPhoneNo'] ??
-      r['driver_phone_number'] ??
-      r['driverPhoneNumber'] ??
-      r['driver_contact'] ??
-      r['driverContact'];
+        // attempt to extract driver phone from multiple possible shapes
+        dynamic _driverPhoneRaw =
+            r['driver_phone'] ??
+            r['driverPhone'] ??
+            r['driver_mobile'] ??
+            r['driverMobile'] ??
+            r['driver_number'] ??
+            r['driverNumber'] ??
+            r['phone'] ??
+            r['phone_number'] ??
+            r['phoneNumber'] ??
+            r['mobile'] ??
+            r['mobile_number'] ??
+            r['mobileNumber'] ??
+            r['contact_phone'] ??
+            r['contactPhone'] ??
+            r['contact_number'] ??
+            r['contactNumber'] ??
+            r['driver_phone_no'] ??
+            r['driverPhoneNo'] ??
+            r['driver_phone_number'] ??
+            r['driverPhoneNumber'] ??
+            r['driver_contact'] ??
+            r['driverContact'];
         String? _driverPhoneVal;
-  if (_driverPhoneRaw == null && _driverRaw is Map) {
-    final m = _driverRaw;
-    _driverPhoneVal = (m['phone'] ??
-      m['phone_number'] ??
-      m['phoneNumber'] ??
-      m['mobile'] ??
-      m['mobile_number'] ??
-      m['mobileNumber'] ??
-      m['contact_phone'] ??
-      m['contactPhone'] ??
-      m['number'] ??
-      m['driver_phone'] ??
-      m['driverPhone'] ??
-      m['driver_mobile'] ??
-      m['driverMobile'])
-        ?.toString();
+        if (_driverPhoneRaw == null && _driverRaw is Map) {
+          final m = _driverRaw;
+          _driverPhoneVal =
+              (m['phone'] ??
+                      m['phone_number'] ??
+                      m['phoneNumber'] ??
+                      m['mobile'] ??
+                      m['mobile_number'] ??
+                      m['mobileNumber'] ??
+                      m['contact_phone'] ??
+                      m['contactPhone'] ??
+                      m['number'] ??
+                      m['driver_phone'] ??
+                      m['driverPhone'] ??
+                      m['driver_mobile'] ??
+                      m['driverMobile'])
+                  ?.toString();
         } else if (_driverPhoneRaw != null) {
           _driverPhoneVal = _driverPhoneRaw.toString();
         }
@@ -188,6 +210,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             final s = v.toString().trim();
             if (s.isNotEmpty) concat += ' $s';
           }
+
           addText(r['driver']);
           addText(r['driver_name']);
           addText(r['driverName']);
@@ -201,15 +224,19 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             addText(_driverRaw['contact']);
           }
           // Regex: match +966 XX XXX XXXX, 05XXXXXXXX, or 9-12 digit sequences
-          final reg = RegExp(r'(?:\+?966\s?\d{1,2}\s?\d{3}\s?\d{4}|05\d{8}|\d{9,12})');
+          final reg = RegExp(
+            r'(?:\+?966\s?\d{1,2}\s?\d{3}\s?\d{4}|05\d{8}|\d{9,12})',
+          );
           final m = reg.firstMatch(concat);
           if (m != null) {
             _driverPhoneVal = m.group(0);
           }
         }
-  // Debug: surface detected driver phone for first few rows
-  // ignore: avoid_print
-  print('MyOrdersScreen - parsed driverPhone: \\u200E${_driverPhoneVal ?? '(none)'}');
+        // Debug: surface detected driver phone for first few rows
+        // ignore: avoid_print
+        print(
+          'MyOrdersScreen - parsed driverPhone: \\u200E${_driverPhoneVal ?? '(none)'}',
+        );
 
         return {
           'id': r['id']?.toString() ?? '',
@@ -324,6 +351,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
       final s = (o['status']?.toString() ?? '').toLowerCase();
       return s == 'delivery_done' || s == 'تم التوصيل' || s == 'delivered';
     }
+
     final unfilteredCurrent = _allOrders.where((o) => !isDelivered(o)).toList();
     final unfilteredPrevious = _allOrders.where(isDelivered).toList();
     final current = _filterList(unfilteredCurrent);
@@ -514,7 +542,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             Expanded(
               child: Text(
                 'تمت إضافة منتجات ${order['id']} إلى السلة',
-                style: const TextStyle(fontFamily: 'Rubik'),
+                style: TextStyle(
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en'
+                      ? 'Inter'
+                      : 'Rubik',
+                ),
               ),
             ),
           ],
@@ -823,11 +855,11 @@ class _LiveOrderCard extends StatelessWidget {
     final rawDriver =
         order['driver'] ?? order['driver_name'] ?? order['driverName'];
     String? driver = rawDriver?.toString();
-  // vehicle omitted in the compact driver layout
+    // vehicle omitted in the compact driver layout
     final String driverDisplay = (driver != null && driver.isNotEmpty)
         ? driver
         : 'سامي';
-  // vehicle not shown in the new compact layout
+    // vehicle not shown in the new compact layout
 
     final cardWidth =
         double.infinity; // fill available width to match nav bar margins
@@ -869,43 +901,60 @@ class _LiveOrderCard extends StatelessWidget {
                       String key;
                       if (s == 'accept' || s == 'accepted' || s == 'قبول') {
                         key = 'status_accept';
-                      } else if (s == 'review_order' || s.contains('review') || s.contains('مراجعة')) {
+                      } else if (s == 'review_order' ||
+                          s.contains('review') ||
+                          s.contains('مراجعة')) {
                         key = 'status_review_order';
-                      } else if (s == 'choose_delivery_captain' || s.contains('choose') || s.contains('driver') || s.contains('اختيار')) {
+                      } else if (s == 'choose_delivery_captain' ||
+                          s.contains('choose') ||
+                          s.contains('driver') ||
+                          s.contains('اختيار')) {
                         key = 'status_choose_delivery_captain';
-                      } else if (s == 'delivering' || s.contains('delivery') || s.contains('التوصيل')) {
+                      } else if (s == 'delivering' ||
+                          s.contains('delivery') ||
+                          s.contains('التوصيل')) {
                         key = 'status_delivering';
-                      } else if (s == 'delivery_done' || s.contains('delivered') || s.contains('تم التوصيل')) {
+                      } else if (s == 'delivery_done' ||
+                          s.contains('delivered') ||
+                          s.contains('تم التوصيل')) {
                         key = 'status_delivery_done';
-                      } else if (s.contains('pending') || statusRaw.contains('قيد')) {
+                      } else if (s.contains('pending') ||
+                          statusRaw.contains('قيد')) {
                         key = 'status_pending';
                       } else {
                         key = 'status_unknown';
                       }
-            final lang = Provider.of<AppSettings>(context, listen: false).currentLanguage;
-            final displayStatus = AppTranslations.getText(key, lang);
-            final isPending = (key == 'status_pending');
-            const red = Color(0xFFEF4444);
-            return Container(
+                      final lang = Provider.of<AppSettings>(
+                        context,
+                        listen: true,
+                      ).currentLanguage;
+                      final displayStatus = AppTranslations.getText(key, lang);
+                      final isPending = (key == 'status_pending');
+                      const red = Color(0xFFEF4444);
+                      return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-              color: isPending ? cardColor : color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: isPending ? Border.all(color: red, width: 1.5) : null,
+                          color: isPending
+                              ? cardColor
+                              : color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: isPending
+                              ? Border.all(color: red, width: 1.5)
+                              : null,
                         ),
                         child: Text(
                           displayStatus,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                color: isPending ? red : color,
+                                color: isPending ? red : color,
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
                       );
-          },
+                    },
                   ),
                 ],
               ),
@@ -921,7 +970,10 @@ class _LiveOrderCard extends StatelessWidget {
               const SizedBox(height: 12),
 
               // Timeline with connected dots/lines + aligned labels
-              _OrderTimeline(step: _stepForStatus((order['status']?.toString() ?? '')), accent: color),
+              _OrderTimeline(
+                step: _stepForStatus((order['status']?.toString() ?? '')),
+                accent: color,
+              ),
               // spacing between timeline and driver row
               const SizedBox(height: 10),
 
@@ -952,29 +1004,30 @@ class _LiveOrderCard extends StatelessWidget {
                         Text(
                           driverDisplay,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
+                          style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
-                        Builder(builder: (context) {
-                          final dp = (order['driverPhone']?.toString() ?? '').trim();
-                          final phoneToShow = dp.isEmpty ? '+966 55 123 4567' : dp;
-                          return Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Text(
-                              phoneToShow,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: scheme.onSurface.withOpacity(0.7),
-                                  ),
-                            ),
-                          );
-                        }),
+                        Builder(
+                          builder: (context) {
+                            final dp = (order['driverPhone']?.toString() ?? '')
+                                .trim();
+                            final phoneToShow = dp.isEmpty
+                                ? '+966 55 123 4567'
+                                : dp;
+                            return Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Text(
+                                phoneToShow,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: scheme.onSurface.withOpacity(0.7),
+                                    ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -994,7 +1047,7 @@ class _LiveOrderCard extends StatelessWidget {
                         child: InkWell(
                           onTap: () => onCallDriver(id),
                           borderRadius: BorderRadius.circular(12),
-                          child: const Center(
+                          child: Center(
                             child: Icon(
                               FontAwesomeIcons.phone,
                               size: 16,
@@ -1021,7 +1074,7 @@ class _LiveOrderCard extends StatelessWidget {
                         child: InkWell(
                           onTap: () => onTrack(id),
                           borderRadius: BorderRadius.circular(12),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'تتبُّع',
                               style: TextStyle(
@@ -1057,18 +1110,19 @@ class _OrderTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const labels = [
-      'مراجعة\nالطلب',
-  'اختيار\nموصل',
-      'جاري\nالتوصيل',
-      'تم\nالتوصيل',
+    final lang = Provider.of<AppSettings>(context, listen: true).currentLanguage;
+    final labels = [
+      AppTranslations.getText('review_order', lang),
+      AppTranslations.getText('choose_delivery_captain', lang),
+      AppTranslations.getText('delivering', lang),
+      AppTranslations.getText('delivery_done', lang),
     ];
 
     const double dotSize = 18.0;
     const double stroke = 1.6;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: lang == 'en' ? TextDirection.ltr : TextDirection.rtl,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;

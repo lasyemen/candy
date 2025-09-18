@@ -163,7 +163,7 @@ class _SignInScreenState extends State<SignInScreen>
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: language == 'en'
-                              ? 'SFProDisplay'
+                              ? 'Inter'
                               : 'Rubik',
                           fontSize: 20,
                           color: Theme.of(context).brightness == Brightness.dark
@@ -186,7 +186,7 @@ class _SignInScreenState extends State<SignInScreen>
                               language == 'en' ? 'Phone number' : 'رقم الهاتف',
                               style: TextStyle(
                                 fontFamily: language == 'en'
-                                    ? 'SFProDisplay'
+                                    ? 'Inter'
                                     : 'Rubik',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -280,7 +280,7 @@ class _SignInScreenState extends State<SignInScreen>
                                   language == 'en' ? 'Sign In' : 'تسجيل الدخول',
                                   style: TextStyle(
                                     fontFamily: language == 'en'
-                                        ? 'SFProDisplay'
+                                        ? 'Inter'
                                         : 'Rubik',
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -302,7 +302,7 @@ class _SignInScreenState extends State<SignInScreen>
                                 : 'ليس لديك حساب؟ ',
                             style: TextStyle(
                               fontFamily: language == 'en'
-                                  ? 'SFProDisplay'
+                                  ? 'Inter'
                                   : 'Rubik',
                               fontSize: 12,
                               color:
@@ -326,7 +326,7 @@ class _SignInScreenState extends State<SignInScreen>
                                     : 'إنشاء حساب',
                                 style: TextStyle(
                                   fontFamily: language == 'en'
-                                      ? 'SFProDisplay'
+                                      ? 'Inter'
                                       : 'Rubik',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,

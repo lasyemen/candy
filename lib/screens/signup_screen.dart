@@ -352,7 +352,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: language == 'en'
-                              ? 'SFProDisplay'
+                              ? 'Inter'
                               : 'Rubik',
                           fontSize: 20,
                           color: Theme.of(context).brightness == Brightness.dark

@@ -4,7 +4,11 @@ class SliverTitleAppBar extends StatelessWidget {
   final String title;
   final Color? backgroundColor;
 
-  const SliverTitleAppBar({super.key, required this.title, this.backgroundColor});
+  const SliverTitleAppBar({
+    super.key,
+    required this.title,
+    this.backgroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +16,8 @@ class SliverTitleAppBar extends StatelessWidget {
       expandedHeight: 80,
       floating: false,
       pinned: true,
-      backgroundColor: backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor:
+          backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
@@ -25,9 +30,9 @@ class SliverTitleAppBar extends StatelessWidget {
                 title,
                 textAlign: TextAlign.right,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onBackground,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: Theme.of(context).colorScheme.onBackground,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -45,5 +50,3 @@ class SliverTitleAppBar extends StatelessWidget {
     );
   }
 }
-
-

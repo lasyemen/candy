@@ -11,6 +11,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../blocs/app_bloc.dart';
 import '../core/constants/design_system.dart';
 import '../core/constants/translations.dart';
+import '../core/i18n/product_localizations.dart';
 // import '../core/constants/app_colors.dart';
 import '../core/services/app_settings.dart';
 import '../widgets/riyal_icon.dart';

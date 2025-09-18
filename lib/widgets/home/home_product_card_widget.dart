@@ -10,7 +10,7 @@ import '../../core/constants/design_system.dart';
 import '../../core/routes/app_routes.dart';
 import '../riyal_icon.dart';
 import '../../core/services/rating_service.dart';
-import '../../core/i18n/product_dictionary.dart';
+import '../../core/i18n/product_localizations.dart';
 import '../../core/services/app_settings.dart';
 import 'package:provider/provider.dart';
 
@@ -152,8 +152,8 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                               children: [
                                 // Product Name with Modern Typography
                                 Text(
-                                  ProductDictionary.translateName(
-                                    widget.product.name,
+                                  ProductLocalizations.nameFor(
+                                    widget.product,
                                     language,
                                   ),
                                   maxLines: 2,
@@ -166,7 +166,7 @@ class _HomeProductCardWidgetState extends State<HomeProductCardWidget> {
                                         : const Color(0xFF1F2937),
                                     height: 1.3,
                                     fontFamily: language == 'en'
-                                        ? 'SFProDisplay'
+                                        ? 'Inter'
                                         : null,
                                   ),
                                 ),

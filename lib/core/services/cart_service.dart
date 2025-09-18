@@ -437,9 +437,20 @@ class CartService {
     try {
       final response = await SupabaseService.instance.client
           .from('cart_items')
-          .select('*, products(*)')
+          .select('*, products(*, translation_key)')
           .eq('cart_id', cartId);
 
+      // Patch: If translation_key is missing, add it heuristically
+      for (final item in response) {
+        final product = item['products'] as Map<String, dynamic>?;
+        if (product != null && (product['translation_key'] == null || product['translation_key'].toString().isEmpty)) {
+          final name = product['name'] ?? '';
+          if (name.contains('330')) product['translation_key'] = 'product_name_1';
+          else if (name.contains('200')) product['translation_key'] = 'product_name_2';
+          else if (name.contains('500')) product['translation_key'] = 'product_name_3';
+          else if (name.contains('1')) product['translation_key'] = 'product_name_4';
+        }
+      }
       return response;
     } catch (e) {
       throw Exception('Error fetching cart items: $e');

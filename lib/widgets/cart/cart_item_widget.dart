@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../riyal_icon.dart';
 import '../../core/services/app_settings.dart';
-import '../../core/i18n/product_dictionary.dart';
+import '../../core/i18n/product_localizations.dart';
 
 class CartItemWidget extends StatelessWidget {
   final Map<String, dynamic> item;
@@ -22,7 +22,8 @@ class CartItemWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final language = context.watch<AppSettings>().currentLanguage;
     final rawName = item['name'] as String;
-    final name = ProductDictionary.translateName(rawName, language);
+    final id = (item['product_id'] ?? item['id'] ?? '').toString();
+    final name = ProductLocalizations.nameForId(id, rawName, language);
     final price = item['price'] as double;
     final quantity = item['quantity'] as int;
     final image = item['image'] as String;
@@ -48,12 +49,7 @@ class CartItemWidget extends StatelessWidget {
           // Product Image
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Image.asset(
-              image,
-              width: 72,
-              height: 72,
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset(image, width: 72, height: 72, fit: BoxFit.cover),
           ),
           const SizedBox(width: 12),
           // Product Info
@@ -63,10 +59,10 @@ class CartItemWidget extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    fontFamily: 'Rubik',
+                    fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -206,7 +202,8 @@ class CartItemWidget extends StatelessWidget {
       listen: false,
     ).currentLanguage;
     final rawName = item['name'] as String;
-    final name = ProductDictionary.translateName(rawName, language);
+    final id = (item['product_id'] ?? item['id'] ?? '').toString();
+    final name = ProductLocalizations.nameForId(id, rawName, language);
     final price = item['price'] as double;
     final quantity = item['quantity'] as int;
     final image = item['image'] as String;
@@ -267,8 +264,8 @@ class CartItemWidget extends StatelessWidget {
               // Product Name
               Text(
                 name,
-                style: const TextStyle(
-                  fontFamily: 'Rubik',
+                style: TextStyle(
+                  fontFamily: Localizations.localeOf(context).languageCode == 'en' ? 'Inter' : 'Rubik',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,

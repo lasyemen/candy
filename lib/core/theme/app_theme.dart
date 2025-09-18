@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class AppTheme {
   static ThemeData lightFor(String language) => ThemeData(
     brightness: Brightness.light,
-    fontFamily: 'Rubik',
+    fontFamily: language == 'en' ? 'Inter' : 'Rubik',
     primarySwatch: Colors.purple,
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: AppBarTheme(
@@ -11,7 +11,7 @@ class AppTheme {
       elevation: 0,
       iconTheme: const IconThemeData(color: Colors.black87),
       titleTextStyle: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontSize: 18,
         fontWeight: language == 'ar' ? FontWeight.w900 : FontWeight.bold,
         color: Colors.black87,
@@ -19,47 +19,47 @@ class AppTheme {
     ),
     textTheme: TextTheme(
       bodyLarge: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       bodyMedium: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       bodySmall: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       titleLarge: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       titleMedium: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       titleSmall: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       labelLarge: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       labelMedium: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
       labelSmall: TextStyle(
-        fontFamily: 'Rubik',
+        fontFamily: language == 'en' ? 'Inter' : 'Rubik',
         fontWeight: language == 'ar' ? FontWeight.w900 : null,
         color: Colors.black87,
       ),
@@ -73,7 +73,7 @@ class AppTheme {
 
     return ThemeData(
       brightness: Brightness.dark,
-      fontFamily: 'Rubik',
+      fontFamily: language == 'en' ? 'Inter' : 'Rubik',
       scaffoldBackgroundColor: background,
       canvasColor: background,
       cardColor: surface,
@@ -90,7 +90,7 @@ class AppTheme {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontSize: 18,
           fontWeight: language == 'ar' ? FontWeight.w900 : FontWeight.bold,
           color: Colors.white,
@@ -111,7 +111,7 @@ class AppTheme {
           color: Colors.white,
         ),
         contentTextStyle: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w900 : null,
           color: onSurface,
           fontSize: 14,
@@ -119,47 +119,47 @@ class AppTheme {
       ),
       textTheme: TextTheme(
         bodyLarge: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w700 : null,
           color: Colors.white,
         ),
         bodyMedium: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w700 : null,
           color: Colors.white,
         ),
         bodySmall: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w700 : null,
           color: Colors.white,
         ),
         titleLarge: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w900 : null,
           color: Colors.white,
         ),
         titleMedium: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w900 : null,
           color: Colors.white,
         ),
         titleSmall: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w900 : null,
           color: Colors.white,
         ),
         labelLarge: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w800 : null,
           color: Colors.white,
         ),
         labelMedium: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w800 : null,
           color: Colors.white,
         ),
         labelSmall: TextStyle(
-          fontFamily: 'Rubik',
+          fontFamily: language == 'en' ? 'Inter' : 'Rubik',
           fontWeight: language == 'ar' ? FontWeight.w800 : null,
           color: Colors.white,
         ),

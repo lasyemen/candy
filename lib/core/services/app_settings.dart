@@ -20,8 +20,8 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    // Load saved language; default to Arabic for Arabic-first experience
-    _currentLanguage = prefs.getString(_languageKey) ?? 'ar';
+    // Load saved language; default to English if none saved
+    _currentLanguage = prefs.getString(_languageKey) ?? 'en';
     final themeString = prefs.getString(_themeKey) ?? 'light';
     _currentTheme = _getThemeModeFromString(themeString);
     _taqnyatBearerToken = prefs.getString(_taqnyatTokenKey);

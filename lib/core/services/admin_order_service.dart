@@ -12,10 +12,13 @@ class AdminOrderService {
   }) async {
     final client = SupabaseService.instance.client;
     // Update status to approved
-    await client.from('orders').update({
-      'status': 'approved',
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', orderId);
+    await client
+        .from('orders')
+        .update({
+          'status': 'approved',
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', orderId);
 
     // Insert status history entry (best-effort)
     try {
